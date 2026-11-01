@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { SUITS, RANKS, sortHand, cardLabel } from './lib/cards.js';
 import { readCards, loadCardReader } from './lib/cardVision.js';
+import { learnedModel, pickCards, rememberHand, forgetLearning } from './lib/learning.js';
 import { Sheet, Icon, PlayingCard } from './components.jsx';
 
 const STEPS = {
@@ -15,6 +16,10 @@ export default function ScanCards({ name, initial, played = [], onSend, onClose 
   const [photo, setPhoto] = useState(null);
   const [step, setStep] = useState(null);
   const [msg, setMsg] = useState(null);
+  const [mixups, setMixups] = useState([]);
+  // Every photo's scores this time, remembered with the final checked hand so the reader learns.
+  const [scans, setScans] = useState([]);
+  const [learned, setLearned] = useState(() => learnedModel().count);
   const busy = Boolean(step);
 
   // Start the one-time model download while they deal and lay out the cards.
@@ -30,9 +35,12 @@ export default function ScanCards({ name, initial, played = [], onSend, onClose 
     setUnsure([]);
     const started = Date.now();
     try {
-      const found = await readCards(file, setStep);
+      const { scores } = await readCards(file, setStep);
+      const found = pickCards(scores, learnedModel().model);
+      setScans((all) => [...all, scores]);
       setCards(sortHand(found.cards));
       setUnsure(found.unsure);
+      setMixups(found.mixups);
       const secs = Math.round((Date.now() - started) / 1000);
       const check = found.unsure.length ? ' Cards with a dotted outline might be in the hand too: tap to add them.' : '';
       setMsg(found.cards.length === 13
@@ -49,7 +57,13 @@ export default function ScanCards({ name, initial, played = [], onSend, onClose 
   const toggle = (code) => setCards((cs) => (cs.includes(code) ? cs.filter((c) => c !== code) : sortHand([...cs, code])));
   const send = () => {
     if (cards.length !== 13 && !confirm(`That's ${cards.length} cards, not 13. Send anyway?`)) return;
+    if (cards.length === 13) scans.forEach((scores) => rememberHand(scores, cards));
     onSend(cards);
+  };
+  const startOver = () => {
+    if (!confirm('Forget everything the card reader has learned on this phone?')) return;
+    forgetLearning();
+    setLearned(0);
   };
 
   return (
@@ -69,6 +83,11 @@ export default function ScanCards({ name, initial, played = [], onSend, onClose 
       {photo && <img className="scan-photo" src={photo} alt={`Photo of ${name}'s cards`} />}
       {busy && <div className="reading"><span className="spinner" /> {STEPS[step]}</div>}
       {msg && <div className={`scan-msg${msg.ok ? ' ok' : ''}`}>{msg.text}</div>}
+      {mixups.length > 0 && (
+        <div className="scan-msg">
+          This phone often mixes up {mixups.map(([x, y]) => `${cardLabel(x)} and ${cardLabel(y)}`).join(', ')}. Check which one it is.
+        </div>
+      )}
 
       <div className="section-title row between">
         <span>{name}'s hand</span>
@@ -98,7 +117,17 @@ export default function ScanCards({ name, initial, played = [], onSend, onClose 
           </div>
         ))}
       </div>
-      <p className="footnote">Tap a card to add or remove it. The photo is read on this phone and isn't sent or saved anywhere. Works best with cards spread flat in good light.</p>
+      <p className="footnote">
+        Tap a card to add or remove it. The photo is read on this phone and isn't sent or saved anywhere.
+        Works best with cards spread flat in good light.
+      </p>
+      <p className="footnote">
+        <b>It learns from your fixes.</b> Each time you send a checked hand of 13, it remembers what it got
+        wrong with your cards and lighting.{' '}
+        {learned > 0
+          ? <>Learned from {learned} hand{learned === 1 ? '' : 's'} so far. <button type="button" className="inline-link" onClick={startOver}>Start over</button></>
+          : 'Nothing learned yet.'}
+      </p>
     </Sheet>
   );
 }

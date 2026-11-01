@@ -238,6 +238,7 @@ button.hand-row:active { transform: scale(0.99); }
 .link { background: none; border: 0; color: var(--primary); font-size: 17px; padding: 8px 4px; }
 .link.bold { font-weight: 800; }
 .link:disabled { opacity: 0.4; }
+.inline-link { background: none; border: 0; padding: 0; color: var(--primary); font-weight: 700; text-decoration: underline; font-size: inherit; }
 .danger-link { display: block; margin: 24px auto 8px; background: none; border: 0; color: var(--neg); font-size: 17px; font-weight: 700; padding: 10px; }
 
 /* − number + */

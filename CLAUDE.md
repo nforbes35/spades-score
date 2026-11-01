@@ -24,6 +24,10 @@ plain words, keep text large and buttons big, check every screen fits a 320px ph
   worker). Model `public/models/cards-gen3.onnx` = sroot/lgd-cards-gen3 on Hugging Face (corner detector,
   52 classes, AGPL-3.0, details in `public/models/README.txt`). Because of AGPL the repo is public and
   the menu links to it. Tested only on drawn cards (about 8 of 13); the person fixes misses on the grid.
+- Learning from fixes (`src/lib/learning.js`): every sent, checked 13-card hand stores (scores, real hand)
+  in localStorage (last 150). Each card gets its own score adjustment (2 numbers, Newton fit, held toward
+  zero so it takes ~2 agreeing hands), plus learned look-alike mix-ups shown as "check which one".
+  Simulated quirky deck: fixes per hand drop by about half. The model file itself is never retrained.
 
 ## Commands
 - Run locally: `npm run dev` (http://localhost:5180)
