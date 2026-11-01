@@ -1,53 +1,48 @@
-import { useState } from 'react';
-import { SUITS, RANKS, isCard, sortHand, cardLabel } from './lib/cards.js';
+import { useEffect, useState } from 'react';
+import { SUITS, RANKS, sortHand, cardLabel } from './lib/cards.js';
+import { readCards, loadCardReader } from './lib/cardVision.js';
 import { Sheet, Icon, PlayingCard } from './components.jsx';
 
-const MAX_SIDE = 1568;
-
-/** Shrink a phone photo before sending it (faster, and well under upload limits). */
-async function shrink(file) {
-  const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
-  const scale = Math.min(1, MAX_SIDE / Math.max(bitmap.width, bitmap.height));
-  const canvas = document.createElement('canvas');
-  canvas.width = Math.round(bitmap.width * scale);
-  canvas.height = Math.round(bitmap.height * scale);
-  canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-  const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
-  return { dataUrl, base64: dataUrl.split(',')[1] };
-}
+const STEPS = {
+  loading: 'Getting the card reader ready (first time only)…',
+  reading: 'Reading the cards…',
+};
 
 /** Photograph the remote player's dealt cards, check them, and send them to their phone. */
 export default function ScanCards({ name, initial, played = [], onSend, onClose }) {
   const [cards, setCards] = useState(initial ?? []);
+  const [unsure, setUnsure] = useState([]);
   const [photo, setPhoto] = useState(null);
-  const [busy, setBusy] = useState(false);
+  const [step, setStep] = useState(null);
   const [msg, setMsg] = useState(null);
+  const busy = Boolean(step);
+
+  // Start the one-time model download while they deal and lay out the cards.
+  useEffect(() => { loadCardReader().catch(() => {}); }, []);
+  useEffect(() => () => { if (photo) URL.revokeObjectURL(photo); }, [photo]);
 
   async function onFile(e) {
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file) return;
-    setBusy(true);
+    setPhoto(URL.createObjectURL(file));
     setMsg(null);
+    setUnsure([]);
+    const started = Date.now();
     try {
-      const { dataUrl, base64 } = await shrink(file);
-      setPhoto(dataUrl);
-      const res = await fetch('/api/read-cards', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ image: base64, mediaType: 'image/jpeg' }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || 'Couldn’t read the photo.');
-      const found = sortHand((data.cards ?? []).filter(isCard));
-      setCards(found);
-      setMsg(found.length === 13
-        ? { ok: true, text: 'Found all 13. Check they match, then send.' }
-        : { text: `Found ${found.length}. Tap cards below to add or remove until there are 13.` });
+      const found = await readCards(file, setStep);
+      setCards(sortHand(found.cards));
+      setUnsure(found.unsure);
+      const secs = Math.round((Date.now() - started) / 1000);
+      const check = found.unsure.length ? ' Cards with a dotted outline might be in the hand too: tap to add them.' : '';
+      setMsg(found.cards.length === 13
+        ? { ok: true, text: `Found all 13 in ${secs} seconds. Check they match, then send.` }
+        : { text: `Found ${found.cards.length}. Tap cards below to add or remove until there are 13.${check}` });
     } catch (err) {
-      setMsg({ text: `${err.message} You can tap ${name}'s cards in below instead.` });
+      console.warn('card reading failed', err);
+      setMsg({ text: `Couldn’t read the photo on this phone. Tap ${name}'s cards in below instead.` });
     } finally {
-      setBusy(false);
+      setStep(null);
     }
   }
 
@@ -72,7 +67,7 @@ export default function ScanCards({ name, initial, played = [], onSend, onClose 
       </div>
 
       {photo && <img className="scan-photo" src={photo} alt={`Photo of ${name}'s cards`} />}
-      {busy && <div className="reading"><span className="spinner" /> Reading the cards…</div>}
+      {busy && <div className="reading"><span className="spinner" /> {STEPS[step]}</div>}
       {msg && <div className={`scan-msg${msg.ok ? ' ok' : ''}`}>{msg.text}</div>}
 
       <div className="section-title row between">
@@ -95,7 +90,7 @@ export default function ScanCards({ name, initial, played = [], onSend, onClose 
                 const on = cards.includes(code);
                 const used = played.includes(code);
                 return (
-                  <button key={code} type="button" className={`rank-btn${on ? ' on' : ''}${suit.red ? ' red' : ''}`}
+                  <button key={code} type="button" className={`rank-btn${on ? ' on' : ''}${suit.red ? ' red' : ''}${!on && unsure.includes(code) ? ' maybe' : ''}`}
                     aria-pressed={on} aria-label={cardLabel(code)} disabled={used} onClick={() => toggle(code)}>{rank}</button>
                 );
               })}
@@ -103,7 +98,7 @@ export default function ScanCards({ name, initial, played = [], onSend, onClose 
           </div>
         ))}
       </div>
-      <p className="footnote">Tap a card to add or remove it. Photo reading uses Claude; the photo isn't saved.</p>
+      <p className="footnote">Tap a card to add or remove it. The photo is read on this phone and isn't sent or saved anywhere. Works best with cards spread flat in good light.</p>
     </Sheet>
   );
 }

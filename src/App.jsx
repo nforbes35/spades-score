@@ -269,6 +269,9 @@ function GameScreen({ store, toast, onNewGame, onJoin }) {
             }}>
               <Icon name="phone" /> Join someone else's game
             </button>
+            <a href="https://github.com/nforbes35/spades-score" target="_blank" rel="noreferrer">
+              <Icon name="share" /> Source code &amp; licenses
+            </a>
           </div>
         </Sheet>
       )}
