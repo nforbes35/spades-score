@@ -20,8 +20,10 @@ plain words, keep text large and buttons big, check every screen fits a 320px ph
 - Link: Supabase Realtime broadcast (needs `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY`; no tables).
   With them blank it falls back to BroadcastChannel, which links tabs in one browser — good for testing.
 - Video: WebRTC (`src/lib/video.js`), signalling over the same room. STUN only unless `VITE_TURN_*` set.
-- Card photo: `api/read-cards.js` (Vercel function) sends the photo to Claude (`claude-opus-5-5`); needs
-  `ANTHROPIC_API_KEY` on Vercel. Without it the scorekeeper taps the cards in.
+- Card photo: read on the phone, free (`src/lib/cardVision.js`, onnxruntime-web, single thread in a
+  worker). Model `public/models/cards-gen3.onnx` = sroot/lgd-cards-gen3 on Hugging Face (corner detector,
+  52 classes, AGPL-3.0, details in `public/models/README.txt`). Because of AGPL the repo is public and
+  the menu links to it. Tested only on drawn cards (about 8 of 13); the person fixes misses on the grid.
 
 ## Commands
 - Run locally: `npm run dev` (http://localhost:5180)
