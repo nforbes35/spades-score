@@ -1,5 +1,5 @@
 // Spades Score service worker: makes the app installable and lets it open without a connection.
-const CACHE = 'spades-score-v1';
+const CACHE = 'spades-score-v2';
 
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', (e) => e.waitUntil(self.clients.claim()));

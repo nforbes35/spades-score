@@ -22,7 +22,12 @@ export const STANDARD_RULES = {
 
 export const newPlayer = () => ({ bid: 0, books: 0, call: 'none' });
 export const newTeamRound = () => ({ players: [newPlayer(), newPlayer()] });
-export const newHand = () => ({ id: crypto.randomUUID(), inPlay: true, teams: [newTeamRound(), newTeamRound()] });
+/** A hand being bid. `dealer` is a seat (see table.js); `live` tracks book-by-book play. */
+export const newHand = (dealer = 0) => ({
+  id: crypto.randomUUID(), inPlay: true, stage: 'bids', dealer,
+  teams: [newTeamRound(), newTeamRound()],
+  live: { tricks: [], cards: null, pending: null },
+});
 
 export const signed = (n) => (n > 0 ? `+${n}` : `${n}`);
 

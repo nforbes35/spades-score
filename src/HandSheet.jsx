@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { contractBid, totalBooks, tableBid, isNil, nilLabel, scoreTeam, signed } from './lib/scoring.js';
+import { stageOf } from './lib/table.js';
 import { NumberControl, NilPicker, Segmented, Sheet } from './components.jsx';
 
 const PHASES = [{ id: 'bids', label: 'Bids' }, { id: 'books', label: 'Books' }];
@@ -12,8 +13,8 @@ export default function HandSheet({ game, hand: initial, onSave, onDelete, onClo
   const [hand, setHand] = useState(initial);
   const index = game.hands.findIndex((h) => h.id === initial.id);
   const number = (index < 0 ? game.hands.length : index) + 1;
-  // A brand-new hand starts at bids; one already in play or scored opens at books.
-  const [phase, setPhase] = useState(index < 0 ? 'bids' : 'books');
+  // A hand still being bid opens at bids; one being played or already scored opens at books.
+  const [phase, setPhase] = useState(stageOf(initial) === 'bids' ? 'bids' : 'books');
 
   const setPlayer = (t, p, change) => setHand((h) => ({
     ...h,
@@ -22,14 +23,12 @@ export default function HandSheet({ game, hand: initial, onSave, onDelete, onClo
     })),
   }));
 
-  const saveLabel = phase === 'bids' ? (hand.inPlay ? 'Start Hand' : 'Save') : (hand.inPlay ? 'Score Hand' : 'Save');
-  const save = () => onSave(phase === 'books' ? { ...hand, inPlay: false } : hand);
 
   const left = 13 - tableBid(hand);
   const tableBooks = hand.teams.reduce((s, t) => s + totalBooks(t), 0);
 
   return (
-    <Sheet title={`Hand ${number}`} onClose={onClose} action={{ label: saveLabel, onClick: save }}>
+    <Sheet title={`Hand ${number}`} onClose={onClose} action={{ label: 'Save', onClick: () => onSave(hand) }}>
       <div className="hand-banner">
         <Segmented options={PHASES} value={phase} onChange={setPhase} label="Step" />
         {phase === 'bids' ? (
