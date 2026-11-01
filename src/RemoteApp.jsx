@@ -2,11 +2,11 @@ import { useEffect, useState } from 'react';
 import { read, write } from './lib/store.js';
 import { history, standings, winner, contractBid, isNil, nilLabel } from './lib/scoring.js';
 import { SEATS, teamOf, playerName, seatEntry, stageOf, liveOf, leaderOf, remainingCards, booksPlayed } from './lib/table.js';
-import { sortHand, cardLabel } from './lib/cards.js';
+import { sortHand } from './lib/cards.js';
 import { useRoom } from './lib/room.js';
 import { useVideoCall } from './lib/video.js';
 import { useWakeLock, chime, buzz } from './lib/fx.js';
-import { NumberControl, NilPicker, PlayingCard, Icon, useToast, StatusDot, Confetti } from './components.jsx';
+import { NumberControl, NilPicker, PlayingCard, Icon, useToast, StatusDot, Confetti, CardText } from './components.jsx';
 import { LeftOnTable, TableView } from './LiveHand.jsx';
 import { ScoreCard, HandRow } from './Scoreboard.jsx';
 import VideoCorner from './VideoCorner.jsx';
@@ -101,7 +101,7 @@ export default function RemoteApp({ code, onLeave }) {
   let status = null;
   if (stage === 'play') {
     const leader = leaderOf(hand);
-    if (live.pending || sending) status = { text: `You played ${cardLabel(live.pending ?? sending.card)}. Waiting for the book.` };
+    if (live.pending || sending) status = { text: <>You played <CardText code={live.pending ?? sending.card} />. Waiting for the book.</> };
     else if (booksPlayed(hand) >= 13) status = { text: 'All 13 books played. Waiting for the score.' };
     else if (leader === mySeat) status = { text: 'You lead this book!', hot: true };
     else status = { text: `${playerName(game, leader)} leads this book. Play when it's your turn.` };
@@ -260,7 +260,7 @@ export default function RemoteApp({ code, onLeave }) {
       <div className="bottom-bar">
         {selected && stage === 'play' ? (
           <button type="button" className="primary big go" disabled={!canPlay} onClick={play}>
-            {canPlay ? `Play ${cardLabel(selected)}` : 'Wait for the book to finish'}
+            {canPlay ? <>Play <CardText code={selected} /></> : 'Wait for the book to finish'}
           </button>
         ) : (
           !call.active && (

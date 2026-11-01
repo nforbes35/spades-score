@@ -6,7 +6,7 @@ import { cardLabel } from './lib/cards.js';
 import { useRoom } from './lib/room.js';
 import { useVideoCall } from './lib/video.js';
 import { useWakeLock, chime, buzz } from './lib/fx.js';
-import { Sheet, RulesFields, NumberField, Icon, useToast, Confetti, StatusDot } from './components.jsx';
+import { Sheet, RulesFields, NumberField, Icon, useToast, Confetti, StatusDot, CardText } from './components.jsx';
 import { BidsPanel, PlayPanel } from './LiveHand.jsx';
 import NewGame from './NewGame.jsx';
 import HandSheet from './HandSheet.jsx';
@@ -102,7 +102,7 @@ function GameScreen({ store, toast, onNewGame, onJoin }) {
       store.updateHand(hand.id, `${name} played ${cardLabel(m.card)}`, (h) => ({ ...h, live: { ...liveOf(h), pending: m.card } }));
       chime(true);
       buzz([80, 60, 80]);
-      toast.show(`${name} played ${cardLabel(m.card)}`, { onUndo: store.undo, ms: 6000 });
+      toast.show(<>{name} played <CardText code={m.card} /></>, { onUndo: store.undo, ms: 6000 });
     }
   }
 

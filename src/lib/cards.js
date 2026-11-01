@@ -1,12 +1,13 @@
 // Playing cards are short codes: rank + suit letter, e.g. "QH", "10S", "AD".
 
 export const RANKS = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
-// Display order alternates colors so a sorted hand is easy to read.
+// Display order alternates colors so a sorted hand is easy to read. \uFE0E asks for the plain text
+// symbol (not an emoji) so it takes our red or black.
 export const SUITS = [
-  { id: 'S', sym: '♠', name: 'Spades', red: false },
-  { id: 'H', sym: '♥', name: 'Hearts', red: true },
-  { id: 'C', sym: '♣', name: 'Clubs', red: false },
-  { id: 'D', sym: '♦', name: 'Diamonds', red: true },
+  { id: 'S', sym: '♠\uFE0E', name: 'Spades', red: false },
+  { id: 'H', sym: '♥\uFE0E', name: 'Hearts', red: true },
+  { id: 'C', sym: '♣\uFE0E', name: 'Clubs', red: false },
+  { id: 'D', sym: '♦\uFE0E', name: 'Diamonds', red: true },
 ];
 const RANK_NAMES = { J: 'Jack', Q: 'Queen', K: 'King', A: 'Ace' };
 

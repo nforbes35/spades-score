@@ -1,7 +1,6 @@
 import { contractBid, isNil, nilLabel, tableBid } from './lib/scoring.js';
 import { SEATS, teamOf, playerName, seatEntry, liveOf, leaderOf, booksPlayed, updateSeat, seatProgress } from './lib/table.js';
-import { cardLabel } from './lib/cards.js';
-import { NumberControl, NilPicker, PlayingCard, Icon } from './components.jsx';
+import { NumberControl, NilPicker, PlayingCard, Icon, CardText } from './components.jsx';
 
 /** Seats drawn around a table: you (seat 1) at the bottom, partner across the top. */
 const AREAS = ['bottom', 'left', 'top', 'right'];
@@ -141,7 +140,7 @@ export function PlayPanel({ game, hand, number, onAward, remoteSeat, peer, onPin
       {remoteSeat != null && (
         <div className="remote-strip">
           {live.pending
-            ? <span className="remote-played"><b>{remoteName}</b> played <b className="big-card-text">{cardLabel(live.pending)}</b>. Play it for them.</span>
+            ? <span className="remote-played"><b>{remoteName}</b> played <span className="big-card-text"><CardText code={live.pending} /></span>. Play it for them.</span>
             : <span>{live.cards ? `${remoteName} has ${remaining} card${remaining === 1 ? '' : 's'} left.` : `${remoteName}'s cards aren't scanned yet.`}</span>}
           <div className="row">
             {!live.cards && <button type="button" className="soft" onClick={onScan}><Icon name="camera" size={18} /> Scan cards</button>}

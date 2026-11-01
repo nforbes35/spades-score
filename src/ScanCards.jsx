@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { SUITS, RANKS, sortHand, cardLabel } from './lib/cards.js';
 import { readCards, loadCardReader } from './lib/cardVision.js';
 import { learnedModel, pickCards, rememberHand, forgetLearning } from './lib/learning.js';
-import { Sheet, Icon, PlayingCard } from './components.jsx';
+import { Sheet, Icon, PlayingCard, CardText } from './components.jsx';
 
 const STEPS = {
   loading: 'Getting the card reader ready (first time only)…',
@@ -68,7 +68,7 @@ export default function ScanCards({ name, initial, played = [], onSend, onClose 
 
   return (
     <Sheet title={`${name}'s cards`} onClose={onClose} action={{ label: 'Send', onClick: send, disabled: !cards.length }}>
-      <p className="lead-text">Lay {name}'s cards out face up, spread so every corner shows, and take a photo.</p>
+      <p className="lead-text">Fan {name}'s cards so every top-left corner shows, hold the phone upright, and take a photo.</p>
       <div className="scan-buttons">
         <label className={`primary big file-btn${busy ? ' disabled' : ''}`}>
           <Icon name="camera" /> {photo ? 'Take another photo' : 'Take a photo'}
@@ -85,7 +85,7 @@ export default function ScanCards({ name, initial, played = [], onSend, onClose 
       {msg && <div className={`scan-msg${msg.ok ? ' ok' : ''}`}>{msg.text}</div>}
       {mixups.length > 0 && (
         <div className="scan-msg">
-          This phone often mixes up {mixups.map(([x, y]) => `${cardLabel(x)} and ${cardLabel(y)}`).join(', ')}. Check which one it is.
+          This phone often mixes up {mixups.map(([x, y], i) => <span key={x + y}>{i > 0 && ', '}<CardText code={x} /> and <CardText code={y} /></span>)}. Check which one it is.
         </div>
       )}
 
@@ -119,7 +119,7 @@ export default function ScanCards({ name, initial, played = [], onSend, onClose 
       </div>
       <p className="footnote">
         Tap a card to add or remove it. The photo is read on this phone and isn't sent or saved anywhere.
-        Works best with cards spread flat in good light.
+        Works best with the phone held upright, not sideways.
       </p>
       <p className="footnote">
         <b>It learns from your fixes.</b> Each time you send a checked hand of 13, it remembers what it got

@@ -189,6 +189,12 @@ export function Confetti() {
   );
 }
 
+/** A card written inline in a sentence or button, as a little white chip in the card's color. */
+export function CardText({ code }) {
+  const { rank, suit } = parseCard(code);
+  return <span className={`card-chip${suit.red ? ' red' : ''}`}>{rank}{suit.sym}</span>;
+}
+
 export function StatusDot({ on, label }) {
   return <span className={`status-dot${on ? ' on' : ''}`}><i />{label}</span>;
 }
