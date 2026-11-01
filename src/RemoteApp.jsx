@@ -6,7 +6,7 @@ import { sortHand } from './lib/cards.js';
 import { useRoom } from './lib/room.js';
 import { useVideoCall } from './lib/video.js';
 import { useWakeLock, chime, buzz } from './lib/fx.js';
-import { NumberControl, NilPicker, PlayingCard, Icon, useToast, StatusDot, Confetti, CardText } from './components.jsx';
+import { NumberControl, NilPicker, FannedHand, Icon, useToast, StatusDot, Confetti, CardText } from './components.jsx';
 import { LeftOnTable, TableView } from './LiveHand.jsx';
 import { ScoreCard, HandRow } from './Scoreboard.jsx';
 import VideoCorner from './VideoCorner.jsx';
@@ -97,6 +97,8 @@ export default function RemoteApp({ code, onLeave }) {
 
   const canPlay = stage === 'play' && !live.pending && !sending && room.peer && booksPlayed(hand) < 13;
   const coverCards = stage === 'bids' && myCards.length > 0 && !revealed[hand.id];
+  // Cards sit in a dock at the bottom of the screen, like a hand held at a real table.
+  const docked = Boolean(hand) && myCards.length > 0 && !coverCards;
 
   let status = null;
   if (stage === 'play') {
@@ -108,7 +110,7 @@ export default function RemoteApp({ code, onLeave }) {
   }
 
   return (
-    <div className="app remote-mode">
+    <div className={`app remote-mode${docked ? ' docked' : ''}`}>
       <header className="hero">
         <div className="wrap hero-row">
           <div className="brand">
@@ -116,7 +118,14 @@ export default function RemoteApp({ code, onLeave }) {
             <h1>Spades</h1>
             <span className="mode-chip"><Icon name="phone" size={13} /> Remote</span>
           </div>
-          <button type="button" className="icon-btn" onClick={() => { if (confirm('Leave this game?')) onLeave(); }}>Leave</button>
+          <div className="row">
+            {!call.active && (
+              <button type="button" className="icon-btn round" aria-label="Video chat with the table" disabled={!room.peer} onClick={call.start}>
+                <Icon name="video" />
+              </button>
+            )}
+            <button type="button" className="icon-btn" onClick={() => { if (confirm('Leave this game?')) onLeave(); }}>Leave</button>
+          </div>
         </div>
         <div className="wrap">
           {game && (
@@ -214,7 +223,7 @@ export default function RemoteApp({ code, onLeave }) {
               </section>
             )}
 
-            {hand && (
+            {hand && !docked && (
               <section className="my-cards">
                 <div className="section-title row between">
                   <span>Your cards</span>
@@ -229,17 +238,7 @@ export default function RemoteApp({ code, onLeave }) {
                     <b>Your {myCards.length} cards are here</b>
                     <span className="muted small">Thinking about blind nil? Bid first. Tap to look at your cards.</span>
                   </button>
-                ) : (
-                  <div className="my-hand">
-                    {myCards.map((c) => (
-                      <PlayingCard key={c} code={c} selected={selected === c}
-                        onClick={() => setSelected(selected === c ? null : c)} />
-                    ))}
-                  </div>
-                )}
-                {stage === 'play' && !canPlay && myCards.length > 0 && !live.pending && !sending && !room.peer && (
-                  <p className="footnote center">Reconnecting to the table…</p>
-                )}
+                ) : null}
               </section>
             )}
 
@@ -257,20 +256,29 @@ export default function RemoteApp({ code, onLeave }) {
         )}
       </main>
 
-      <div className="bottom-bar">
-        {selected && stage === 'play' ? (
-          <button type="button" className="primary big go" disabled={!canPlay} onClick={play}>
-            {canPlay ? <>Play <CardText code={selected} /></> : 'Wait for the book to finish'}
-          </button>
-        ) : (
-          !call.active && (
-            <button type="button" className="secondary big" disabled={!room.peer} onClick={call.start}>
-              <Icon name="video" /> Video chat with the table
-            </button>
-          )
-        )}
-        {call.error && <p className="scan-msg">{call.error}</p>}
-      </div>
+      {docked ? (
+        <div className="hand-dock">
+          <div className="dock-head">
+            <span>Your cards · {myCards.length} left</span>
+            {stage === 'play' && !room.peer && <span>Reconnecting…</span>}
+          </div>
+          <FannedHand cards={myCards} selected={selected} onSelect={stage === 'play' ? setSelected : undefined} />
+          <div className="dock-action">
+            {stage !== 'play' ? (
+              <p className="dock-hint">Bid above. You'll play from here once the hand starts.</p>
+            ) : selected ? (
+              <button type="button" className="primary big go" disabled={!canPlay} onClick={play}>
+                {canPlay ? <>Play <CardText code={selected} /></> : 'Wait for the book to finish'}
+              </button>
+            ) : (
+              <p className="dock-hint">{live.pending || sending ? 'Waiting for the book to be taken…' : 'Tap a card to choose it.'}</p>
+            )}
+          </div>
+        </div>
+      ) : (
+        call.error && <div className="bottom-bar"><p className="scan-msg">{call.error}</p></div>
+      )}
+      {docked && call.error && <p className="scan-msg">{call.error}</p>}
 
       <VideoCorner call={call} peerName="the table" />
       {win != null && <Confetti />}

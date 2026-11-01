@@ -113,7 +113,7 @@ export function pickCards(scores, model) {
   }
   const likely = ranked.filter((x) => x.p >= SUGGEST && !cards.includes(x.c)).map((x) => x.c);
   const fromMixups = mixups.map(([, y]) => y);
-  const unsure = [...new Set([...fromMixups, ...likely])].slice(0, Math.max(13 - cards.length, fromMixups.length));
+  const unsure = [...new Set([...fromMixups, ...likely])].slice(0, Math.max(13 - cards.length, fromMixups.length, 3));
   return { cards, unsure, mixups };
 }
 

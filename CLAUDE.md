@@ -10,6 +10,8 @@ plain words, keep text large and buttons big, check every screen fits a 320px ph
 - `src/lib/scoring.js`: all scoring (ported from SpadesCore). `table.js`: seats (partners across:
   T1P1, T2P1, T1P2, T2P2 clockwise), dealer, book-by-book tracking. `cards.js`: card codes like "QH", "10S".
   Tests in `test/` — run `npm test`.
+- Cards sort diamonds, clubs, hearts, spades, low to high (owner's request). The remote player's hand is
+  a fanned, docked hand (`FannedHand` in components.jsx).
 - Hand flow: New Hand → bids (stage 'bids') → tap who won each book (stage 'play') → Score Hand.
   `HandSheet.jsx` fixes bids/books by hand.
 

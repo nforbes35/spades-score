@@ -321,28 +321,59 @@ button.hand-row:active { transform: scale(0.99); }
 /* ---------- Playing cards ---------- */
 .pcard {
   --w: 60px;
-  position: relative; width: var(--w); aspect-ratio: 5 / 7; border-radius: calc(var(--w) * 0.12);
-  background: var(--card-face); color: var(--card-black); border: 1px solid rgba(0, 0, 0, 0.18);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2), 0 4px 10px rgba(0, 0, 0, 0.12); padding: 0; flex-shrink: 0;
-  transition: transform 0.15s, box-shadow 0.15s;
+  position: relative; width: var(--w); aspect-ratio: 5 / 7; border-radius: calc(var(--w) * 0.11);
+  background: linear-gradient(160deg, #ffffff 0%, var(--card-face) 55%, #f1ede2 100%);
+  color: var(--card-black); border: 1px solid rgba(0, 0, 0, 0.16);
+  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.18), 0 6px 14px rgba(0, 0, 0, 0.16), inset 0 0 0 calc(var(--w) * 0.03) #fff;
+  padding: 0; flex-shrink: 0; overflow: hidden; font-family: Georgia, 'Times New Roman', serif;
+  transition: transform 0.18s cubic-bezier(.2,.9,.3,1.2), top 0.18s cubic-bezier(.2,.9,.3,1.2), box-shadow 0.18s;
 }
 .pcard.red { color: var(--card-red); }
 .pcard.xs { --w: 34px; } .pcard.sm { --w: 46px; } .pcard.lg { --w: 84px; }
-.pc-corner { position: absolute; top: 6%; left: 9%; display: flex; flex-direction: column; align-items: center; line-height: 0.95; }
-.pc-corner b { font-size: calc(var(--w) * 0.34); font-weight: 800; letter-spacing: -0.04em; }
-.pc-corner i { font-style: normal; font-size: calc(var(--w) * 0.28); }
-.pc-pip { position: absolute; right: 9%; bottom: 5%; font-size: calc(var(--w) * 0.5); line-height: 1; }
-.pcard.xs .pc-pip { display: none; }
+.pc-corner { position: absolute; top: 4%; left: 7%; display: flex; flex-direction: column; align-items: center; line-height: 0.92; }
+.pc-corner.flip { top: auto; left: auto; bottom: 4%; right: 7%; transform: rotate(180deg); }
+.pc-corner b { font-size: calc(var(--w) * 0.3); font-weight: 700; letter-spacing: -0.05em; }
+.pc-corner i { font-style: normal; font-size: calc(var(--w) * 0.25); }
+.pc-pip { position: absolute; inset: 0; display: grid; place-items: center; font-size: calc(var(--w) * 0.52); line-height: 1; }
+/* Court cards: a framed, tinted panel with the letter, a nod to the printed faces. */
+.pc-court {
+  position: absolute; inset: 18% 20%; border-radius: calc(var(--w) * 0.05);
+  border: calc(var(--w) * 0.02) solid currentColor; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  background: linear-gradient(135deg, rgba(234, 179, 8, 0.28), rgba(59, 130, 246, 0.16) 50%, rgba(208, 38, 45, 0.18));
+}
+.pc-court b { font-size: calc(var(--w) * 0.36); font-weight: 700; line-height: 1; }
+.pc-court i { font-style: normal; font-size: calc(var(--w) * 0.22); line-height: 1; }
+.pcard.xs .pc-pip, .pcard.xs .pc-court, .pcard.xs .pc-corner.flip,
+.pcard.sm .pc-corner.flip { display: none; }
 .pcard.xs .pc-corner { position: static; height: 100%; justify-content: center; }
-button.pcard:not(:disabled):active { transform: translateY(-2px); }
-.pcard.sel { transform: translateY(-14px); box-shadow: 0 0 0 3px var(--primary), 0 10px 20px rgba(0, 0, 0, 0.25); }
-.pcard:disabled { opacity: 0.5; }
+.pcard.sm .pc-court { inset: 30% 22% 14%; }
+button.pcard:not(:disabled):active { filter: brightness(0.96); }
+.pcard.sel { box-shadow: 0 0 0 3px var(--primary), 0 14px 24px rgba(0, 0, 0, 0.3); }
+.pcard:disabled { opacity: 1; filter: saturate(0.85); }
 
-.my-hand { display: grid; grid-template-columns: repeat(auto-fill, minmax(54px, 1fr)); gap: 8px; padding-top: 14px; }
-.my-hand .pcard { --w: 100%; }
-.my-hand .pc-corner b { font-size: 22px; }
-.my-hand .pc-corner i { font-size: 18px; }
-.my-hand .pc-pip { font-size: 30px; }
+/* The remote player's hand, held in a fan, docked on a strip of felt at the bottom */
+.remote-mode.docked { padding-bottom: calc(300px + env(safe-area-inset-bottom)); }
+.hand-dock {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 30;
+  padding: 10px 12px calc(12px + env(safe-area-inset-bottom));
+  background:
+    radial-gradient(120% 90% at 50% 0%, rgba(255, 255, 255, 0.10), transparent 60%),
+    linear-gradient(180deg, var(--felt-c), var(--felt-b) 60%, var(--felt-a));
+  border-radius: 24px 24px 0 0; box-shadow: 0 -10px 30px rgba(4, 30, 16, 0.35);
+}
+.hand-dock > * { max-width: 560px; margin-left: auto; margin-right: auto; }
+.dock-head { display: flex; justify-content: space-between; gap: 8px; white-space: nowrap; color: rgba(255, 255, 255, 0.85); font-size: 13px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; padding: 0 6px; }
+.dock-action { min-height: 56px; display: flex; align-items: center; justify-content: center; }
+.dock-hint { color: rgba(255, 255, 255, 0.85); font-weight: 700; font-size: 16px; text-align: center; }
+.hand-dock .primary.big { width: 100%; }
+.fan { position: relative; width: 100%; margin-top: 6px; touch-action: manipulation; }
+.fan .pcard { position: absolute; transform-origin: 50% 120%; }
+/* In a fan only the left strip shows, so the corner index is tight and bold. */
+.pcard.held .pc-corner { left: 4%; top: 3%; }
+.pcard.held .pc-court { inset: 16% 12% 16% 36%; }
+.pcard.held .pc-corner b { font-size: calc(var(--w) * 0.27); letter-spacing: -0.09em; }
+.pcard.held .pc-corner i { font-size: calc(var(--w) * 0.24); }
+.fan .pcard.sel { filter: none; }
 .cover-cards { width: 100%; padding: 20px 16px; display: flex; flex-direction: column; align-items: center; gap: 6px; color: var(--ink); text-align: center; }
 .cover-stack { position: relative; width: 70px; height: 90px; margin-bottom: 8px; }
 .cover-stack span { position: absolute; inset: 0; border-radius: 9px; border: 3px solid #fff; background: repeating-linear-gradient(45deg, #1d4ed8 0 6px, #2563eb 6px 12px); box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3); }
@@ -436,6 +467,8 @@ button.pcard:not(:disabled):active { transform: translateY(-2px); }
   .tile-books { font-size: 30px; }
   .icon-label { display: none; }
   .code span { width: 46px; height: 58px; font-size: 30px; }
+  .mode-chip { display: none; }
+  .dock-head { font-size: 12px; letter-spacing: 0.03em; }
 }
 
 @media (prefers-reduced-motion: reduce) {

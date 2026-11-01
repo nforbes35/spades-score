@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { NIL_CALLS } from './lib/scoring.js';
 import { parseCard, cardName } from './lib/cards.js';
 
@@ -131,20 +131,76 @@ export function Icon({ name, size = 22 }) {
   );
 }
 
-/** A playing card face. Pass onClick to make it tappable. */
-export function PlayingCard({ code, size = 'md', selected, onClick, disabled, className = '' }) {
+const COURT = { J: 'J', Q: 'Q', K: 'K' };
+
+/** A playing card face. Pass onClick to make it tappable; `style` positions it (e.g. in a fan). */
+export function PlayingCard({ code, size = 'md', selected, onClick, disabled, className = '', style }) {
   const { rank, suit } = parseCard(code);
-  const classes = `pcard ${size}${suit.red ? ' red' : ''}${selected ? ' sel' : ''} ${className}`;
+  const classes = `pcard ${size}${suit.red ? ' red' : ''}${selected ? ' sel' : ''}${COURT[rank] ? ' court' : ''} ${className}`;
   const face = (
     <>
       <span className="pc-corner"><b>{rank}</b><i>{suit.sym}</i></span>
-      <span className="pc-pip">{suit.sym}</span>
+      {COURT[rank]
+        ? <span className="pc-court"><b>{rank}</b><i>{suit.sym}</i></span>
+        : <span className="pc-pip">{suit.sym}</span>}
+      <span className="pc-corner flip"><b>{rank}</b><i>{suit.sym}</i></span>
     </>
   );
-  if (!onClick) return <div className={classes} role="img" aria-label={cardName(code)}>{face}</div>;
+  if (!onClick) return <div className={classes} style={style} role="img" aria-label={cardName(code)}>{face}</div>;
   return (
-    <button type="button" className={classes} onClick={onClick} disabled={disabled}
+    <button type="button" className={classes} style={style} onClick={onClick} disabled={disabled}
       aria-label={cardName(code)} aria-pressed={selected}>{face}</button>
+  );
+}
+
+const FAN_SPREAD_DEG = 12;
+const FAN_DROP = 9;
+const SUIT_GAP = 5;
+
+/**
+ * A hand held in a fan: cards overlap so each corner shows, curve gently, and a small gap
+ * separates suits. Tap a card to lift it.
+ */
+export function FannedHand({ cards, selected, onSelect, disabled }) {
+  const box = useRef(null);
+  const [width, setWidth] = useState(340);
+  useLayoutEffect(() => {
+    const el = box.current;
+    if (!el) return undefined;
+    const ro = new ResizeObserver(([e]) => setWidth(e.contentRect.width));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const n = cards.length;
+  const cardW = Math.round(Math.min(88, Math.max(62, width / 4.8)));
+  const cardH = Math.round(cardW * 1.4);
+  const suitOf = (c) => c.slice(-1);
+  const gapsBefore = cards.map((c, i) => cards.slice(0, i + 1).filter((x, j) => j > 0 && suitOf(x) !== suitOf(cards[j - 1])).length);
+  const gaps = gapsBefore[n - 1] ?? 0;
+  const step = n > 1 ? Math.min(cardW * 0.6, (width - cardW - gaps * SUIT_GAP - 8) / (n - 1)) : 0;
+  const total = cardW + step * Math.max(0, n - 1) + gaps * SUIT_GAP;
+  const left0 = (width - total) / 2;
+  const mid = (n - 1) / 2;
+
+  return (
+    <div ref={box} className="fan" style={{ height: cardH + FAN_DROP + 26 }}>
+      {cards.map((c, i) => {
+        const off = n > 1 ? (i - mid) / mid || 0 : 0;
+        const lift = selected === c ? -22 : 0;
+        return (
+          <PlayingCard key={c} code={c} size="held" selected={selected === c} disabled={disabled}
+            onClick={onSelect ? () => onSelect(selected === c ? null : c) : undefined}
+            style={{
+              '--w': `${cardW}px`,
+              left: left0 + i * step + gapsBefore[i] * SUIT_GAP,
+              top: 18 + off * off * FAN_DROP + lift,
+              transform: `rotate(${off * (FAN_SPREAD_DEG / 2)}deg)`,
+              zIndex: i + 1,
+            }} />
+        );
+      })}
+    </div>
   );
 }
 

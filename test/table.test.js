@@ -36,8 +36,8 @@ test('remote cards leave the hand once played', () => {
   assert.deepEqual(remainingCards(h), ['AS', '2C']);
 });
 
-test('cards sort by suit, high first', () => {
-  assert.deepEqual(sortHand(['2S', 'AH', 'AS', '10S', 'KD', '3C']), ['AS', '10S', '2S', 'AH', '3C', 'KD']);
+test('cards sort diamonds, clubs, hearts, spades, low to high', () => {
+  assert.deepEqual(sortHand(['2S', 'AH', 'AS', '10S', 'KD', '3C', '4D']), ['4D', 'KD', '3C', 'AH', '2S', '10S', 'AS']);
   assert.equal(isCard('10H'), true);
   assert.equal(isCard('1H'), false);
 });
