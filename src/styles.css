@@ -417,6 +417,8 @@ button.pcard:not(:disabled):active { filter: brightness(0.96); }
 .rank-btn.on { background: var(--ink); color: var(--bg); border-color: var(--ink); }
 .rank-btn.red.on { background: var(--card-red); border-color: var(--card-red); color: #fff; }
 .rank-btn.maybe { border: 2px dashed var(--warn); }
+.rank-btn.on.maybe { outline: 2px dashed var(--warn); outline-offset: 2px; }
+.pcard.guess { outline: 2px dashed var(--warn); outline-offset: 1px; }
 .rank-btn:disabled { opacity: 0.3; text-decoration: line-through; }
 .spinner { width: 22px; height: 22px; border-radius: 50%; border: 3px solid var(--fill); border-top-color: var(--primary); animation: spin 0.8s linear infinite; display: inline-block; }
 @keyframes spin { to { transform: rotate(360deg); } }

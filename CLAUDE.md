@@ -26,7 +26,11 @@ plain words, keep text large and buttons big, check every screen fits a 320px ph
   worker). Model `public/models/cards-gen3.onnx` = sroot/lgd-cards-gen3 on Hugging Face (corner detector,
   52 classes, AGPL-3.0, details in `public/models/README.txt`). Because of AGPL the repo is public and
   the menu links to it. Owner's real photo (hand-held fan, Maverick deck): 13/13 in ~1 s, also when dim,
-  yellow-lit, blurry or small; sideways photo got 12/13. The person fixes misses on the grid.
+  yellow-lit, blurry or small. The person fixes misses on the grid.
+- Accuracy helpers: photos of the same hand add up (`mergeScores`); a card read on the same corner as a
+  stronger card is turned down ("one corner, one card", fixed 6S-as-6C and 10H-as-10D on the owner's
+  deck); missing 1-2 cards are filled in as outlined guesses (never a turned-down card). A corner close-up
+  pass was tried and dropped: no gain, slower. Owner's 2 photos x 5 versions: 128/130, 0 wrong.
 - Learning from fixes (`src/lib/learning.js`): every sent, checked 13-card hand stores (scores, real hand)
   in localStorage (last 150). Each card gets its own score adjustment (2 numbers, Newton fit, held toward
   zero so it takes ~2 agreeing hands), plus learned look-alike mix-ups shown as "check which one".

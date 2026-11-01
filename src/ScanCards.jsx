@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { SUITS, RANKS, sortHand, cardLabel } from './lib/cards.js';
 import { readCards, loadCardReader } from './lib/cardVision.js';
-import { learnedModel, pickCards, rememberHand, forgetLearning } from './lib/learning.js';
+import { learnedModel, pickCards, mergeScores, rememberHand, forgetLearning } from './lib/learning.js';
 import { Sheet, Icon, PlayingCard, CardText } from './components.jsx';
 
 const STEPS = {
@@ -13,12 +13,15 @@ const STEPS = {
 export default function ScanCards({ name, initial, played = [], onSend, onClose }) {
   const [cards, setCards] = useState(initial ?? []);
   const [unsure, setUnsure] = useState([]);
+  const [guessed, setGuessed] = useState([]);
   const [photo, setPhoto] = useState(null);
   const [step, setStep] = useState(null);
   const [msg, setMsg] = useState(null);
   const [mixups, setMixups] = useState([]);
-  // Every photo's scores this time, remembered with the final checked hand so the reader learns.
+  // Every photo's scores this time. Photos add up (a card hidden in one may show in another), and the
+  // combined scores are remembered with the final checked hand so the reader learns.
   const [scans, setScans] = useState([]);
+  const [shadowed, setShadowed] = useState([]);
   const [learned, setLearned] = useState(() => learnedModel().count);
   const busy = Boolean(step);
 
@@ -32,20 +35,29 @@ export default function ScanCards({ name, initial, played = [], onSend, onClose 
     if (!file) return;
     setPhoto(URL.createObjectURL(file));
     setMsg(null);
-    setUnsure([]);
     const started = Date.now();
     try {
-      const { scores } = await readCards(file, setStep);
-      const found = pickCards(scores, learnedModel().model);
-      setScans((all) => [...all, scores]);
+      const read = await readCards(file, setStep);
+      const all = [...scans, read.scores];
+      const noGuess = [...new Set([...shadowed, ...read.shadowed])];
+      const found = pickCards(mergeScores(all), learnedModel().model, { noGuess });
+      setScans(all);
+      setShadowed(noGuess);
       setCards(sortHand(found.cards));
+      setGuessed(found.guessed);
       setUnsure(found.unsure);
       setMixups(found.mixups);
       const secs = Math.round((Date.now() - started) / 1000);
-      const check = found.unsure.length ? ' Cards with a dotted outline might be in the hand too: tap to add them.' : '';
-      setMsg(found.cards.length === 13
-        ? { ok: true, text: `Found all 13 in ${secs} seconds. Check they match, then send.` }
-        : { text: `Found ${found.cards.length}. Tap cards below to add or remove until there are 13.${check}` });
+      const sure = found.cards.length - found.guessed.length;
+      const combined = all.length > 1 ? ` (combining your ${all.length} photos)` : '';
+      const guessNote = found.guessed.length
+        ? ` Found ${sure} for sure${combined}; the card${found.guessed.length > 1 ? 's' : ''} with a dotted outline ${found.guessed.length > 1 ? 'are best guesses' : 'is a best guess'}. Check, then send.`
+        : '';
+      setMsg(found.cards.length === 13 && !found.guessed.length
+        ? { ok: true, text: `Found all 13 in ${secs} seconds${combined}. Check they match, then send.` }
+        : found.cards.length === 13
+          ? { text: guessNote.trim() }
+          : { text: `Found ${found.cards.length}${combined}. Take another photo, or tap cards below until there are 13.` });
     } catch (err) {
       console.warn('card reading failed', err);
       setMsg({ text: `Couldn’t read the photo on this phone. Tap ${name}'s cards in below instead.` });
@@ -54,10 +66,13 @@ export default function ScanCards({ name, initial, played = [], onSend, onClose 
     }
   }
 
-  const toggle = (code) => setCards((cs) => (cs.includes(code) ? cs.filter((c) => c !== code) : sortHand([...cs, code])));
+  const toggle = (code) => {
+    setGuessed((g) => g.filter((c) => c !== code));
+    setCards((cs) => (cs.includes(code) ? cs.filter((c) => c !== code) : sortHand([...cs, code])));
+  };
   const send = () => {
     if (cards.length !== 13 && !confirm(`That's ${cards.length} cards, not 13. Send anyway?`)) return;
-    if (cards.length === 13) scans.forEach((scores) => rememberHand(scores, cards));
+    if (cards.length === 13 && scans.length) rememberHand(mergeScores(scans), cards);
     onSend(cards);
   };
   const startOver = () => {
@@ -95,7 +110,7 @@ export default function ScanCards({ name, initial, played = [], onSend, onClose 
       </div>
       {cards.length > 0 && (
         <div className="hand-preview">
-          {cards.map((c) => <PlayingCard key={c} code={c} size="xs" />)}
+          {cards.map((c) => <PlayingCard key={c} code={c} size="xs" className={guessed.includes(c) ? 'guess' : ''} />)}
         </div>
       )}
 
@@ -109,7 +124,7 @@ export default function ScanCards({ name, initial, played = [], onSend, onClose 
                 const on = cards.includes(code);
                 const used = played.includes(code);
                 return (
-                  <button key={code} type="button" className={`rank-btn${on ? ' on' : ''}${suit.red ? ' red' : ''}${!on && unsure.includes(code) ? ' maybe' : ''}`}
+                  <button key={code} type="button" className={`rank-btn${on ? ' on' : ''}${suit.red ? ' red' : ''}${(!on && unsure.includes(code)) || guessed.includes(code) ? ' maybe' : ''}`}
                     aria-pressed={on} aria-label={cardLabel(code)} disabled={used} onClick={() => toggle(code)}>{rank}</button>
                 );
               })}
@@ -118,8 +133,8 @@ export default function ScanCards({ name, initial, played = [], onSend, onClose 
         ))}
       </div>
       <p className="footnote">
-        Tap a card to add or remove it. The photo is read on this phone and isn't sent or saved anywhere.
-        Works best with the phone held upright, not sideways.
+        Tap a card to add or remove it. Missed one? Take another photo: photos add up. The photo is read on
+        this phone and isn't sent or saved anywhere. Works best upright, with no glare on the corners.
       </p>
       <p className="footnote">
         <b>It learns from your fixes.</b> Each time you send a checked hand of 13, it remembers what it got

@@ -12,6 +12,10 @@ const MAX_EXAMPLES = 150;
 const PRIOR = { w: 10, b: -5 };
 const PICK = 0.5;
 const SUGGEST = 0.2;
+// A hand is always 13 cards: if a card or two are missing, the strongest leftovers above this are
+// filled in as marked guesses for the scorekeeper to check.
+const FILL = 0.1;
+const MAX_GUESSES = 2;
 // How firmly each card holds to the starting point. Evidence adds up across hands, so a card needs
 // a couple of corrections that agree before it changes; one odd photo only nudges it.
 const HOLD_BIAS = 0.3;
@@ -94,15 +98,29 @@ function confusions(examples) {
   return counts;
 }
 
+/** Several photos of the same hand: keep each card's best score from any of them. */
+export function mergeScores(list) {
+  const merged = {};
+  for (const scores of list) {
+    for (const [c, s] of Object.entries(scores)) merged[c] = Math.max(merged[c] ?? 0, s);
+  }
+  return merged;
+}
+
 /**
- * Turn reader scores into { cards, unsure, mixups }: picked cards (at most 13), ones to double-check,
- * and [read, maybe-really] pairs this phone has learned the reader confuses.
+ * Turn reader scores into { cards, guessed, unsure, mixups }: picked cards (13 when it can), which of
+ * those are best guesses filling out the 13, other cards to double-check, and [read, maybe-really]
+ * pairs this phone has learned the reader confuses. `noGuess` cards are never used to fill out 13.
  */
-export function pickCards(scores, model) {
+export function pickCards(scores, model, { noGuess = [] } = {}) {
   const ranked = FULL_DECK
     .map((c) => ({ c, p: chance(model, c, scores[c] ?? 0) }))
     .sort((a, b) => b.p - a.p);
   const cards = ranked.filter((x) => x.p >= PICK).slice(0, 13).map((x) => x.c);
+  const guessed = 13 - cards.length <= MAX_GUESSES
+    ? ranked.filter((x) => x.p < PICK && x.p >= FILL && !noGuess.includes(x.c)).slice(0, 13 - cards.length).map((x) => x.c)
+    : [];
+  cards.push(...guessed);
   // If the reader saw X and X has really been Y at least twice before, ask about Y.
   const mixups = [];
   for (const [x, ys] of Object.entries(model.confusions ?? {})) {
@@ -114,7 +132,7 @@ export function pickCards(scores, model) {
   const likely = ranked.filter((x) => x.p >= SUGGEST && !cards.includes(x.c)).map((x) => x.c);
   const fromMixups = mixups.map(([, y]) => y);
   const unsure = [...new Set([...fromMixups, ...likely])].slice(0, Math.max(13 - cards.length, fromMixups.length, 3));
-  return { cards, unsure, mixups };
+  return { cards, guessed, unsure, mixups };
 }
 
 // ----- Storage on this phone -----
