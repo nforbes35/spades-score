@@ -26,4 +26,6 @@ plain words, keep text large and buttons big, check every screen fits a 320px ph
 ## Commands
 - Run locally: `npm run dev` (http://localhost:5180)
 - Build check: `npx vite build`
-- Publish: hosted on Vercel like Sunday Table; pushing `main` to GitHub publishes. Get the owner's OK first.
+- Live site: https://spades-score-three.vercel.app (Vercel project `spades-score`, private repo
+  nforbes35/spades-score). Pushing `main` publishes automatically; get the owner's OK first.
+  Manual fallback: `npx vercel deploy --prod --yes`.
