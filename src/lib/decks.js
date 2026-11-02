@@ -3,6 +3,7 @@
 // Team decks use colours only: team names and logos are trademarks.
 import { useSyncExternalStore } from 'react';
 import { read, write } from './store.js';
+import { SEASON_DECKS, seasonFor } from './seasons.js';
 
 const DECK_KEY = 'spades-deck';
 
@@ -23,10 +24,16 @@ const photoDeck = (id, name, group, back, table, extra = {}) => ({
   id, name, group, faces: 'classic',
   back: `url(/decks/${back}-back.webp) center / cover`,
   table: `linear-gradient(rgba(0, 0, 0, 0.28), rgba(0, 0, 0, 0.42)), url(/decks/${table}-table.webp) center / cover`,
+  home: `url(/decks/${table}-table.webp)`,
   ...extra,
 });
 
+/** Today's season or holiday theme, changing by itself through the year. */
+const seasonal = () => ({ ...seasonFor(), id: 'seasonal', name: 'Changes with the date', season: seasonFor().name });
+
 export const DECKS = [
+  seasonal(),
+  ...SEASON_DECKS,
   { id: 'classic', name: 'Classic', group: 'Classic', faces: 'classic' },
   { id: 'cartoon', name: 'Cartoon', group: 'Classic', faces: 'cartoon' },
   teamDeck('big-blue', 'Big Blue', ['#0b2265', '#a71930', '#ffffff']),
@@ -42,7 +49,8 @@ export const DECKS = [
   }),
 ];
 
-const byId = (id) => DECKS.find((d) => d.id === id) ?? DECKS[0];
+// Anyone who hasn't picked a deck gets the seasonal one.
+const byId = (id) => (id === 'seasonal' || !id ? seasonal() : DECKS.find((d) => d.id === id) ?? seasonal());
 
 let current = byId(read(DECK_KEY));
 const listeners = new Set();
@@ -56,8 +64,20 @@ function apply(deck) {
   if (deck.back) root.style.setProperty('--deck-back', deck.back); else root.style.removeProperty('--deck-back');
   if (deck.table) root.style.setProperty('--deck-table', deck.table); else root.style.removeProperty('--deck-table');
   if (deck.emblemImage) root.style.setProperty('--deck-emblem', deck.emblemImage); else root.style.removeProperty('--deck-emblem');
+  root.toggleAttribute('data-home-photo', !!deck.home);
+  if (deck.home) root.style.setProperty('--deck-home', deck.home); else root.style.removeProperty('--deck-home');
+  ['--felt-a', '--felt-b', '--felt-c'].forEach((v, i) => {
+    if (deck.felt) root.style.setProperty(v, deck.felt[i]); else root.style.removeProperty(v);
+  });
 }
 apply(current);
+
+// Left open overnight: move on to the next season's look when the phone comes back to the app.
+if (typeof document !== 'undefined') {
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && current.id === 'seasonal' && current.season !== seasonFor().name) setDeck('seasonal');
+  });
+}
 
 export function setDeck(id) {
   current = byId(id);

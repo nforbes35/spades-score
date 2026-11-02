@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { PlayingCard, Icon } from './components.jsx';
 import DeckPicker from './DeckPicker.jsx';
+import { useDeck } from './lib/decks.js';
 
 const SHOWCASE = ['10S', 'JD', 'QC', 'KH', 'AS'];
 
@@ -9,6 +10,7 @@ export default function Home({ onPlayOnline, onTable, onJoin, onStats }) {
   const [joining, setJoining] = useState(false);
   const [decksOpen, setDecksOpen] = useState(false);
   const [code, setCode] = useState('');
+  const deck = useDeck();
   const clean = code.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 4);
 
   return (
@@ -22,6 +24,7 @@ export default function Home({ onPlayOnline, onTable, onJoin, onStats }) {
         <h1 className="home-title"><span className="brand-mark">♠</span> Family Spades</h1>
         <p className="home-tagline">Made Especially for <span className="papi">👑 Papi</span></p>
         <p className="home-king">The King of Spades!</p>
+        {deck.season && <button type="button" className="home-season" onClick={() => setDecksOpen(true)}>{deck.season} theme</button>}
       </div>
 
       <div className="home-choices">

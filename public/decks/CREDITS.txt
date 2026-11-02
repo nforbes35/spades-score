@@ -9,3 +9,9 @@ decks/glass-*      — "Christ Church Newton NJ stained glass window" (public do
 decks/cross-*      — "A silhouette of a cross at sunrise" by Aaron Burden (CC0), Wikimedia Commons.
 Verse: Psalm 118:24, King James Version (public domain).
 Team decks use colours only; no team names or logos.
+
+Seasons & holidays (season-*.webp): photos from Unsplash (Unsplash License), the same ones Sunday Table uses —
+  fall: Johannes Plenio · thanksgiving: Bonnie Kittle · christmas: Tessa Rampersad · newyear: mana5280 ·
+  winter: jaanu ramesh · valentines: Matea Gvozdenovic · spring: AJ · easter: Samuel McGarrigle ·
+  summer: Jeb Buchman · patriotic: Muhammad Nabeel.
+  Verses: King James Version (public domain).

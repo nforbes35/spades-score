@@ -28,6 +28,9 @@ plain words, keep text large and buttons big, check every screen fits a 320px ph
   (`--deck-back`, `--deck-table`, `--deck-emblem`, `data-deck`, `data-emblem`). Classic faces = cropped public-domain
   portraits in `public/faces/*.webp`; 'cartoon' = drawn `CourtPanel`. Photos in `public/decks/` (credits there).
   Team decks are colours only: no team names/logos (trademarks).
+- Seasons & holidays (`src/lib/seasons.js`): photo themes like the Sunday Table project (same Unsplash photos, saved as
+  `public/decks/season-*.webp`). The default deck 'seasonal' follows the date (`seasonFor`, tested in test/seasons.test.js);
+  themes also set `--felt-*`, `--deck-home` + `data-home-photo` (home screen, lobby header, online room). KJV verses.
 - Bid timer: `settings.bidTimer` (seconds, 0 = off; lobby offers 15–90). Host auto-bids (botBid) after time + 1.5 s grace;
   each device counts down locally from when it sees the turn change (`useCountdown`), so no clock sync needed.
 - Cards (`PlayingCard` in components.jsx) are Spades Masters style: big index top-left, big suit lower right,

@@ -20,12 +20,13 @@ export default function DeckPicker({ onClose }) {
                   <PlayingCard code="KH" size="sm" className="face" faces={d.faces} />
                 </span>
                 {d.name}
+                {d.season && <span className="deck-sub">Now: {d.season}</span>}
               </button>
             ))}
           </div>
         </div>
       ))}
-      <p className="footnote">Face cards: public-domain artwork by Byron Knoll. Photos: NASA, U.S. National Park Service, NOAA and Wikimedia Commons (public domain / CC0). Team decks use team colours only.</p>
+      <p className="footnote">Face cards: public-domain artwork by Byron Knoll. Photos: NASA, U.S. National Park Service, NOAA and Wikimedia Commons (public domain / CC0); season and holiday photos from Unsplash. Verses: King James Version. Team decks use team colours only.</p>
     </Sheet>
   );
 }

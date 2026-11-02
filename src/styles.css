@@ -1108,7 +1108,7 @@ button.choice:active { transform: scale(0.98); }
 .table-verse { position: absolute; left: 50%; bottom: 9%; transform: translateX(-50%); width: 70%; text-align: center; color: rgba(255, 255, 255, 0.82); font: italic 600 13px/1.35 var(--court-font); text-shadow: 0 1px 4px rgba(0, 0, 0, 0.7); }
 .table-verse small { display: block; font-style: normal; font-size: 11px; opacity: 0.8; margin-top: 3px; }
 :root[data-emblem='football'] .table-logo { opacity: 0.5; }
-:root:not([data-deck='classic']):not([data-deck='cartoon']):not([data-emblem='football']) .table-logo { display: none; }
+:root:not([data-deck='classic']):not([data-deck='cartoon']):not([data-emblem='football']):not([data-emblem='ornament']) .table-logo { display: none; }
 
 .deck-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
 .deck-tile { position: relative; display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 12px 8px 10px; border-radius: 18px; border: 2px solid var(--line); background: var(--surface); color: var(--ink); font-weight: 800; font-size: 14px; }
@@ -1143,3 +1143,18 @@ button.choice:active { transform: scale(0.98); }
 @keyframes secs-pulse { 50% { transform: scale(1.15); } }
 .dock-clock { color: var(--gold); font-variant-numeric: tabular-nums; }
 .dock-clock.hurry { color: #ff6b6b; }
+
+/* Seasons & holidays (lib/seasons.js): an ornament in the middle of the table, the photo behind the home screen */
+:root[data-emblem='ornament'] .table-logo { display: block; color: transparent; text-shadow: none; width: 92px; height: 92px; opacity: 0.4; background: var(--deck-emblem) center / contain no-repeat; filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.5)); }
+:root[data-home-photo] .home {
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.38), rgba(0, 0, 0, 0.55) 40%, color-mix(in srgb, var(--felt-a) 88%, transparent) 72%, var(--felt-a)), var(--deck-home) center top / cover no-repeat, var(--felt-a);
+}
+.home-title, .home-tagline, .home-king { text-shadow: 0 2px 12px rgba(0, 0, 0, 0.55); }
+.home-season { align-self: center; display: inline-flex; align-items: center; gap: 6px; margin-top: 12px; padding: 6px 14px; border: 0; border-radius: 999px; background: rgba(0, 0, 0, 0.35); color: #fff; font-weight: 700; font-size: 14px; backdrop-filter: blur(6px); }
+.deck-tile .deck-sub { font-weight: 600; font-size: 12px; color: var(--muted); margin-top: -6px; }
+:root[data-home-photo] .app.online.at-table {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--felt-a) 70%, transparent), color-mix(in srgb, var(--felt-a) 92%, transparent) 70%), var(--deck-home) center / cover no-repeat, var(--felt-a);
+}
+:root[data-home-photo] .hero {
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.35), color-mix(in srgb, var(--felt-a) 80%, transparent)), var(--deck-home) center / cover no-repeat, var(--felt-a);
+}
