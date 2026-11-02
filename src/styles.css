@@ -896,3 +896,17 @@ button.choice:active { transform: scale(0.98); }
 .game-team { display: flex; justify-content: space-between; gap: 8px; padding-left: 8px; border-left: 3px solid var(--team); font-weight: 600; }
 .game-team.won { font-weight: 800; }
 .game-team b { font-variant-numeric: tabular-nums; }
+
+/* Swipe a card out of the hand */
+.fan.swipeable { touch-action: none; user-select: none; -webkit-user-select: none; }
+.fan .pcard.dragging { pointer-events: none; transition: none; box-shadow: 0 0 0 3px var(--gold), 0 24px 40px rgba(0, 0, 0, 0.45); }
+.fan .pcard.refused { animation: refuse 0.4s ease; }
+@keyframes refuse { 20%, 60% { translate: -7px 0; } 40%, 80% { translate: 7px 0; } }
+.fan .pcard.flying { animation: fly-out 0.4s ease-in forwards; }
+@keyframes fly-out { to { translate: 0 -220px; scale: 0.7; opacity: 0; } }
+.play-line {
+  position: absolute; left: 8%; right: 8%; z-index: 50; pointer-events: none; text-align: center;
+  border-top: 2px dashed rgba(255, 255, 255, 0.55); padding-top: 4px; color: rgba(255, 255, 255, 0.85);
+  font-size: 13px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase;
+}
+.play-line.ready { border-top-color: var(--gold); color: var(--gold); }

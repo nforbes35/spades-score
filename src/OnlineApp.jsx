@@ -489,11 +489,14 @@ function OnlineTable({ table, mySeat, cards, me, isHost, call, room, present, se
     : [];
   const sorted = cards ? sortHand(cards) : [];
 
-  const play = () => {
-    if (!selected || !legal.includes(selected)) return;
+  const canAct = table.phase === 'playing' && myTurn && !sending;
+  const playCardNow = (card) => {
+    if (!legal.includes(card)) return;
+    setSelected(null);
     setSending(true);
-    send('o-play', { card: selected });
+    send('o-play', { card });
   };
+  const play = () => { if (selected) playCardNow(selected); };
   const videoOf = (id) => (id === me.id ? call.local : call.videos.find((v) => v.peer.id === id)?.stream);
   const peerOf = (id) => room.peers.find((p) => p.id === id);
   const trickCards = showingLast ? r.lastTrick.cards : r?.trick ?? [];
@@ -591,7 +594,9 @@ function OnlineTable({ table, mySeat, cards, me, isHost, call, room, present, se
             </div>
           ) : cards ? (
             <FannedHand cards={sorted} selected={selected} dealKey={handNo}
-              onSelect={table.phase === 'playing' && myTurn && !sending ? (c) => setSelected(c && legal.includes(c) ? c : null) : undefined}
+              onSelect={canAct ? (c) => setSelected(c && legal.includes(c) ? c : null) : undefined}
+              onPlay={canAct ? playCardNow : undefined} playable={legal}
+              onRefuse={() => toast.show(refuseReason(table, cards))}
               dim={table.phase === 'playing' && myTurn ? sorted.filter((c) => !legal.includes(c)) : []} />
           ) : (
             <p className="dock-hint">Getting your cards…</p>
@@ -600,7 +605,7 @@ function OnlineTable({ table, mySeat, cards, me, isHost, call, room, present, se
             {myTurn && table.phase === 'bidding' && !coverCards && <BidPad onBid={(b) => send('o-bid', b)} />}
             {myTurn && table.phase === 'playing' && (selected
               ? <button type="button" className="primary big go" disabled={sending} onClick={play}>Play <CardText code={selected} /></button>
-              : <p className="dock-hint">Tap a card to play. Cards you can’t play are dimmed.</p>)}
+              : <p className="dock-hint">Swipe a card up to play it, or tap it. Dimmed cards can’t be played.</p>)}
           </div>
         </div>
       )}
@@ -613,6 +618,15 @@ function OnlineTable({ table, mySeat, cards, me, isHost, call, room, present, se
 }
 
 const hasVideo = (stream) => stream.getVideoTracks().length > 0;
+
+/** Why a card can't be played right now, in words. */
+function refuseReason(table, cards) {
+  const r = table.round;
+  if (!r.trick.length) return 'Spades aren’t broken yet: lead another suit.';
+  const led = r.trick[0].card.slice(-1);
+  const names = { S: 'spades', H: 'hearts', D: 'diamonds', C: 'clubs' };
+  return cards?.some((c) => c.slice(-1) === led) ? `You have to follow suit: play ${names[led]}.` : 'You can’t play that card.';
+}
 const CountUp = ({ value }) => useCountUp(value);
 
 /** Has `seat` already played `card` this hand (so a repeat of that move can be ignored)? */

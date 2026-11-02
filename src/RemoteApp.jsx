@@ -102,10 +102,11 @@ export default function RemoteApp({ code, seat: mySeat, onLeave }) {
     setDraft(next);
     room.send({ type: 'bid', handId: hand.id, bid: next.bid, call: next.call });
   };
-  const play = () => {
-    if (!selected) return;
-    room.send({ type: 'play', handId: hand.id, book: live.tricks.length, card: selected });
-    setSending({ card: selected });
+  const play = (card = selected) => {
+    if (!card) return;
+    room.send({ type: 'play', handId: hand.id, book: live.tricks.length, card });
+    setSelected(null);
+    setSending({ card });
     buzz(40);
   };
 
@@ -289,16 +290,17 @@ export default function RemoteApp({ code, seat: mySeat, onLeave }) {
             <span>Your cards · {myCards.length} left</span>
             {stage === 'play' && !connected && <span>Reconnecting…</span>}
           </div>
-          <FannedHand cards={myCards} selected={selected} onSelect={stage === 'play' ? setSelected : undefined} dealKey={hand.id} />
+          <FannedHand cards={myCards} selected={selected} onSelect={stage === 'play' ? setSelected : undefined} dealKey={hand.id}
+            onPlay={canPlay ? (c) => play(c) : undefined} />
           <div className="dock-action">
             {stage !== 'play' ? (
               <p className="dock-hint">Bid above. You'll play from here once the hand starts.</p>
             ) : selected ? (
-              <button type="button" className="primary big go" disabled={!canPlay} onClick={play}>
+              <button type="button" className="primary big go" disabled={!canPlay} onClick={() => play()}>
                 {canPlay ? <>Play <CardText code={selected} /></> : 'Wait for the book to finish'}
               </button>
             ) : (
-              <p className="dock-hint">{myPlayed || sending ? 'Waiting for the book to be taken…' : 'Tap a card to choose it.'}</p>
+              <p className="dock-hint">{myPlayed || sending ? 'Waiting for the book to be taken…' : 'Swipe a card up to play it, or tap it.'}</p>
             )}
           </div>
         </div>

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { NIL_CALLS } from './lib/scoring.js';
 import { parseCard, cardName } from './lib/cards.js';
+import { cardAt } from './lib/hand.js';
 
 /** − number + with big solid buttons. Tap the number to pick a value directly. */
 export function NumberControl({ label, value, onChange, min = 0, max = 13, compact }) {
@@ -153,9 +154,9 @@ export function PlayingCard({ code, size = 'md', selected, onClick, disabled, cl
       <span className="pc-corner flip"><b>{rank}</b><i>{suit.sym}</i></span>
     </>
   );
-  if (!onClick) return <div className={classes} style={style} role="img" aria-label={cardName(code)}>{face}</div>;
+  if (!onClick) return <div className={classes} style={style} role="img" aria-label={cardName(code)} data-code={code}>{face}</div>;
   return (
-    <button type="button" className={classes} style={style} onClick={onClick} disabled={disabled}
+    <button type="button" className={classes} style={style} onClick={onClick} disabled={disabled} data-code={code}
       aria-label={cardName(code)} aria-pressed={selected}>{face}</button>
   );
 }
@@ -163,14 +164,24 @@ export function PlayingCard({ code, size = 'md', selected, onClick, disabled, cl
 const FAN_SPREAD_DEG = 12;
 const FAN_DROP = 9;
 const SUIT_GAP = 5;
+// Swipe a card this far up (in card heights) to play it; less and it drops back into the hand.
+const PLAY_LINE = 0.75;
+// How far a finger must move up before a slide along the hand becomes a swipe.
+const SWIPE_START = 18;
+const STICKY_PX = 5;
 
 /**
- * A hand held in a fan: cards overlap so each corner shows, curve gently, and a small gap
- * separates suits. Tap a card to lift it.
+ * A hand held in a fan: cards overlap so each corner shows, curve gently, and a small gap separates
+ * suits. With `onPlay`, slide a finger along the hand to pick a card (it rises), swipe it up past the
+ * line to play it, or tap it to select it. Cards not in `playable` shake and drop back.
  */
-export function FannedHand({ cards, selected, onSelect, disabled, dim = [], dealKey }) {
+export function FannedHand({ cards, selected, onSelect, disabled, dim = [], dealKey, onPlay, playable, onRefuse }) {
   const box = useRef(null);
   const [width, setWidth] = useState(340);
+  const [touch, setTouch] = useState(null); // { card, dx, dy, swiping }
+  const [refused, setRefused] = useState(null);
+  const [flying, setFlying] = useState(null);
+  const gesture = useRef(null);
   useLayoutEffect(() => {
     const el = box.current;
     if (!el) return undefined;
@@ -189,23 +200,105 @@ export function FannedHand({ cards, selected, onSelect, disabled, dim = [], deal
   const total = cardW + step * Math.max(0, n - 1) + gaps * SUIT_GAP;
   const left0 = (width - total) / 2;
   const mid = (n - 1) / 2;
+  const lefts = cards.map((_, i) => left0 + i * step + gapsBefore[i] * SUIT_GAP);
+  const swipeable = Boolean(onPlay) && !disabled;
+  const canPlay = (c) => !playable || playable.includes(c);
 
+  // The card drawn under the finger, exactly as it looks (tilted cards included); if the finger is just
+  // off the cards, the card whose strip it's beside.
+  const pointAt = (e) => {
+    const hit = document.elementFromPoint(e.clientX, e.clientY)?.closest?.('.pcard[data-code]');
+    if (hit && box.current.contains(hit)) {
+      const i = cards.indexOf(hit.dataset.code);
+      if (i >= 0) return i;
+    }
+    const r = box.current.getBoundingClientRect();
+    return cardAt(e.clientX - r.left, lefts, cardW);
+  };
+  const buzzOnce = (ms) => { try { navigator.vibrate?.(ms); } catch { /* not supported */ } };
+
+  const down = (e) => {
+    if (!swipeable || e.button > 0) return;
+    const i = pointAt(e);
+    if (i < 0) return;
+    e.currentTarget.setPointerCapture(e.pointerId);
+    gesture.current = { x: e.clientX, y: e.clientY, card: cards[i], swiping: false };
+    setTouch({ card: cards[i], dx: 0, dy: 0, swiping: false });
+  };
+  const move = (e) => {
+    const g = gesture.current;
+    if (!g) return;
+    const dx = e.clientX - g.x;
+    const dy = e.clientY - g.y;
+    if (!g.swiping && -dy > SWIPE_START && Math.abs(dy) > Math.abs(dx) * 0.8) g.swiping = true;
+    if (g.swiping) {
+      setTouch({ card: g.card, dx, dy: Math.min(dy, 0), swiping: true });
+    } else {
+      // Sliding along the hand: the card under the finger rises, a small tick when it changes. It only
+      // changes once the finger has moved a few pixels, so resting on a border doesn't flicker.
+      const c = cards[pointAt(e)];
+      if (c && c !== g.card && Math.abs(e.clientX - (g.switchX ?? g.x)) >= STICKY_PX) {
+        g.card = c;
+        g.switchX = e.clientX;
+        buzzOnce(8);
+      }
+      setTouch({ card: g.card, dx: 0, dy: 0, swiping: false });
+    }
+  };
+  const up = (e) => {
+    const g = gesture.current;
+    gesture.current = null;
+    if (!g) return;
+    const dy = e.clientY - g.y;
+    setTouch(null);
+    if (g.swiping && -dy > cardH * PLAY_LINE) {
+      if (canPlay(g.card)) {
+        setFlying(g.card);
+        buzzOnce(25);
+        setTimeout(() => setFlying(null), 400);
+        onPlay(g.card);
+      } else {
+        setRefused(g.card);
+        buzzOnce([40, 40, 40]);
+        setTimeout(() => setRefused(null), 450);
+        onRefuse?.(g.card);
+      }
+    } else if (!g.swiping) {
+      onSelect?.(selected === g.card ? null : g.card);
+    }
+  };
+  const cancel = () => { gesture.current = null; setTouch(null); };
+
+  const pastLine = touch?.swiping && -touch.dy > cardH * PLAY_LINE;
   return (
-    <div ref={box} key={dealKey} className={`fan${dealKey != null ? ' dealing' : ''}`} style={{ height: cardH + FAN_DROP + 26 }}>
+    <div ref={box} key={dealKey} className={`fan${dealKey != null ? ' dealing' : ''}${swipeable ? ' swipeable' : ''}`}
+      style={{ height: cardH + FAN_DROP + 26 }}
+      onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={cancel}>
+      {swipeable && touch?.swiping && (
+        <div className={`play-line${pastLine ? ' ready' : ''}`} style={{ top: 18 - cardH * PLAY_LINE + cardH * 0.25 }}>
+          {pastLine ? (canPlay(touch.card) ? 'Let go to play' : 'Can’t play that card') : 'Swipe up to play'}
+        </div>
+      )}
       {cards.map((c, i) => {
         const off = n > 1 ? (i - mid) / mid || 0 : 0;
-        const lift = selected === c ? -22 : 0;
+        const held = touch?.card === c;
+        const lift = selected === c || (held && !touch.swiping) ? -22 : 0;
+        const drag = held && touch.swiping;
+        const rot = off * (FAN_SPREAD_DEG / 2);
         return (
-          <PlayingCard key={c} code={c} size="held" selected={selected === c} disabled={disabled}
-            className={dim.includes(c) ? 'dim' : ''}
-            onClick={onSelect ? () => onSelect(selected === c ? null : c) : undefined}
+          <PlayingCard key={c} code={c} size="held" selected={selected === c || held} disabled={disabled}
+            className={`${dim.includes(c) ? 'dim' : ''}${drag ? ' dragging' : ''}${refused === c ? ' refused' : ''}${flying === c ? ' flying' : ''}`}
+            // With swiping on, the hand handles touches; clicks only come from the keyboard.
+            onClick={onSelect ? (e) => { if (!swipeable || e.detail === 0) onSelect(selected === c ? null : c); } : undefined}
             style={{
               '--w': `${cardW}px`,
               '--k': i,
-              left: left0 + i * step + gapsBefore[i] * SUIT_GAP,
+              left: lefts[i],
               top: 18 + off * off * FAN_DROP + lift,
-              transform: `rotate(${off * (FAN_SPREAD_DEG / 2)}deg)`,
-              zIndex: i + 1,
+              transform: drag
+                ? `translate(${touch.dx}px, ${touch.dy}px) rotate(${rot * 0.3}deg) scale(1.08)`
+                : `rotate(${rot}deg)`,
+              zIndex: drag ? 100 : i + 1,
             }} />
         );
       })}
