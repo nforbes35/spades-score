@@ -1,5 +1,5 @@
 import { contractBid, isNil, nilLabel, tableBid } from './lib/scoring.js';
-import { SEATS, teamOf, playerName, seatEntry, liveOf, leaderOf, booksPlayed, updateSeat, seatProgress } from './lib/table.js';
+import { SEATS, teamOf, playerName, seatEntry, liveOf, leaderOf, booksPlayed, updateSeat, seatProgress, remainingCards } from './lib/table.js';
 import { NumberControl, NilPicker, PlayingCard, Icon, CardText } from './components.jsx';
 
 /** Seats drawn around a table: you (seat 1) at the bottom, partner across the top. */
@@ -15,17 +15,17 @@ export function LeftOnTable({ hand }) {
   );
 }
 
-function SeatBadges({ game, hand, s, remoteSeat }) {
+function SeatBadges({ hand, s, remote }) {
   return (
     <>
       {hand.dealer === s && <span className="tag">deals</span>}
-      {remoteSeat === s && <span className="tag remote"><Icon name="phone" size={12} /> remote</span>}
+      {remote && <span className="tag remote"><Icon name="phone" size={12} /> remote</span>}
     </>
   );
 }
 
-/** Stage 1: everyone's bids, with nil / blind nil. */
-export function BidsPanel({ game, hand, number, onChange, remoteSeat, remoteName, peer }) {
+/** Stage 1: everyone's bids, with nil / blind nil. `remoteSeats` play from their phones. */
+export function BidsPanel({ game, hand, number, onChange, remoteSeats = [], online = () => false }) {
   const cycleDealer = () => onChange('Change dealer', (h) => ({ ...h, dealer: ((h.dealer ?? 0) + 1) % 4 }));
   return (
     <section className="live card">
@@ -52,7 +52,7 @@ export function BidsPanel({ game, hand, number, onChange, remoteSeat, remoteName
               <div className="bid-top">
                 <div className="who">
                   <span className="name">{name}</span>
-                  <SeatBadges game={game} hand={hand} s={s} remoteSeat={remoteSeat} />
+                  <SeatBadges hand={hand} s={s} remote={remoteSeats.includes(s)} />
                 </div>
                 {isNil(p.call)
                   ? <span className="nil-tag">{nilLabel(p.call)}</span>
@@ -61,8 +61,8 @@ export function BidsPanel({ game, hand, number, onChange, remoteSeat, remoteName
               </div>
               <NilPicker small label={`${name} nil`} value={p.call}
                 onChange={(call) => onChange(`${name}'s nil`, (h) => updateSeat(h, s, { call }))} />
-              {remoteSeat === s && (
-                <div className="hint">{peer ? `${remoteName} can bid from their phone too.` : `Waiting for ${remoteName} to connect.`}</div>
+              {remoteSeats.includes(s) && (
+                <div className="hint">{online(s) ? `${name} can bid from their phone too.` : `Waiting for ${name} to connect.`}</div>
               )}
             </div>
           );
@@ -76,12 +76,12 @@ export function BidsPanel({ game, hand, number, onChange, remoteSeat, remoteName
  * Stage 2: the table. Tap whoever won each book. Read-only when onAward is missing
  * (the remote player's view).
  */
-export function TableView({ game, hand, onAward, remoteSeat, mySeat, centerExtra }) {
+export function TableView({ game, hand, onAward, remoteSeats = [], mySeat, centerExtra }) {
   const live = liveOf(hand);
   const played = booksPlayed(hand);
   const leader = leaderOf(hand);
   const done = played >= 13;
-  const remoteName = remoteSeat != null ? playerName(game, remoteSeat) : null;
+  const shown = Object.entries(live.played).filter(([, c]) => c);
 
   return (
     <div className="table-grid">
@@ -93,7 +93,7 @@ export function TableView({ game, hand, onAward, remoteSeat, mySeat, centerExtra
           <>
             <div className="tile-name">
               {name}
-              {remoteSeat === s && s !== mySeat && <Icon name="phone" size={13} />}
+              {remoteSeats.includes(s) && s !== mySeat && <Icon name="phone" size={13} />}
             </div>
             <div className="tile-books">{p.books}</div>
             <div className={`tile-sub${prog.good ? ' good' : ''}${prog.bad ? ' bad' : ''}`}>
@@ -110,10 +110,14 @@ export function TableView({ game, hand, onAward, remoteSeat, mySeat, centerExtra
       })}
       <div className="table-center">
         <div className="book-count">{done ? 'All 13 books' : `Book ${played + 1}`}<small>{done ? 'played' : 'of 13'}</small></div>
-        {live.pending && (
-          <div className="played-card">
-            <PlayingCard code={live.pending} size="sm" />
-            <span>{mySeat === remoteSeat ? 'You played' : `${remoteName} played`}</span>
+        {shown.length > 0 && (
+          <div className="played-cards">
+            {shown.map(([seat, card]) => (
+              <div key={seat} className="played-card">
+                <PlayingCard code={card} size="sm" />
+                <span>{Number(seat) === mySeat ? 'You' : playerName(game, Number(seat))}</span>
+              </div>
+            ))}
           </div>
         )}
         {centerExtra}
@@ -122,11 +126,9 @@ export function TableView({ game, hand, onAward, remoteSeat, mySeat, centerExtra
   );
 }
 
-/** Stage 2 for the scorekeeper, with the remote player's card and a "your turn" ping. */
-export function PlayPanel({ game, hand, number, onAward, remoteSeat, peer, onPing, onScan }) {
+/** Stage 2 for the scorekeeper: the table, plus each remote player's card and a "your turn" ping. */
+export function PlayPanel({ game, hand, number, onAward, remoteSeats = [], online = () => false, onPing, onScan }) {
   const live = liveOf(hand);
-  const remoteName = remoteSeat != null ? playerName(game, remoteSeat) : null;
-  const remaining = live.cards ? live.cards.length - booksPlayed(hand) - (live.pending ? 1 : 0) : null;
   return (
     <section className="live card">
       <div className="live-head">
@@ -136,18 +138,23 @@ export function PlayPanel({ game, hand, number, onAward, remoteSeat, peer, onPin
         </div>
         <span className="chip quiet">{playerName(game, hand.dealer ?? 0)} dealt</span>
       </div>
-      <TableView game={game} hand={hand} onAward={onAward} remoteSeat={remoteSeat} />
-      {remoteSeat != null && (
-        <div className="remote-strip">
-          {live.pending
-            ? <span className="remote-played"><b>{remoteName}</b> played <span className="big-card-text"><CardText code={live.pending} /></span>. Play it for them.</span>
-            : <span>{live.cards ? `${remoteName} has ${remaining} card${remaining === 1 ? '' : 's'} left.` : `${remoteName}'s cards aren't scanned yet.`}</span>}
-          <div className="row">
-            {!live.cards && <button type="button" className="soft" onClick={onScan}><Icon name="camera" size={18} /> Scan cards</button>}
-            <button type="button" className="soft" disabled={!peer} onClick={onPing}><Icon name="bell" size={18} /> Your turn</button>
+      <TableView game={game} hand={hand} onAward={onAward} remoteSeats={remoteSeats} />
+      {remoteSeats.map((seat) => {
+        const name = playerName(game, seat);
+        const left = remainingCards(hand, seat);
+        const card = live.played[seat];
+        return (
+          <div key={seat} className="remote-strip">
+            {card
+              ? <span className="remote-played"><b>{name}</b> played <span className="big-card-text"><CardText code={card} /></span>. Play it for them.</span>
+              : <span>{left ? `${name} has ${left.length} card${left.length === 1 ? '' : 's'} left.` : `${name}'s cards aren't scanned yet.`}</span>}
+            <div className="row">
+              {!left && <button type="button" className="soft" onClick={() => onScan(seat)}><Icon name="camera" size={18} /> Scan cards</button>}
+              <button type="button" className="soft" disabled={!online(seat)} onClick={() => onPing(seat)}><Icon name="bell" size={18} /> Your turn</button>
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })}
     </section>
   );
 }

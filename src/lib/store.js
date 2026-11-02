@@ -1,5 +1,6 @@
 // Saves the game on this device (localStorage) and keeps an undo history of every change.
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { normalizeGame } from './table.js';
 
 const GAME_KEY = 'spades-game';
 const SETUP_KEY = 'spades-last-setup';
@@ -24,7 +25,7 @@ export function write(key, value) {
 }
 
 export function useGame() {
-  const [state, setState] = useState(() => ({ game: read(GAME_KEY), past: [] }));
+  const [state, setState] = useState(() => ({ game: normalizeGame(read(GAME_KEY)), past: [] }));
   useEffect(() => write(GAME_KEY, state.game), [state.game]);
   const last = useRef({ label: null, at: 0 });
 

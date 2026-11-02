@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { useGame, read, write } from './lib/store.js';
 import { history, standings, winner, newHand, signed, tableBid, totalBooks, scoreTeam, NIL_CALLS, STANDARD_RULES } from './lib/scoring.js';
-import { playerName, stageOf, liveOf, booksPlayed, updateSeat, awardBook, remainingCards, nextDealer } from './lib/table.js';
+import { playerName, stageOf, liveOf, booksPlayed, updateSeat, awardBook, remainingCards, nextDealer, remoteSeats, gameFor, playedBy } from './lib/table.js';
 import { cardLabel } from './lib/cards.js';
 import { useRoom } from './lib/room.js';
-import { useVideoCall } from './lib/video.js';
+import { useDevice } from './lib/device.js';
+import { useCall } from './lib/call.js';
 import { useWakeLock, chime, buzz } from './lib/fx.js';
 import { Sheet, RulesFields, NumberField, Icon, useToast, Confetti, StatusDot, CardText } from './components.jsx';
 import { BidsPanel, PlayPanel } from './LiveHand.jsx';
@@ -12,30 +13,47 @@ import NewGame from './NewGame.jsx';
 import HandSheet from './HandSheet.jsx';
 import ScanCards from './ScanCards.jsx';
 import Invite from './Invite.jsx';
-import VideoCorner from './VideoCorner.jsx';
+import { CallBox, SoundNote } from './Video.jsx';
 import RemoteApp from './RemoteApp.jsx';
+import GuestApp from './GuestApp.jsx';
+import TvApp from './TvApp.jsx';
+import JoinAs from './JoinAs.jsx';
 import { ScoreCard, HandRow } from './Scoreboard.jsx';
 
 const JOIN_KEY = 'spades-join';
 
+/**
+ * Joining someone else's game: { code, as: 'player' | 'guest' | 'tv' | undefined, seat }. Comes from
+ * a link (?join=CODE&as=tv or &seat=3) or from typing the code; remembered on this device.
+ */
 function initialJoin() {
-  const fromLink = new URLSearchParams(location.search).get('join');
-  if (fromLink) {
-    const code = fromLink.trim().toUpperCase();
-    write(JOIN_KEY, code);
+  const q = new URLSearchParams(location.search);
+  const code = q.get('join');
+  if (code) {
+    const seat = q.get('seat');
+    const join = {
+      code: code.trim().toUpperCase(),
+      as: seat != null ? 'player' : q.get('as') || undefined,
+      seat: seat != null ? Number(seat) : null,
+    };
+    write(JOIN_KEY, join);
     clearJoinParam();
-    return code;
+    return join;
   }
-  return read(JOIN_KEY);
+  const saved = read(JOIN_KEY);
+  return typeof saved === 'string' ? { code: saved } : saved; // older versions saved just the code
 }
 const clearJoinParam = () => window.history.replaceState(null, '', location.pathname);
 
 export default function App() {
-  const [joinCode, setJoinCode] = useState(initialJoin);
-  if (joinCode) {
-    return <RemoteApp code={joinCode} onLeave={() => { write(JOIN_KEY, null); setJoinCode(null); }} />;
-  }
-  return <HostApp onJoin={(code) => { write(JOIN_KEY, code); setJoinCode(code); }} />;
+  const [join, setJoin] = useState(initialJoin);
+  const update = (next) => { write(JOIN_KEY, next); setJoin(next); };
+  const leave = () => update(null);
+  if (join?.as === 'player' && join.seat != null) return <RemoteApp code={join.code} seat={join.seat} onLeave={leave} />;
+  if (join?.as === 'guest') return <GuestApp code={join.code} onLeave={leave} />;
+  if (join?.as === 'tv') return <TvApp code={join.code} onLeave={leave} />;
+  if (join?.code) return <JoinAs code={join.code} onChoose={(as, seat) => update({ code: join.code, as, seat })} onLeave={leave} />;
+  return <HostApp onJoin={(code) => update({ code })} />;
 }
 
 function HostApp({ onJoin }) {
@@ -76,40 +94,51 @@ function GameScreen({ store, toast, onNewGame, onJoin }) {
   const inPlayNumber = inPlay ? game.hands.indexOf(inPlay) + 1 : 0;
   const stage = inPlay ? stageOf(inPlay) : null;
 
-  // ----- Remote player link -----
+  // ----- Remote players, video guests and TV screens -----
   const remote = game.remote ?? null;
-  const remoteName = remote ? playerName(game, remote.seat) : '';
+  const seats = remoteSeats(game);
   const gameRef = useRef(game);
   gameRef.current = game;
-  const room = useRoom(remote?.code, 'host', onRemoteMessage);
-  const call = useVideoCall(room.send, false);
+  const [me, setMe] = useDevice(remote?.code, { role: 'host', name: 'Table' });
+  const room = useRoom(remote?.code, me, onRoomMessage);
+  // The table's phone points its rear camera at the table: that's the big picture on everyone's TV.
+  const call = useCall({ room, me, setMe, facing: 'environment' });
+  const players = room.peers.filter((p) => p.role === 'player');
+  const online = (seat) => players.some((p) => p.seat === seat);
 
-  function onRemoteMessage(m) {
+  const sendState = (g, to) => {
+    const targets = to ? [to] : room.peers;
+    for (const p of targets) room.send({ type: 'state', game: gameFor(g, p.role === 'player' ? p.seat : null) }, p.id);
+  };
+
+  function onRoomMessage(m, from) {
     const g = gameRef.current;
     if (!g?.remote) return;
-    const seat = g.remote.seat;
+    if (m.type === 'hello') { if (from) sendState(g, from); return; }
+    if (m.type === 'rtc') { call.handle(m); return; }
+    // Bids and plays only count from a remote player's phone, for their own seat.
+    const seat = from?.role === 'player' ? from.seat : null;
+    if (seat == null || !remoteSeats(g).includes(seat)) return;
     const name = playerName(g, seat);
     const hand = g.hands.find((h) => h.id === m.handId);
-    if (m.type === 'hello') room.send({ type: 'state', game: g });
-    else if (m.type === 'rtc') call.handle(m);
-    else if (m.type === 'bid' && hand && stageOf(hand) === 'bids') {
+    if (m.type === 'bid' && hand && stageOf(hand) === 'bids') {
       const bid = Math.max(0, Math.min(13, Math.trunc(Number(m.bid)) || 0));
       const nil = NIL_CALLS.some((c) => c.id === m.call) ? m.call : 'none';
       store.updateHand(hand.id, `${name}'s bid`, (h) => updateSeat(h, seat, { bid, call: nil }));
     } else if (m.type === 'play' && hand && stageOf(hand) === 'play') {
       const live = liveOf(hand);
-      if (live.pending || live.tricks.length !== m.book || !remainingCards(hand)?.includes(m.card)) return;
-      store.updateHand(hand.id, `${name} played ${cardLabel(m.card)}`, (h) => ({ ...h, live: { ...liveOf(h), pending: m.card } }));
+      if (live.played[seat] || live.tricks.length !== m.book || !remainingCards(hand, seat)?.includes(m.card)) return;
+      store.updateHand(hand.id, `${name} played ${cardLabel(m.card)}`,
+        (h) => ({ ...h, live: { ...liveOf(h), played: { ...liveOf(h).played, [seat]: m.card } } }));
       chime(true);
       buzz([80, 60, 80]);
       toast.show(<>{name} played <CardText code={m.card} /></>, { onUndo: store.undo, ms: 6000 });
     }
   }
 
-  // Keep the remote player's screen up to date.
-  useEffect(() => {
-    if (room.peer) room.send({ type: 'state', game });
-  }, [game, room.peer, room.send]);
+  // Keep every connected screen up to date.
+  const peerKey = room.peers.map((p) => `${p.id}:${p.role}:${p.seat}`).join(',');
+  useEffect(() => { sendState(game); }, [game, peerKey]);
 
   useWakeLock(true);
 
@@ -142,14 +171,18 @@ function GameScreen({ store, toast, onNewGame, onJoin }) {
     const played = booksPlayed(inPlay);
     const books = inPlay.teams.reduce((n, t) => n + totalBooks(t), 0);
     if (played < 13 && books !== 13 && !confirm(`Only ${books} of 13 books are counted. Score the hand anyway?`)) return;
-    change('Score hand', (h) => ({ ...h, inPlay: false, stage: 'done', live: { ...liveOf(h), pending: null } }));
+    change('Score hand', (h) => ({ ...h, inPlay: false, stage: 'done', live: { ...liveOf(h), played: {} } }));
     const pts = [0, 1].map((t) => `${game.teams[t].name} ${signed(scoreTeam(inPlay.teams[t], game.rules).total)}`).join(' · ');
     toast.show(`Scored: ${pts}`, { onUndo: store.undo, ms: 5000 });
   };
-  const ping = () => {
-    room.send({ type: 'ping' });
-    toast.show(`Told ${remoteName} it's their turn`);
+  const ping = (seat) => {
+    for (const p of players.filter((x) => x.seat === seat)) room.send({ type: 'ping' }, p.id);
+    toast.show(`Told ${playerName(game, seat)} it's their turn`);
   };
+  const [scanSeat, setScanSeat] = useState(null);
+  const openScan = (seat) => { setScanSeat(seat); setSheet('scan'); };
+  const guests = room.peers.filter((p) => p.role === 'guest');
+  const tvs = room.peers.filter((p) => p.role === 'tv');
 
   const numbered = game.hands.map((h, i) => ({ hand: h, number: i + 1, standing: hist[i] })).reverse();
 
@@ -185,16 +218,21 @@ function GameScreen({ store, toast, onNewGame, onJoin }) {
         {remote && (
           <div className="remote-bar card">
             <div className="remote-who">
-              <Icon name="phone" size={18} />
-              <div>
-                <b>{remoteName}</b> is playing remotely
-                <StatusDot on={room.peer} label={room.peer ? 'connected' : room.status === 'error' ? 'connection problem' : 'waiting to join'} />
+              <Icon name="users" size={18} />
+              <div className="who-list">
+                {seats.map((s) => <StatusDot key={s} on={online(s)} label={playerName(game, s)} />)}
+                {guests.length > 0 && <StatusDot on label={`${guests.length} on video`} />}
+                {tvs.length > 0 && <StatusDot on label={`${tvs.length} TV${tvs.length > 1 ? 's' : ''}`} />}
+                {!seats.length && !guests.length && !tvs.length && <span className="muted small">Nobody has joined yet</span>}
+                {room.status === 'error' && <span className="neg small">Connection problem</span>}
               </div>
             </div>
             <div className="row">
-              {!call.active && <button type="button" className="soft" disabled={!room.peer} onClick={call.start}><Icon name="video" size={18} /> Video</button>}
+              {!call.joined && <button type="button" className="soft" onClick={call.join}><Icon name="video" size={18} /> Table camera</button>}
               <button type="button" className="soft" onClick={() => setSheet('invite')}>Invite</button>
             </div>
+            {call.joined && <p className="hint">Point this phone’s back camera at the table: it’s the big picture on everyone’s TV.</p>}
+            <SoundNote call={call} />
           </div>
         )}
         {call.error && <p className="scan-msg">{call.error}</p>}
@@ -202,20 +240,24 @@ function GameScreen({ store, toast, onNewGame, onJoin }) {
         {inPlay && stage === 'bids' && (
           <>
             <BidsPanel game={game} hand={inPlay} number={inPlayNumber} onChange={change}
-              remoteSeat={remote?.seat} remoteName={remoteName} peer={room.peer} />
-            {remote && (
-              <div className="remote-strip standalone card">
-                <span>{liveOf(inPlay).cards ? `${remoteName}'s ${liveOf(inPlay).cards.length} cards are on their phone.` : `Deal, then scan ${remoteName}'s cards.`}</span>
-                <button type="button" className="soft" onClick={() => setSheet('scan')}>
-                  <Icon name="camera" size={18} /> {liveOf(inPlay).cards ? 'Rescan' : 'Scan cards'}
-                </button>
-              </div>
-            )}
+              remoteSeats={seats} online={online} />
+            {seats.map((s) => {
+              const cards = liveOf(inPlay).hands[s];
+              const name = playerName(game, s);
+              return (
+                <div key={s} className="remote-strip standalone card">
+                  <span>{cards ? `${name}'s ${cards.length} cards are on their phone.` : `Deal, then scan ${name}'s cards.`}</span>
+                  <button type="button" className="soft" onClick={() => openScan(s)}>
+                    <Icon name="camera" size={18} /> {cards ? 'Rescan' : 'Scan cards'}
+                  </button>
+                </div>
+              );
+            })}
           </>
         )}
         {inPlay && stage === 'play' && (
           <PlayPanel game={game} hand={inPlay} number={inPlayNumber} onAward={award}
-            remoteSeat={remote?.seat} peer={room.peer} onPing={ping} onScan={() => setSheet('scan')} />
+            remoteSeats={seats} online={online} onPing={ping} onScan={openScan} />
         )}
         {inPlay && (
           <button type="button" className="text-btn" onClick={() => setEditing(inPlay)}>
@@ -257,7 +299,7 @@ function GameScreen({ store, toast, onNewGame, onJoin }) {
       {sheet === 'menu' && (
         <Sheet title="Menu" onClose={() => setSheet(null)} closeLabel="Close">
           <div className="menu-list card group">
-            <button type="button" onClick={() => setSheet('invite')}><Icon name="phone" /> {remote ? 'Remote player' : 'Add a remote player'}</button>
+            <button type="button" onClick={() => setSheet('invite')}><Icon name="users" /> Remote players, video &amp; TV</button>
             <button type="button" onClick={() => setSheet('rules')}><Icon name="edit" /> Scoring rules</button>
             <button type="button" onClick={() => { setSheet(null); if (confirm('Start a new game? You can undo this.')) onNewGame(); }}>
               <Icon name="flip" /> New game
@@ -279,21 +321,22 @@ function GameScreen({ store, toast, onNewGame, onJoin }) {
         <RulesSheet game={game} onSave={(r, t) => { store.updateSettings(r, t); setSheet(null); }} onClose={() => setSheet(null)} />
       )}
       {sheet === 'invite' && (
-        <Invite game={game} peer={room.peer} onClose={() => setSheet(null)}
+        <Invite game={game} peers={room.peers} onClose={() => setSheet(null)}
           onSet={(r) => { if (!r) room.send({ type: 'ended' }); store.setRemote(r); }} />
       )}
-      {sheet === 'scan' && inPlay && remote && (
-        <ScanCards name={remoteName} initial={liveOf(inPlay).cards}
-          played={liveOf(inPlay).tricks.map((t) => t.card).filter(Boolean)}
+      {sheet === 'scan' && inPlay && scanSeat != null && (
+        <ScanCards name={playerName(game, scanSeat)} initial={liveOf(inPlay).hands[scanSeat]}
+          played={playedBy(inPlay, scanSeat)}
           onClose={() => setSheet(null)}
           onSend={(cards) => {
-            change(`Scanned ${remoteName}'s cards`, (h) => ({ ...h, live: { ...liveOf(h), cards } }));
+            const name = playerName(game, scanSeat);
+            change(`Scanned ${name}'s cards`, (h) => ({ ...h, live: { ...liveOf(h), hands: { ...liveOf(h).hands, [scanSeat]: cards } } }));
             setSheet(null);
-            toast.show(room.peer ? `Sent ${cards.length} cards to ${remoteName}` : `Saved. ${remoteName} sees them when they join.`);
+            toast.show(online(scanSeat) ? `Sent ${cards.length} cards to ${name}` : `Saved. ${name} sees them when they join.`);
           }} />
       )}
 
-      {remote && <VideoCorner call={call} peerName={remoteName} />}
+      {remote && <CallBox call={call} videos={call.videos} emptyText="Waiting for others to turn on video…" />}
       {party && <Confetti />}
       {toast.node}
     </div>

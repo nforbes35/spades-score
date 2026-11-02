@@ -15,13 +15,21 @@ plain words, keep text large and buttons big, check every screen fits a 320px ph
 - Hand flow: New Hand → bids (stage 'bids') → tap who won each book (stage 'play') → Score Hand.
   `HandSheet.jsx` fixes bids/books by hand.
 
-## Remote player
-- One player can join from another phone ("remote mode", `RemoteApp.jsx`) with a 4-letter code or link
-  (`?join=CODE`). The table's phone is the source of truth; it broadcasts the whole game; the remote sends
-  `bid` / `play` messages; the table can `ping`. See `src/lib/room.js`.
-- Link: Supabase Realtime broadcast (needs `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY`; no tables).
-  With them blank it falls back to BroadcastChannel, which links tabs in one browser — good for testing.
-- Video: WebRTC (`src/lib/video.js`), signalling over the same room. STUN only unless `VITE_TURN_*` set.
+## Remote play, video and TV
+- Devices in a game room (`src/lib/room.js`): the table's phone ("host"), remote players ("player", one per
+  seat in `game.remote.seats`), video guests ("guest": extra faces at the table, family at home), TV views
+  ("tv"), and "lobby" while choosing. Each sends a heartbeat with who it is; messages go to all or `to` one.
+  The host sends each device its own copy of the game (`gameFor`): a player gets only their own cards.
+- Links: `?join=CODE&seat=3` (player), `&as=guest`, `&as=tv`, or just `?join=CODE` to choose (`JoinAs.jsx`).
+- Hand data per remote seat: `live.hands[seat]`, `live.played[seat]`, tricks `{ winner, cards: {seat: card} }`.
+  `normalizeGame` converts games saved with the old single `remote.seat`.
+- Video (`src/lib/call.js`): every pair of devices in the call connects directly (WebRTC, perfect
+  negotiation); signalling over the room. The host uses the rear camera (the table, big in the middle of
+  the TV); others the front. `TvApp.jsx` is receive-only. iPhone web apps can't drive a separate AirPlay
+  screen, so the TV view runs on a second device (smart-TV browser, laptop on HDMI, iPad mirrored).
+- Feedback: `place.js` fingerprints each device's public address (STUN, hashed with the game code). Per
+  place one device handles sound (host > player > guest > tv, then first joined); the rest start muted.
+- Link: Supabase Realtime broadcast (`VITE_SUPABASE_*`; no tables) or BroadcastChannel between tabs.
 - Card photo: read on the phone, free (`src/lib/cardVision.js`, onnxruntime-web, single thread in a
   worker). Model `public/models/cards-gen3.onnx` = sroot/lgd-cards-gen3 on Hugging Face (corner detector,
   52 classes, AGPL-3.0, details in `public/models/README.txt`). Because of AGPL the repo is public and

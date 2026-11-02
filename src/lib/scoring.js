@@ -26,7 +26,7 @@ export const newTeamRound = () => ({ players: [newPlayer(), newPlayer()] });
 export const newHand = (dealer = 0) => ({
   id: crypto.randomUUID(), inPlay: true, stage: 'bids', dealer,
   teams: [newTeamRound(), newTeamRound()],
-  live: { tricks: [], cards: null, pending: null },
+  live: { tricks: [], hands: {}, played: {} },
 });
 
 export const signed = (n) => (n > 0 ? `+${n}` : `${n}`);

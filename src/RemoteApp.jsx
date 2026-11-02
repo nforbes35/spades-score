@@ -1,21 +1,23 @@
 import { useEffect, useState } from 'react';
+import QRCode from 'qrcode';
 import { read, write } from './lib/store.js';
 import { history, standings, winner, contractBid, isNil, nilLabel } from './lib/scoring.js';
-import { SEATS, teamOf, playerName, seatEntry, stageOf, liveOf, leaderOf, remainingCards, booksPlayed } from './lib/table.js';
+import { SEATS, teamOf, playerName, seatEntry, stageOf, liveOf, leaderOf, remainingCards, booksPlayed, remoteSeats } from './lib/table.js';
 import { sortHand } from './lib/cards.js';
-import { useRoom } from './lib/room.js';
-import { useVideoCall } from './lib/video.js';
+import { useRoom, joinLink } from './lib/room.js';
+import { useDevice } from './lib/device.js';
+import { useCall } from './lib/call.js';
 import { useWakeLock, chime, buzz } from './lib/fx.js';
-import { NumberControl, NilPicker, FannedHand, Icon, useToast, StatusDot, Confetti, CardText } from './components.jsx';
+import { NumberControl, NilPicker, FannedHand, Icon, useToast, StatusDot, Confetti, CardText, Sheet } from './components.jsx';
 import { LeftOnTable, TableView } from './LiveHand.jsx';
 import { ScoreCard, HandRow } from './Scoreboard.jsx';
-import VideoCorner from './VideoCorner.jsx';
+import { CallBox, CallButtons, SoundNote } from './Video.jsx';
 
 const STATE_KEY = 'spades-remote-state';
 const SEND_TIMEOUT_MS = 6000;
 
-/** Remote mode: the player who isn't at the table. Sees their cards, bids and books live. */
-export default function RemoteApp({ code, onLeave }) {
+/** Remote mode: a player who isn't at the table. Sees their cards, bids and books live. */
+export default function RemoteApp({ code, seat: mySeat, onLeave }) {
   const [game, setGame] = useState(() => {
     const saved = read(STATE_KEY);
     return saved?.code === code ? saved.game : null;
@@ -26,9 +28,11 @@ export default function RemoteApp({ code, onLeave }) {
   const [sending, setSending] = useState(null);
   const [revealed, setRevealed] = useState({});
   const [draft, setDraft] = useState(null);
+  const [tvHelp, setTvHelp] = useState(false);
   const toast = useToast();
 
-  const room = useRoom(code, 'remote', (m) => {
+  const [device, setDevice] = useDevice(code, { role: 'player', name: game ? playerName(game, mySeat) : '', seat: mySeat });
+  const room = useRoom(code, device, (m) => {
     if (m.type === 'state') {
       setGame(m.game);
       setEnded(!m.game?.remote || m.game.remote.code !== code);
@@ -44,17 +48,22 @@ export default function RemoteApp({ code, onLeave }) {
       call.handle(m);
     }
   });
-  const call = useVideoCall(room.send, true);
+  const call = useCall({ room, me: device, setMe: setDevice, facing: 'user' });
+  const host = room.peers.find((p) => p.role === 'host');
+  const connected = Boolean(host);
+  // A TV view at this player's home shows the video, so the phone keeps to the cards.
+  const tvHere = room.peers.some((p) => p.role === 'tv' && p.place && p.place === device.place);
 
-  useEffect(() => { if (room.peer) room.send({ type: 'hello' }); }, [room.peer, room.send]);
+  useEffect(() => { if (connected) room.send({ type: 'hello' }); }, [connected, room.send]);
   useWakeLock(true);
 
-  const mySeat = game?.remote?.seat;
   const hand = game?.hands.find((h) => h.inPlay) ?? null;
   const stage = hand ? stageOf(hand) : null;
   const me = hand && mySeat != null ? seatEntry(hand, mySeat) : null;
   const live = hand ? liveOf(hand) : null;
-  const myCards = hand ? sortHand(remainingCards(hand) ?? []) : [];
+  const myCards = hand ? sortHand(remainingCards(hand, mySeat) ?? []) : [];
+  const myPlayed = live?.played[mySeat] ?? null;
+  const notMySeat = game && !remoteSeats(game).includes(mySeat);
 
   // My bid while it's on its way to the table, so quick taps don't jump around.
   const shownBid = draft && draft.handId === hand?.id ? draft : me;
@@ -69,8 +78,8 @@ export default function RemoteApp({ code, onLeave }) {
 
   // A played card is "sending" until the table's state shows it.
   useEffect(() => {
-    if (sending && live?.pending === sending.card) setSending(null);
-  }, [live?.pending]);
+    if (sending && myPlayed === sending.card) setSending(null);
+  }, [myPlayed]);
   useEffect(() => {
     if (!sending) return undefined;
     const t = setTimeout(() => {
@@ -95,7 +104,7 @@ export default function RemoteApp({ code, onLeave }) {
     buzz(40);
   };
 
-  const canPlay = stage === 'play' && !live.pending && !sending && room.peer && booksPlayed(hand) < 13;
+  const canPlay = stage === 'play' && !myPlayed && !sending && connected && booksPlayed(hand) < 13;
   const coverCards = stage === 'bids' && myCards.length > 0 && !revealed[hand.id];
   // Cards sit in a dock at the bottom of the screen, like a hand held at a real table.
   const docked = Boolean(hand) && myCards.length > 0 && !coverCards;
@@ -103,7 +112,7 @@ export default function RemoteApp({ code, onLeave }) {
   let status = null;
   if (stage === 'play') {
     const leader = leaderOf(hand);
-    if (live.pending || sending) status = { text: <>You played <CardText code={live.pending ?? sending.card} />. Waiting for the book.</> };
+    if (myPlayed || sending) status = { text: <>You played <CardText code={myPlayed ?? sending.card} />. Waiting for the book.</> };
     else if (booksPlayed(hand) >= 13) status = { text: 'All 13 books played. Waiting for the score.' };
     else if (leader === mySeat) status = { text: 'You lead this book!', hot: true };
     else status = { text: `${playerName(game, leader)} leads this book. Play when it's your turn.` };
@@ -119,8 +128,11 @@ export default function RemoteApp({ code, onLeave }) {
             <span className="mode-chip"><Icon name="phone" size={13} /> Remote</span>
           </div>
           <div className="row">
-            {!call.active && (
-              <button type="button" className="icon-btn round" aria-label="Video chat with the table" disabled={!room.peer} onClick={call.start}>
+            <button type="button" className="icon-btn round" aria-label="Watch on your TV" onClick={() => setTvHelp(true)}>
+              <Icon name="tv" />
+            </button>
+            {!call.joined && (
+              <button type="button" className="icon-btn round" aria-label="Video chat with the table" disabled={!connected} onClick={call.join}>
                 <Icon name="video" />
               </button>
             )}
@@ -137,7 +149,7 @@ export default function RemoteApp({ code, onLeave }) {
             </div>
           )}
           <div className="target">
-            <StatusDot on={room.peer} label={room.peer ? 'Connected to the table' : room.status === 'error' ? 'Connection problem' : 'Connecting…'} />
+            <StatusDot on={connected} label={connected ? 'Connected to the table' : room.status === 'error' ? 'Connection problem' : 'Connecting…'} />
           </div>
         </div>
       </header>
@@ -168,6 +180,16 @@ export default function RemoteApp({ code, onLeave }) {
           <>
             {win != null && <div className="winner"><Icon name="trophy" size={26} /> {game.teams[win].name} wins!</div>}
             <p className="you-are">You're playing as <b>{playerName(game, mySeat)}</b> for {game.teams[teamOf(mySeat)].name}</p>
+            {notMySeat && (
+              <div className="scan-msg">The table hasn't set {playerName(game, mySeat)} as a remote player. Ask the scorekeeper to add you in Invite.</div>
+            )}
+            {call.joined && tvHere && (
+              <div className="card tv-bar">
+                <span><Icon name="tv" size={18} /> Video is on your TV</span>
+                <CallButtons call={call} showFlip={false} size={18} />
+              </div>
+            )}
+            {call.joined && <SoundNote call={call} />}
 
             {!hand && (
               <div className="card waiting-card">
@@ -260,7 +282,7 @@ export default function RemoteApp({ code, onLeave }) {
         <div className="hand-dock">
           <div className="dock-head">
             <span>Your cards · {myCards.length} left</span>
-            {stage === 'play' && !room.peer && <span>Reconnecting…</span>}
+            {stage === 'play' && !connected && <span>Reconnecting…</span>}
           </div>
           <FannedHand cards={myCards} selected={selected} onSelect={stage === 'play' ? setSelected : undefined} />
           <div className="dock-action">
@@ -271,7 +293,7 @@ export default function RemoteApp({ code, onLeave }) {
                 {canPlay ? <>Play <CardText code={selected} /></> : 'Wait for the book to finish'}
               </button>
             ) : (
-              <p className="dock-hint">{live.pending || sending ? 'Waiting for the book to be taken…' : 'Tap a card to choose it.'}</p>
+              <p className="dock-hint">{myPlayed || sending ? 'Waiting for the book to be taken…' : 'Tap a card to choose it.'}</p>
             )}
           </div>
         </div>
@@ -280,9 +302,41 @@ export default function RemoteApp({ code, onLeave }) {
       )}
       {docked && call.error && <p className="scan-msg">{call.error}</p>}
 
-      <VideoCorner call={call} peerName="the table" />
+      {call.joined && !tvHere && (
+        <CallBox call={call} emptyText="Waiting for the table’s camera…"
+          videos={[...call.videos].sort((a, b) => (a.peer.role === 'host' ? -1 : b.peer.role === 'host' ? 1 : 0))} />
+      )}
+      {tvHelp && <TvHelp code={code} tvHere={tvHere} onClose={() => setTvHelp(false)} />}
       {win != null && <Confetti />}
       {toast.node}
     </div>
+  );
+}
+
+/** How to put the table and everyone's faces on a TV: open the TV view on a second device. */
+function TvHelp({ code, tvHere, onClose }) {
+  const link = joinLink(code, { as: 'tv' });
+  const [qr, setQr] = useState(null);
+  useEffect(() => { QRCode.toDataURL(link, { margin: 1, width: 300 }).then(setQr).catch(() => {}); }, [link]);
+  return (
+    <Sheet title="Watch on your TV" onClose={onClose} closeLabel="Done">
+      {tvHere && <div className="scan-msg ok">A TV view is connected at your place. Video shows there; this phone keeps your cards.</div>}
+      <p className="lead-text">
+        Put the table and everyone’s faces on your TV while this phone keeps your cards. Open the TV view on
+        something connected to the TV:
+      </p>
+      <ul className="tv-ways">
+        <li><b>A smart TV’s web browser</b>: go to the address below.</li>
+        <li><b>A laptop</b> plugged into the TV with an HDMI cable.</li>
+        <li><b>An iPad or Mac</b> with an Apple TV: open the TV view, then AirPlay <i>Screen Mirroring</i> to the TV.</li>
+      </ul>
+      <div className="invite-card card">
+        <div className="eyebrow">TV view address</div>
+        <div className="tv-link">{link.replace(/^https?:\/\//, '')}</div>
+        {qr && <img className="qr" src={qr} alt="QR code for the TV view" />}
+        <p className="footnote center">Or open Spades on that device, tap <b>Join a game</b>, type <b>{code}</b> and choose <b>TV view</b>.</p>
+      </div>
+      <p className="footnote">An iPhone can’t send a separate picture to the TV, only mirror itself, which is why the TV view goes on a second device. Sound stays on this phone so there’s no echo.</p>
+    </Sheet>
   );
 }

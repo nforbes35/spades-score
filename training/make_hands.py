@@ -10,6 +10,7 @@ import argparse
 import json
 import random
 import shutil
+from multiprocessing import Pool, cpu_count
 
 import cv2
 import numpy as np
@@ -185,31 +186,46 @@ def finish(img: np.ndarray) -> np.ndarray:
     return cv2.imdecode(buf, cv2.IMREAD_COLOR)
 
 
+DECK = {}
+
+
+def load_deck():
+    src = WORK / "cards"
+    DECK["index"] = json.loads((src / "index.json").read_text())
+    DECK["cards"] = {code: cv2.imread(str(src / f"{code}.png")) for code in DECK["index"]}
+
+
+def make_and_save(job):
+    split, n, seed = job
+    random.seed(seed)
+    np.random.seed(seed % 2**32)
+    w, h = random.choice([(960, 1280), (1280, 960), (1024, 1024)])
+    img, labels = make_one(DECK["cards"], DECK["index"], w, h)
+    out = WORK / "synth"
+    cv2.imwrite(str(out / "images" / split / f"{n:05d}.jpg"), img)
+    (out / "labels" / split / f"{n:05d}.txt").write_text(
+        "".join(f"{c} {x:.6f} {y:.6f} {bw:.6f} {bh:.6f}\n" for c, x, y, bw, bh in labels))
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--train", type=int, default=3000)
     ap.add_argument("--val", type=int, default=300)
     ap.add_argument("--seed", type=int, default=1)
     args = ap.parse_args()
-    random.seed(args.seed)
-    np.random.seed(args.seed)
 
-    src = WORK / "cards"
-    index = json.loads((src / "index.json").read_text())
-    cards = {code: cv2.imread(str(src / f"{code}.png")) for code in index}
     out = WORK / "synth"
     shutil.rmtree(out, ignore_errors=True)
+    jobs = []
     for split, count in (("train", args.train), ("val", args.val)):
         (out / "images" / split).mkdir(parents=True)
         (out / "labels" / split).mkdir(parents=True)
-        for n in range(count):
-            w, h = random.choice([(960, 1280), (1280, 960), (1024, 1024)])
-            img, labels = make_one(cards, index, w, h)
-            cv2.imwrite(str(out / "images" / split / f"{n:05d}.jpg"), img)
-            (out / "labels" / split / f"{n:05d}.txt").write_text(
-                "".join(f"{c} {x:.6f} {y:.6f} {bw:.6f} {bh:.6f}\n" for c, x, y, bw, bh in labels))
-            if n % 250 == 0:
-                print(f"{split}: {n}/{count}", flush=True)
+        jobs += [(split, n, args.seed * 1_000_003 + len(jobs) + n) for n in range(count)]
+    # Spread the work over the Mac's cores; each photo gets its own seed so runs repeat exactly.
+    with Pool(max(1, cpu_count() - 1), initializer=load_deck) as pool:
+        for done, _ in enumerate(pool.imap_unordered(make_and_save, jobs, chunksize=8), 1):
+            if done % 500 == 0:
+                print(f"{done}/{len(jobs)}", flush=True)
     (out / "data.yaml").write_text(
         f"path: {out}\ntrain: images/train\nval: images/val\nnames:\n" + "".join(f"  {i}: {n}\n" for i, n in enumerate(NAMES)))
     print(f"Done: {out}")
