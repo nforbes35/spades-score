@@ -11,6 +11,8 @@ import { useDevice } from './lib/device.js';
 import { useCall } from './lib/call.js';
 import { useKeys, seal, unseal } from './lib/secret.js';
 import { useWakeLock, chime, buzz } from './lib/fx.js';
+import { recordGame, useStatsSync } from './lib/stats.js';
+import Stats from './Stats.jsx';
 import { Icon, FannedHand, PlayingCard, Sheet, RulesFields, Toggle, Segmented, useToast, Confetti, StatusDot, CardText, useCountUp } from './components.jsx';
 import { VideoTile, CallButtons, SoundNote } from './Video.jsx';
 import { HandRow } from './Scoreboard.jsx';
@@ -83,6 +85,7 @@ function OnlineRoom({ code, isHost, name, onLeave }) {
 
   const room = useRoom(code, me, onMessage);
   const call = useCall({ room, me, setMe, facing: 'user' });
+  const statsSync = useStatsSync(room);
   const hostPeer = isHost ? null : room.peers.find((p) => p.role === 'ohost');
   hostRef.current = hostPeer;
 
@@ -105,6 +108,7 @@ function OnlineRoom({ code, isHost, name, onLeave }) {
 
   function onMessage(m, from) {
     if (m.type === 'rtc') { call.handle(m); return; }
+    if (statsSync(m, from)) return;
     if (isHost) {
       if (!from) return;
       const t = tableRef.current;
@@ -181,6 +185,11 @@ function OnlineRoom({ code, isHost, name, onLeave }) {
   // ----- What this device shows -----
   const shown = isHost ? (table ? publicTable(table) : null) : view;
   const mySeat = shown ? seatOf(shown, me.id) : -1;
+  // Every device keeps the game for stats as hands are scored (computer players noted).
+  const scoredHands = shown?.game ? shown.game.hands.filter((h) => !h.inPlay).length : 0;
+  useEffect(() => {
+    if (shown?.game) recordGame(shown.game, { mode: 'online', bots: shown.seats.filter((s) => s?.bot).map((s) => s.name) });
+  }, [scoredHands, shown?.game?.id, shown?.phase]);
   const handNo = shown?.game?.hands.length ?? 0;
   const cards = isHost
     ? (mySeat >= 0 && table?.round?.hands ? table.round.hands[mySeat] : null)
@@ -298,6 +307,7 @@ function Lobby({ code, table, isHost, me, people, call, onSit, onStand, hostActi
   const [qr, setQr] = useState(null);
   const [copied, setCopied] = useState(false);
   const [rulesOpen, setRulesOpen] = useState(false);
+  const [statsOpen, setStatsOpen] = useState(false);
   const link = joinLink(code, { as: 'online' });
   useEffect(() => { QRCode.toDataURL(link, { margin: 1, width: 320 }).then(setQr).catch(() => {}); }, [link]);
   const mySeat = table.seats.findIndex((s) => s?.id === me.id);
@@ -348,7 +358,10 @@ function Lobby({ code, table, isHost, me, people, call, onSit, onStand, hostActi
       <main className="wrap">
         {table.game && (
           <div className="card last-game">
-            <div className="eyebrow">Last game</div>
+            <div className="row between">
+              <span className="eyebrow">Last game</span>
+              <button type="button" className="text-btn small" onClick={() => setStatsOpen(true)}><Icon name="trophy" size={15} /> Stats</button>
+            </div>
             {(() => {
               const st = standings(table.game);
               const w = winner(table.game);
@@ -420,6 +433,7 @@ function Lobby({ code, table, isHost, me, people, call, onSit, onStand, hostActi
           <p className="dock-hint dark">{mySeat >= 0 ? `Waiting for ${host?.name ?? 'the host'} to start…` : 'Tap “Sit here” to take a seat.'}</p>
         )}
       </div>
+      {statsOpen && <Stats onClose={() => setStatsOpen(false)} />}
       {rulesOpen && (
         <RulesSheetOnline rules={table.settings.rules} onClose={() => setRulesOpen(false)}
           onSave={(rules) => { hostActions.settings({ rules: { ...rules, blindNilAllowed: table.settings.rules.blindNilAllowed } }); setRulesOpen(false); }} />
@@ -656,6 +670,7 @@ function HandResult({ table, isHost, hostActions }) {
   const over = table.phase === 'over';
   const w = winner(game);
   const [left, setLeft] = useState(Math.round(NEXT_HAND_MS / 1000));
+  const [statsOpen, setStatsOpen] = useState(false);
   useEffect(() => {
     if (over) return undefined;
     const t = setInterval(() => setLeft((x) => Math.max(0, x - 1)), 1000);
@@ -679,6 +694,8 @@ function HandResult({ table, isHost, hostActions }) {
           })}
         </div>
         {over && <HandList game={game} />}
+        {over && <button type="button" className="text-btn" onClick={() => setStatsOpen(true)}><Icon name="trophy" size={16} /> See everyone’s stats</button>}
+        {statsOpen && <Stats onClose={() => setStatsOpen(false)} />}
         {isHost ? (
           over ? (
             <div className="stack">

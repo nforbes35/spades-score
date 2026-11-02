@@ -4,7 +4,7 @@ import { PlayingCard, Icon } from './components.jsx';
 const SHOWCASE = ['10S', 'JD', 'QC', 'KH', 'AS'];
 
 /** The first screen: pick how you're playing tonight. */
-export default function Home({ onPlayOnline, onTable, onJoin }) {
+export default function Home({ onPlayOnline, onTable, onJoin, onStats }) {
   const [joining, setJoining] = useState(false);
   const [code, setCode] = useState('');
   const clean = code.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 4);
@@ -60,6 +60,9 @@ export default function Home({ onPlayOnline, onTable, onJoin }) {
             </div>
           </form>
         )}
+        <button type="button" className="home-stats" onClick={onStats}>
+          <Icon name="trophy" size={20} /> Stats &amp; records
+        </button>
       </div>
     </div>
   );

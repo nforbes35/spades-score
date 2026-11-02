@@ -7,6 +7,8 @@ import { useRoom } from './lib/room.js';
 import { useDevice } from './lib/device.js';
 import { useCall } from './lib/call.js';
 import { useWakeLock, chime, buzz } from './lib/fx.js';
+import { recordGame, useStatsSync } from './lib/stats.js';
+import Stats from './Stats.jsx';
 import { Sheet, RulesFields, NumberField, Icon, useToast, Confetti, StatusDot, CardText } from './components.jsx';
 import { BidsPanel, PlayPanel } from './LiveHand.jsx';
 import NewGame from './NewGame.jsx';
@@ -66,6 +68,7 @@ function HostApp({ onJoin, onPlayOnline }) {
   const store = useGame();
   const [newGameOpen, setNewGameOpen] = useState(false);
   const [setup, setSetup] = useState(false);
+  const [statsOpen, setStatsOpen] = useState(false);
   const toast = useToast();
 
   if (!store.game) {
@@ -73,7 +76,8 @@ function HostApp({ onJoin, onPlayOnline }) {
       <>
         {setup
           ? <NewGame lastSetup={store.lastSetup} onStart={store.start} onBack={() => setSetup(false)} />
-          : <Home onPlayOnline={onPlayOnline} onTable={() => setSetup(true)} onJoin={onJoin} />}
+          : <Home onPlayOnline={onPlayOnline} onTable={() => setSetup(true)} onJoin={onJoin} onStats={() => setStatsOpen(true)} />}
+        {statsOpen && <Stats onClose={() => setStatsOpen(false)} />}
         {toast.node}
       </>
     );
@@ -112,6 +116,7 @@ function GameScreen({ store, toast, onNewGame, onJoin, onPlayOnline }) {
   const room = useRoom(remote?.code, me, onRoomMessage);
   // The table's phone points its rear camera at the table: that's the big picture on everyone's TV.
   const call = useCall({ room, me, setMe, facing: 'environment' });
+  const statsSync = useStatsSync(room);
   const players = room.peers.filter((p) => p.role === 'player');
   const online = (seat) => players.some((p) => p.seat === seat);
 
@@ -123,6 +128,7 @@ function GameScreen({ store, toast, onNewGame, onJoin, onPlayOnline }) {
   function onRoomMessage(m, from) {
     const g = gameRef.current;
     if (!g?.remote) return;
+    if (statsSync(m, from)) return;
     if (m.type === 'hello') { if (from) sendState(g, from); return; }
     if (m.type === 'rtc') { call.handle(m); return; }
     // Bids and plays only count from a remote player's phone, for their own seat.
@@ -150,6 +156,10 @@ function GameScreen({ store, toast, onNewGame, onJoin, onPlayOnline }) {
   useEffect(() => { sendState(game); }, [game, peerKey]);
 
   useWakeLock(true);
+
+  // Keep this game in the stats log as it goes (finished once someone wins).
+  const scoredHands = game.hands.filter((h) => !h.inPlay).length;
+  useEffect(() => { recordGame(game, { mode: 'table' }); }, [scoredHands, win, game.id]);
 
   useEffect(() => {
     if (win == null) return undefined;
@@ -312,6 +322,7 @@ function GameScreen({ store, toast, onNewGame, onJoin, onPlayOnline }) {
           <div className="menu-list card group">
             <button type="button" onClick={() => setSheet('invite')}><Icon name="users" /> Remote players, video &amp; TV</button>
             <button type="button" onClick={() => { setSheet(null); onPlayOnline(); }}><Icon name="cards" /> Play online instead</button>
+            <button type="button" onClick={() => setSheet('stats')}><Icon name="trophy" /> Stats &amp; records</button>
             <button type="button" onClick={() => setSheet('rules')}><Icon name="edit" /> Scoring rules</button>
             <button type="button" onClick={() => { setSheet(null); if (confirm('Start a new game? You can undo this.')) onNewGame(); }}>
               <Icon name="flip" /> New game
@@ -329,6 +340,7 @@ function GameScreen({ store, toast, onNewGame, onJoin, onPlayOnline }) {
           </div>
         </Sheet>
       )}
+      {sheet === 'stats' && <Stats onClose={() => setSheet(null)} />}
       {sheet === 'rules' && (
         <RulesSheet game={game} onSave={(r, t) => { store.updateSettings(r, t); setSheet(null); }} onClose={() => setSheet(null)} />
       )}

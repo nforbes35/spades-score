@@ -34,6 +34,13 @@ plain words, keep text large and buttons big, check every screen fits a 320px ph
   (`spades-device-id`, per tab first) so a reload rejoins the same seat; the host can let the computer stand in
   for someone who dropped out. After a game: play again (same seats) or back to the lobby to change things.
 
+## Stats
+- `src/lib/stats.js`: every game (both modes) is saved to `spades-game-log` as scored hands come in
+  (`recordGame`, finished once someone wins); `computeStats` gives wins/losses/win %, nil & blind nil made,
+  bids, books, streaks, partners, rivals. People are matched by name (case/space-insensitive); computer
+  players are kept as partners but not ranked. Devices in any game room swap logs (`useStatsSync`,
+  `log-have`/`log-games`), so stats fill in on every phone. UI: `Stats.jsx` (home, menus, lobby, game over).
+
 ## Remote play, video and TV
 - Devices in a game room (`src/lib/room.js`): the table's phone ("host"), remote players ("player", one per
   seat in `game.remote.seats`), video guests ("guest": extra faces at the table, family at home), TV views

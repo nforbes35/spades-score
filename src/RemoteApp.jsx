@@ -8,6 +8,7 @@ import { useRoom, joinLink } from './lib/room.js';
 import { useDevice } from './lib/device.js';
 import { useCall } from './lib/call.js';
 import { useWakeLock, chime, buzz } from './lib/fx.js';
+import { recordGame, useStatsSync } from './lib/stats.js';
 import { NumberControl, NilPicker, FannedHand, Icon, useToast, StatusDot, Confetti, CardText, Sheet } from './components.jsx';
 import { LeftOnTable, TableView } from './LiveHand.jsx';
 import { ScoreCard, HandRow } from './Scoreboard.jsx';
@@ -32,7 +33,8 @@ export default function RemoteApp({ code, seat: mySeat, onLeave }) {
   const toast = useToast();
 
   const [device, setDevice] = useDevice(code, { role: 'player', name: game ? playerName(game, mySeat) : '', seat: mySeat });
-  const room = useRoom(code, device, (m) => {
+  const room = useRoom(code, device, (m, from) => {
+    if (statsSync(m, from)) return;
     if (m.type === 'state') {
       setGame(m.game);
       setEnded(!m.game?.remote || m.game.remote.code !== code);
@@ -49,6 +51,7 @@ export default function RemoteApp({ code, seat: mySeat, onLeave }) {
     }
   });
   const call = useCall({ room, me: device, setMe: setDevice, facing: 'user' });
+  const statsSync = useStatsSync(room);
   const host = room.peers.find((p) => p.role === 'host');
   const connected = Boolean(host);
   // A TV view at this player's home shows the video, so the phone keeps to the cards.
@@ -56,6 +59,8 @@ export default function RemoteApp({ code, seat: mySeat, onLeave }) {
 
   useEffect(() => { if (connected) room.send({ type: 'hello' }); }, [connected, room.send]);
   useWakeLock(true);
+  const scoredHands = game ? game.hands.filter((h) => !h.inPlay).length : 0;
+  useEffect(() => { if (game) recordGame(game, { mode: 'table' }); }, [scoredHands, game?.id]);
 
   const hand = game?.hands.find((h) => h.inPlay) ?? null;
   const stage = hand ? stageOf(hand) : null;
