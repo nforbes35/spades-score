@@ -37,7 +37,10 @@ export default function Invite({ game, peers, onSet, onClose }) {
   return (
     <Sheet title="Invite" onClose={onClose} closeLabel="Done">
       <div className="section-title">Remote players</div>
-      <p className="footnote">Who’s playing from somewhere else? Their phone shows their cards, bids and books.</p>
+      <p className="footnote">
+        Who’s playing from somewhere else? Their phone shows their cards, bids and books. A spare phone or tablet
+        laid in their spot at the table can show each card they play, full screen.
+      </p>
       <div className="seat-pick">
         {SEATS.map((_, s) => (
           <button key={s} type="button" className={`seat-choice t${teamOf(s)}${seats.includes(s) ? ' on' : ''}`}
@@ -52,13 +55,26 @@ export default function Invite({ game, peers, onSet, onClose }) {
           {seats.map((s) => {
             const name = playerName(game, s);
             const here = peers.some((p) => p.role === 'player' && p.seat === s);
+            const shows = peers.some((p) => p.role === 'card' && p.seat === s);
             return (
-              <div key={s} className="invite-row">
-                <div><b>{name}</b><StatusDot on={here} label={here ? 'connected' : 'not connected yet'} /></div>
-                <button type="button" className="soft"
-                  onClick={() => share(`${name}, join our spades game! You’ll see your cards on your phone.`, joinLink(code, { seat: s }), done(name))}>
-                  <Icon name="share" size={18} /> {copied === name ? 'Copied' : 'Send link'}
-                </button>
+              <div key={s} className="invite-seat">
+                <div className="invite-row">
+                  <div><b>{name}</b><StatusDot on={here} label={here ? 'connected' : 'not connected yet'} /></div>
+                  <button type="button" className="soft"
+                    onClick={() => share(`${name}, join our spades game! You’ll see your cards on your phone.`, joinLink(code, { seat: s }), done(name))}>
+                    <Icon name="share" size={18} /> {copied === name ? 'Copied' : 'Send link'}
+                  </button>
+                </div>
+                <div className="invite-row">
+                  <div>
+                    <span>Card display for {name}</span>
+                    <StatusDot on={shows} label={shows ? 'on the table' : 'a spare phone or tablet laid in their spot'} />
+                  </div>
+                  <button type="button" className="soft"
+                    onClick={() => share(`Open this on the device lying in ${name}’s spot:`, joinLink(code, { as: 'card', seat: s }), done(`card${s}`))}>
+                    <Icon name="cards" size={18} /> {copied === `card${s}` ? 'Copied' : 'Link'}
+                  </button>
+                </div>
               </div>
             );
           })}

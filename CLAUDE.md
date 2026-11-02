@@ -21,6 +21,8 @@ plain words, keep text large and buttons big, check every screen fits a 320px ph
   ("tv"), and "lobby" while choosing. Each sends a heartbeat with who it is; messages go to all or `to` one.
   The host sends each device its own copy of the game (`gameFor`): a player gets only their own cards.
 - Links: `?join=CODE&seat=3` (player), `&as=guest`, `&as=tv`, or just `?join=CODE` to choose (`JoinAs.jsx`).
+- Card displays (`CardDisplayApp.jsx`, `?join=CODE&as=card&seat=3`): a spare device laid in a remote player's
+  spot shows the card they played full screen (real pip layouts) until the book is taken; tap to turn it.
 - Hand data per remote seat: `live.hands[seat]`, `live.played[seat]`, tricks `{ winner, cards: {seat: card} }`.
   `normalizeGame` converts games saved with the old single `remote.seat`.
 - Video (`src/lib/call.js`): every pair of devices in the call connects directly (WebRTC, perfect

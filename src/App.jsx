@@ -17,6 +17,7 @@ import { CallBox, SoundNote } from './Video.jsx';
 import RemoteApp from './RemoteApp.jsx';
 import GuestApp from './GuestApp.jsx';
 import TvApp from './TvApp.jsx';
+import CardDisplayApp from './CardDisplayApp.jsx';
 import JoinAs from './JoinAs.jsx';
 import { ScoreCard, HandRow } from './Scoreboard.jsx';
 
@@ -33,7 +34,7 @@ function initialJoin() {
     const seat = q.get('seat');
     const join = {
       code: code.trim().toUpperCase(),
-      as: seat != null ? 'player' : q.get('as') || undefined,
+      as: q.get('as') || (seat != null ? 'player' : undefined),
       seat: seat != null ? Number(seat) : null,
     };
     write(JOIN_KEY, join);
@@ -52,6 +53,7 @@ export default function App() {
   if (join?.as === 'player' && join.seat != null) return <RemoteApp code={join.code} seat={join.seat} onLeave={leave} />;
   if (join?.as === 'guest') return <GuestApp code={join.code} onLeave={leave} />;
   if (join?.as === 'tv') return <TvApp code={join.code} onLeave={leave} />;
+  if (join?.as === 'card' && join.seat != null) return <CardDisplayApp code={join.code} seat={join.seat} onLeave={leave} />;
   if (join?.code) return <JoinAs code={join.code} onChoose={(as, seat) => update({ code: join.code, as, seat })} onLeave={leave} />;
   return <HostApp onJoin={(code) => update({ code })} />;
 }
@@ -183,6 +185,7 @@ function GameScreen({ store, toast, onNewGame, onJoin }) {
   const openScan = (seat) => { setScanSeat(seat); setSheet('scan'); };
   const guests = room.peers.filter((p) => p.role === 'guest');
   const tvs = room.peers.filter((p) => p.role === 'tv');
+  const cardShows = room.peers.filter((p) => p.role === 'card');
 
   const numbered = game.hands.map((h, i) => ({ hand: h, number: i + 1, standing: hist[i] })).reverse();
 
@@ -223,6 +226,7 @@ function GameScreen({ store, toast, onNewGame, onJoin }) {
                 {seats.map((s) => <StatusDot key={s} on={online(s)} label={playerName(game, s)} />)}
                 {guests.length > 0 && <StatusDot on label={`${guests.length} on video`} />}
                 {tvs.length > 0 && <StatusDot on label={`${tvs.length} TV${tvs.length > 1 ? 's' : ''}`} />}
+                {cardShows.length > 0 && <StatusDot on label={`${cardShows.length} card display${cardShows.length > 1 ? 's' : ''}`} />}
                 {!seats.length && !guests.length && !tvs.length && <span className="muted small">Nobody has joined yet</span>}
                 {room.status === 'error' && <span className="neg small">Connection problem</span>}
               </div>

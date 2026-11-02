@@ -480,6 +480,8 @@ button.pcard:not(:disabled):active { filter: brightness(0.96); }
 
 /* Invite */
 .invite-list { margin-top: 10px; }
+.invite-seat { display: flex; flex-direction: column; gap: 10px; }
+.invite-seat .invite-row + .invite-row { padding-top: 10px; border-top: 1px dashed var(--line); font-size: 15px; }
 .invite-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .invite-row > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 
@@ -573,3 +575,47 @@ button.pcard:not(:disabled):active { filter: brightness(0.96); }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+
+/* ---------- Card display: a device laid on the table showing a remote player's card ---------- */
+.card-display {
+  position: fixed; inset: 0; overflow: hidden; display: grid; place-items: center; cursor: pointer; user-select: none;
+  background: radial-gradient(120% 90% at 50% 45%, var(--felt-c), var(--felt-b) 60%, var(--felt-a));
+}
+.cd-turn {
+  --w: min(84vw, 80vh * 0.714);
+  display: flex; flex-direction: column; align-items: center; gap: 2vh; transition: transform 0.35s ease;
+}
+.cd-turn.sideways { --w: min(84vh, 80vw * 0.714); gap: 2vw; }
+.cd-card { animation: toss 0.45s cubic-bezier(.2, 1.2, .35, 1); }
+@keyframes toss { from { transform: translateY(-30%) rotate(-12deg) scale(0.6); opacity: 0; } }
+.cd-caption { display: flex; align-items: center; gap: 0.5em; color: #fff; font-weight: 800; font-size: calc(var(--w) * 0.07); text-shadow: 0 2px 6px rgba(0, 0, 0, 0.4); text-align: center; }
+.cd-back { width: var(--w); aspect-ratio: 5 / 7; border-radius: calc(var(--w) * 0.06); padding: calc(var(--w) * 0.05); background: #fff; box-shadow: 0 2vh 5vh rgba(0, 0, 0, 0.45); }
+.cd-back-inner {
+  width: 100%; height: 100%; border-radius: calc(var(--w) * 0.03); display: grid; place-items: center;
+  background: repeating-linear-gradient(45deg, #1e40af 0 calc(var(--w) * 0.02), #2563eb calc(var(--w) * 0.02) calc(var(--w) * 0.04));
+}
+.cd-back-inner .brand-mark { width: calc(var(--w) * 0.28); height: calc(var(--w) * 0.28); font-size: calc(var(--w) * 0.2); border-radius: 22%; }
+.cd-leave { position: absolute; right: 12px; top: calc(12px + env(safe-area-inset-top)); border: 0; border-radius: 999px; padding: 6px 12px; background: rgba(255, 255, 255, 0.15); color: #fff; font-weight: 700; font-size: 13px; }
+
+.big-card {
+  position: relative; width: var(--w); aspect-ratio: 5 / 7; border-radius: calc(var(--w) * 0.06);
+  background: linear-gradient(160deg, #ffffff, var(--card-face) 55%, #f1ede2); color: var(--card-black);
+  box-shadow: 0 2vh 5vh rgba(0, 0, 0, 0.45), inset 0 0 0 calc(var(--w) * 0.012) #fff; font-family: Georgia, 'Times New Roman', serif; overflow: hidden;
+}
+.big-card.red { color: var(--card-red); }
+.bc-corner { position: absolute; top: 3%; left: 5%; display: flex; flex-direction: column; align-items: center; line-height: 0.9; }
+.bc-corner.flip { top: auto; left: auto; bottom: 3%; right: 5%; transform: rotate(180deg); }
+.bc-corner b { font-size: calc(var(--w) * 0.17); font-weight: 700; letter-spacing: -0.06em; }
+.bc-corner i { font-style: normal; font-size: calc(var(--w) * 0.13); }
+.bc-pips { position: absolute; inset: 15% 20%; }
+.bc-pips span { position: absolute; transform: translate(-50%, -50%); font-size: calc(var(--w) * 0.17); line-height: 1; }
+.bc-pips span.down { transform: translate(-50%, -50%) rotate(180deg); }
+.bc-pips.ace span { font-size: calc(var(--w) * 0.5); }
+.bc-court {
+  position: absolute; inset: 14% 17%; border: calc(var(--w) * 0.012) solid currentColor; border-radius: calc(var(--w) * 0.03);
+  display: flex; flex-direction: column; align-items: center; justify-content: space-between; padding: 4% 0;
+  background: linear-gradient(135deg, rgba(234, 179, 8, 0.3), rgba(59, 130, 246, 0.18) 50%, rgba(208, 38, 45, 0.2));
+}
+.bc-court b { font-size: calc(var(--w) * 0.24); line-height: 1; }
+.bc-court b.flip { transform: rotate(180deg); }
+.bc-court i { font-style: normal; font-size: calc(var(--w) * 0.3); line-height: 1; }

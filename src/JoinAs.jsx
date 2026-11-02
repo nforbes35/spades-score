@@ -39,6 +39,12 @@ export default function JoinAs({ code, onChoose, onLeave }) {
                   <span><b>I’m {playerName(game, s)}</b><br /><span className="muted small">Play from this phone: your cards, bids and books.</span></span>
                 </button>
               ))}
+              {seats.map((s) => (
+                <button key={`card${s}`} type="button" className="card join-choice" onClick={() => onChoose('card', s)}>
+                  <Icon name="cards" />
+                  <span><b>Show {playerName(game, s)}’s card</b><br /><span className="muted small">Lay this device on the table in {playerName(game, s)}’s spot. Their card fills the screen.</span></span>
+                </button>
+              ))}
               <button type="button" className="card join-choice" onClick={() => onChoose('guest', null)}>
                 <Icon name="video" />
                 <span><b>Video chat</b><br /><span className="muted small">Add your face, at the table or from home. No cards.</span></span>
