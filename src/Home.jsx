@@ -20,7 +20,7 @@ export default function Home({ onPlayOnline, onTable, onJoin, onStats }) {
           ))}
         </div>
         <h1 className="home-title"><span className="brand-mark">♠</span> Family Spades</h1>
-        <p className="home-tagline">Made Especially for Papi</p>
+        <p className="home-tagline">Made Especially for <span className="papi">👑 Papi</span></p>
         <p className="home-king">The King of Spades!</p>
       </div>
 
