@@ -910,3 +910,5 @@ button.choice:active { transform: scale(0.98); }
   font-size: 13px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase;
 }
 .play-line.ready { border-top-color: var(--gold); color: var(--gold); }
+
+.deck-pick { margin-top: 14px; display: flex; flex-direction: column; gap: 6px; }

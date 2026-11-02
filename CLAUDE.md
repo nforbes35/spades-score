@@ -58,6 +58,8 @@ plain words, keep text large and buttons big, check every screen fits a 320px ph
 - Feedback: `place.js` fingerprints each device's public address (STUN, hashed with the game code). Per
   place one device handles sound (host > player > guest > tv, then first joined); the rest start muted.
 - Link: Supabase Realtime broadcast (`VITE_SUPABASE_*`; no tables) or BroadcastChannel between tabs.
+- Readers: `cards-maverick.onnx` (trained on the family's Maverick deck, default; 130/130 on the owner's photos)
+  and `cards-gen3.onnx` ("Another deck"); chosen in the scanner (`READERS` in cardVision.js).
 - Card photo: read on the phone, free (`src/lib/cardVision.js`, onnxruntime-web, single thread in a
   worker). Model `public/models/cards-gen3.onnx` = sroot/lgd-cards-gen3 on Hugging Face (corner detector,
   52 classes, AGPL-3.0, details in `public/models/README.txt`). Because of AGPL the repo is public and

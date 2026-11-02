@@ -2,7 +2,19 @@
 // leaves the device. Uses an open model that spots card corners (sroot/lgd-cards-gen3 on Hugging
 // Face, AGPL-3.0; see public/models/README.txt). It runs in a background thread via onnxruntime-web.
 
-const MODEL_URL = '/models/cards-gen3.onnx';
+// Two readers: one trained on the family's Maverick deck (best for it: 130/130 on their photos vs
+// 125/130), and the original general one for any other deck. See training/README.md.
+export const READERS = {
+  maverick: { url: '/models/cards-maverick.onnx', label: 'Our Maverick deck' },
+  general: { url: '/models/cards-gen3.onnx', label: 'Another deck' },
+};
+const DECK_KEY = 'spades-reader-deck';
+export function readerDeck() {
+  try { return READERS[JSON.parse(localStorage.getItem(DECK_KEY))] ? JSON.parse(localStorage.getItem(DECK_KEY)) : 'maverick'; } catch { return 'maverick'; }
+}
+export function setReaderDeck(deck) {
+  try { localStorage.setItem(DECK_KEY, JSON.stringify(deck)); } catch { /* storage off */ }
+}
 // Model output order (model.classes.json).
 const NAMES = ['10C', '10D', '10H', '10S', '2C', '2D', '2H', '2S', '3C', '3D', '3H', '3S', '4C', '4D', '4H', '4S',
   '5C', '5D', '5H', '5S', '6C', '6D', '6H', '6S', '7C', '7D', '7H', '7S', '8C', '8D', '8H', '8S', '9C', '9D', '9H', '9S',
@@ -18,21 +30,21 @@ const TILE_IF_BELOW = 0.5;
 const SIZES = [640, 960];
 const TILE_SIZE = 640;
 
-let loading = null;
+const loading = {};
 
-/** Start downloading the model (about 38 MB, once; the browser keeps it). */
-export function loadCardReader() {
-  loading ??= (async () => {
+/** Start downloading a reader (about 38 MB, once; the browser keeps it). */
+export function loadCardReader(deck = readerDeck()) {
+  loading[deck] ??= (async () => {
     const ort = await import('onnxruntime-web/wasm');
     ort.env.wasm.numThreads = 1;
     ort.env.wasm.proxy = true; // keep the screen responsive while it thinks
-    const session = await ort.InferenceSession.create(MODEL_URL, { executionProviders: ['wasm'], graphOptimizationLevel: 'all' });
+    const session = await ort.InferenceSession.create(READERS[deck].url, { executionProviders: ['wasm'], graphOptimizationLevel: 'all' });
     return { ort, session };
   })().catch((err) => {
-    loading = null;
+    delete loading[deck];
     throw err;
   });
-  return loading;
+  return loading[deck];
 }
 
 /** Draw part of the image into a padded square-ish input (sides a multiple of 32) and make a tensor. */
@@ -95,9 +107,9 @@ const overlap = (a, b) => {
  * each card code (like "QH") to its best score, 0 to 1 (learning.js turns these into a hand), and
  * shadowed lists cards turned down because a stronger card was read on the same corner.
  */
-export async function readCards(file, onStep = () => {}) {
+export async function readCards(file, onStep = () => {}, deck = readerDeck()) {
   onStep('loading');
-  const { ort, session } = await loadCardReader();
+  const { ort, session } = await loadCardReader(deck);
   onStep('reading');
   const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
   const { width: W, height: H } = bitmap;

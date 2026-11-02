@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { SUITS, RANKS, sortHand, cardLabel } from './lib/cards.js';
-import { readCards, loadCardReader } from './lib/cardVision.js';
+import { readCards, loadCardReader, READERS, readerDeck, setReaderDeck } from './lib/cardVision.js';
 import { learnedModel, pickCards, mergeScores, rememberHand, forgetLearning } from './lib/learning.js';
-import { Sheet, Icon, PlayingCard, CardText } from './components.jsx';
+import { Sheet, Icon, PlayingCard, CardText, Segmented } from './components.jsx';
 
 const STEPS = {
   loading: 'Getting the card reader ready (first time only)…',
@@ -25,8 +25,9 @@ export default function ScanCards({ name, initial, played = [], onSend, onClose 
   const [learned, setLearned] = useState(() => learnedModel().count);
   const busy = Boolean(step);
 
+  const [deck, setDeck] = useState(readerDeck);
   // Start the one-time model download while they deal and lay out the cards.
-  useEffect(() => { loadCardReader().catch(() => {}); }, []);
+  useEffect(() => { loadCardReader(deck).catch(() => {}); }, [deck]);
   useEffect(() => () => { if (photo) URL.revokeObjectURL(photo); }, [photo]);
 
   async function onFile(e) {
@@ -37,7 +38,7 @@ export default function ScanCards({ name, initial, played = [], onSend, onClose 
     setMsg(null);
     const started = Date.now();
     try {
-      const read = await readCards(file, setStep);
+      const read = await readCards(file, setStep, deck);
       const all = [...scans, read.scores];
       const noGuess = [...new Set([...shadowed, ...read.shadowed])];
       const found = pickCards(mergeScores(all), learnedModel().model, { noGuess });
@@ -84,6 +85,11 @@ export default function ScanCards({ name, initial, played = [], onSend, onClose 
   return (
     <Sheet title={`${name}'s cards`} onClose={onClose} action={{ label: 'Send', onClick: send, disabled: !cards.length }}>
       <p className="lead-text">Fan {name}'s cards so every top-left corner shows, hold the phone upright, and take a photo.</p>
+      <div className="deck-pick">
+        <span className="eyebrow">Cards being scanned</span>
+        <Segmented small label="Deck" value={deck} onChange={(d) => { setDeck(d); setReaderDeck(d); }}
+          options={Object.entries(READERS).map(([id, r]) => ({ id, label: r.label }))} />
+      </div>
       <div className="scan-buttons">
         <label className={`primary big file-btn${busy ? ' disabled' : ''}`}>
           <Icon name="camera" /> {photo ? 'Take another photo' : 'Take a photo'}
