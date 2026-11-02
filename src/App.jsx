@@ -10,6 +10,7 @@ import { useWakeLock, chime, buzz } from './lib/fx.js';
 import { Sheet, RulesFields, NumberField, Icon, useToast, Confetti, StatusDot, CardText } from './components.jsx';
 import { BidsPanel, PlayPanel } from './LiveHand.jsx';
 import NewGame from './NewGame.jsx';
+import Home from './Home.jsx';
 import HandSheet from './HandSheet.jsx';
 import ScanCards from './ScanCards.jsx';
 import Invite from './Invite.jsx';
@@ -64,19 +65,22 @@ export default function App() {
 function HostApp({ onJoin, onPlayOnline }) {
   const store = useGame();
   const [newGameOpen, setNewGameOpen] = useState(false);
+  const [setup, setSetup] = useState(false);
   const toast = useToast();
 
   if (!store.game) {
     return (
       <>
-        <NewGame lastSetup={store.lastSetup} onStart={store.start} onJoin={onJoin} onPlayOnline={onPlayOnline} />
+        {setup
+          ? <NewGame lastSetup={store.lastSetup} onStart={store.start} onBack={() => setSetup(false)} />
+          : <Home onPlayOnline={onPlayOnline} onTable={() => setSetup(true)} onJoin={onJoin} />}
         {toast.node}
       </>
     );
   }
   return (
     <>
-      <GameScreen store={store} toast={toast} onJoin={onJoin} onNewGame={() => setNewGameOpen(true)} />
+      <GameScreen store={store} toast={toast} onJoin={onJoin} onPlayOnline={onPlayOnline} onNewGame={() => setNewGameOpen(true)} />
       {newGameOpen && (
         <NewGame asSheet lastSetup={store.lastSetup}
           onStart={(g) => { store.start(g); setNewGameOpen(false); toast.show('New game started', { onUndo: store.undo }); }}
@@ -86,7 +90,7 @@ function HostApp({ onJoin, onPlayOnline }) {
   );
 }
 
-function GameScreen({ store, toast, onNewGame, onJoin }) {
+function GameScreen({ store, toast, onNewGame, onJoin, onPlayOnline }) {
   const { game } = store;
   const [editing, setEditing] = useState(null);
   const [sheet, setSheet] = useState(null); // 'menu' | 'rules' | 'invite' | 'scan'
@@ -304,9 +308,10 @@ function GameScreen({ store, toast, onNewGame, onJoin }) {
           onClose={() => setEditing(null)} />
       )}
       {sheet === 'menu' && (
-        <Sheet title="Menu" onClose={() => setSheet(null)} closeLabel="Close">
+        <Sheet title="Menu" onClose={() => setSheet(null)} closeLabel="Close" short>
           <div className="menu-list card group">
             <button type="button" onClick={() => setSheet('invite')}><Icon name="users" /> Remote players, video &amp; TV</button>
+            <button type="button" onClick={() => { setSheet(null); onPlayOnline(); }}><Icon name="cards" /> Play online instead</button>
             <button type="button" onClick={() => setSheet('rules')}><Icon name="edit" /> Scoring rules</button>
             <button type="button" onClick={() => { setSheet(null); if (confirm('Start a new game? You can undo this.')) onNewGame(); }}>
               <Icon name="flip" /> New game

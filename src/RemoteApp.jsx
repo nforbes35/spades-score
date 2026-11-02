@@ -284,7 +284,7 @@ export default function RemoteApp({ code, seat: mySeat, onLeave }) {
             <span>Your cards · {myCards.length} left</span>
             {stage === 'play' && !connected && <span>Reconnecting…</span>}
           </div>
-          <FannedHand cards={myCards} selected={selected} onSelect={stage === 'play' ? setSelected : undefined} />
+          <FannedHand cards={myCards} selected={selected} onSelect={stage === 'play' ? setSelected : undefined} dealKey={hand.id} />
           <div className="dock-action">
             {stage !== 'play' ? (
               <p className="dock-hint">Bid above. You'll play from here once the hand starts.</p>

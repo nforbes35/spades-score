@@ -11,7 +11,7 @@ import { useDevice } from './lib/device.js';
 import { useCall } from './lib/call.js';
 import { useKeys, seal, unseal } from './lib/secret.js';
 import { useWakeLock, chime, buzz } from './lib/fx.js';
-import { Icon, FannedHand, PlayingCard, Sheet, RulesFields, Toggle, Segmented, useToast, Confetti, StatusDot, CardText } from './components.jsx';
+import { Icon, FannedHand, PlayingCard, Sheet, RulesFields, Toggle, Segmented, useToast, Confetti, StatusDot, CardText, useCountUp } from './components.jsx';
 import { VideoTile, CallButtons, SoundNote } from './Video.jsx';
 import { HandRow } from './Scoreboard.jsx';
 import { history } from './lib/scoring.js';
@@ -491,7 +491,7 @@ function OnlineTable({ table, mySeat, cards, me, isHost, call, room, present, se
           {[0, 1].map((t) => (
             <div key={t} className={`online-team t${t}`}>
               <span>{game.teams[t].name}</span>
-              <b>{st[t].score}</b>
+              <b><CountUp value={st[t].score} /></b>
               {game.rules.bagsEnabled && <small>{st[t].bags} bag{st[t].bags === 1 ? '' : 's'}</small>}
             </div>
           ))}
@@ -576,7 +576,7 @@ function OnlineTable({ table, mySeat, cards, me, isHost, call, room, present, se
               {!myTurn && <p className="small">You can bid blind nil when it’s your turn.</p>}
             </div>
           ) : cards ? (
-            <FannedHand cards={sorted} selected={selected}
+            <FannedHand cards={sorted} selected={selected} dealKey={handNo}
               onSelect={table.phase === 'playing' && myTurn && !sending ? (c) => setSelected(c && legal.includes(c) ? c : null) : undefined}
               dim={table.phase === 'playing' && myTurn ? sorted.filter((c) => !legal.includes(c)) : []} />
           ) : (
@@ -599,6 +599,7 @@ function OnlineTable({ table, mySeat, cards, me, isHost, call, room, present, se
 }
 
 const hasVideo = (stream) => stream.getVideoTracks().length > 0;
+const CountUp = ({ value }) => useCountUp(value);
 
 /** Has `seat` already played `card` this hand (so a repeat of that move can be ignored)? */
 function alreadyPlayed(t, seat, card) {

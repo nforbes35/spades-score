@@ -36,14 +36,14 @@ export const NilPicker = ({ value, onChange, label, small }) => (
 );
 
 /** Full-screen sheet that slides up, with Cancel / action buttons on top. */
-export function Sheet({ title, onClose, action, children, closeLabel = 'Cancel' }) {
+export function Sheet({ title, onClose, action, children, closeLabel = 'Cancel', short = false }) {
   useEffect(() => {
     document.body.classList.add('sheet-open');
     return () => document.body.classList.remove('sheet-open');
   }, []);
   return (
     <div className="sheet-backdrop" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="sheet" role="dialog" aria-label={title}>
+      <div className={`sheet${short ? ' short' : ''}`} role="dialog" aria-label={title}>
         <header className="sheet-bar">
           <button type="button" className="link" onClick={onClose}>{closeLabel}</button>
           <h2>{title}</h2>
@@ -122,6 +122,7 @@ const ICONS = {
   grow: <><path d="M15 3h6v6" /><path d="M9 21H3v-6" /><path d="m21 3-7 7" /><path d="m3 21 7-7" /></>,
   edit: <><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></>,
   trophy: <><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4Z" /><path d="M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3" /></>,
+  chevron: <path d="m9 18 6-6-6-6" />,
   cards: <><rect x="3" y="5" width="11" height="16" rx="2" transform="rotate(-10 8.5 13)" /><rect x="9" y="3" width="11" height="16" rx="2" /></>,
   speaker: <><path d="M11 5 6 9H2v6h4l5 4V5Z" /><path d="M15.5 8.5a5 5 0 0 1 0 7" /><path d="M19 5a10 10 0 0 1 0 14" /></>,
   speakerOff: <><path d="M11 5 6 9H2v6h4l5 4V5Z" /><path d="m22 9-6 6" /><path d="m16 9 6 6" /></>,
@@ -167,7 +168,7 @@ const SUIT_GAP = 5;
  * A hand held in a fan: cards overlap so each corner shows, curve gently, and a small gap
  * separates suits. Tap a card to lift it.
  */
-export function FannedHand({ cards, selected, onSelect, disabled, dim = [] }) {
+export function FannedHand({ cards, selected, onSelect, disabled, dim = [], dealKey }) {
   const box = useRef(null);
   const [width, setWidth] = useState(340);
   useLayoutEffect(() => {
@@ -176,7 +177,7 @@ export function FannedHand({ cards, selected, onSelect, disabled, dim = [] }) {
     const ro = new ResizeObserver(([e]) => setWidth(e.contentRect.width));
     ro.observe(el);
     return () => ro.disconnect();
-  }, []);
+  }, [dealKey]);
 
   const n = cards.length;
   const cardW = Math.round(Math.min(88, Math.max(62, width / 4.8)));
@@ -190,7 +191,7 @@ export function FannedHand({ cards, selected, onSelect, disabled, dim = [] }) {
   const mid = (n - 1) / 2;
 
   return (
-    <div ref={box} className="fan" style={{ height: cardH + FAN_DROP + 26 }}>
+    <div ref={box} key={dealKey} className={`fan${dealKey != null ? ' dealing' : ''}`} style={{ height: cardH + FAN_DROP + 26 }}>
       {cards.map((c, i) => {
         const off = n > 1 ? (i - mid) / mid || 0 : 0;
         const lift = selected === c ? -22 : 0;
@@ -200,6 +201,7 @@ export function FannedHand({ cards, selected, onSelect, disabled, dim = [] }) {
             onClick={onSelect ? () => onSelect(selected === c ? null : c) : undefined}
             style={{
               '--w': `${cardW}px`,
+              '--k': i,
               left: left0 + i * step + gapsBefore[i] * SUIT_GAP,
               top: 18 + off * off * FAN_DROP + lift,
               transform: `rotate(${off * (FAN_SPREAD_DEG / 2)}deg)`,
@@ -209,6 +211,28 @@ export function FannedHand({ cards, selected, onSelect, disabled, dim = [] }) {
       })}
     </div>
   );
+}
+
+/** A number that rolls to its new value instead of jumping (scores). */
+export function useCountUp(value, ms = 700) {
+  const [shown, setShown] = useState(value);
+  const from = useRef(value);
+  useEffect(() => {
+    const start = performance.now();
+    const a = from.current;
+    if (a === value) return undefined;
+    let frame;
+    const tick = (now) => {
+      const t = Math.min(1, (now - start) / ms);
+      const eased = 1 - (1 - t) ** 3;
+      setShown(Math.round(a + (value - a) * eased));
+      if (t < 1) frame = requestAnimationFrame(tick);
+      else from.current = value;
+    };
+    frame = requestAnimationFrame(tick);
+    return () => { cancelAnimationFrame(frame); from.current = value; };
+  }, [value, ms]);
+  return shown;
 }
 
 /** One message at a time at the bottom of the screen, optionally with an Undo button. */

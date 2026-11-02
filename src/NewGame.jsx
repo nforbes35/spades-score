@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { STANDARD_RULES } from './lib/scoring.js';
-import { RulesFields, Segmented, Sheet, Icon } from './components.jsx';
+import { RulesFields, Segmented, Sheet } from './components.jsx';
 
 const PRESETS = [250, 300, 500];
 
-export default function NewGame({ lastSetup, onStart, onCancel, asSheet, onJoin, onPlayOnline }) {
+export default function NewGame({ lastSetup, onStart, onCancel, asSheet, onBack }) {
   const [teams, setTeams] = useState(lastSetup?.teams ?? [
     { name: 'Team 1', players: ['', ''] },
     { name: 'Team 2', players: ['', ''] },
@@ -59,45 +59,16 @@ export default function NewGame({ lastSetup, onStart, onCancel, asSheet, onJoin,
   return (
     <div className="app">
       <header className="hero">
-        <div className="wrap hero-row"><div className="brand"><span className="brand-mark">♠</span><h1>New Game</h1></div></div>
+        <div className="wrap hero-row">
+          <div className="brand"><span className="brand-mark">♠</span><h1>At the table</h1></div>
+          {onBack && <button type="button" className="icon-btn" onClick={onBack}>Back</button>}
+        </div>
+        <div className="wrap"><p className="target">Who’s playing tonight?</p></div>
       </header>
-      <main className="wrap">
-        {onPlayOnline && (
-          <button type="button" className="card join-card online-card" onClick={onPlayOnline}>
-            <Icon name="users" />
-            <span><b>Play online</b><br /><span className="muted small">Everyone plays on their own phone. The app deals, checks the rules and keeps score, with video or audio chat.</span></span>
-          </button>
-        )}
-        {onJoin && <JoinCard onJoin={onJoin} />}
-        <div className="section-title mode-title">Or score a game at the table</div>
-        {form}
-      </main>
+      <main className="wrap">{form}</main>
       <div className="bottom-bar">
         <button type="button" className="primary big" disabled={target <= 0} onClick={start}>Start Game</button>
       </div>
     </div>
-  );
-}
-
-/** For the remote player: type the code the table sent you. */
-function JoinCard({ onJoin }) {
-  const [open, setOpen] = useState(false);
-  const [code, setCode] = useState('');
-  const clean = code.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 4);
-  if (!open) {
-    return (
-      <button type="button" className="card join-card" onClick={() => setOpen(true)}>
-        <Icon name="phone" />
-        <span><b>Playing from somewhere else?</b><br /><span className="muted small">Join a game with a code</span></span>
-      </button>
-    );
-  }
-  return (
-    <form className="card join-card open" onSubmit={(e) => { e.preventDefault(); if (clean.length === 4) onJoin(clean); }}>
-      <label className="eyebrow" htmlFor="join-code">Code from the table</label>
-      <input id="join-code" className="code-input" value={clean} onChange={(e) => setCode(e.target.value)}
-        autoCapitalize="characters" autoComplete="off" placeholder="ABCD" autoFocus inputMode="text" />
-      <button type="submit" className="primary big" disabled={clean.length !== 4}>Join game</button>
-    </form>
   );
 }
