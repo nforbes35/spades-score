@@ -210,7 +210,7 @@ function GameScreen({ store, toast, onNewGame, onJoin, onPlayOnline }) {
     <div className="app">
       <header className="hero">
         <div className="wrap hero-row">
-          <div className="brand"><span className="brand-mark">♠</span><h1>Spades</h1></div>
+          <div className="brand"><span className="brand-mark">♠</span><h1>Family Spades</h1></div>
           <div className="row">
             <button type="button" className="icon-btn" aria-label={store.undoLabel ? `Undo ${store.undoLabel}` : 'Nothing to undo'}
               disabled={!store.undoLabel} onClick={undo}>

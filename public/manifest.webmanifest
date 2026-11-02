@@ -1,6 +1,6 @@
 {
-  "name": "Spades Score",
-  "short_name": "Spades",
+  "name": "Family Spades",
+  "short_name": "Family Spades",
   "description": "Score keeper for our family spades game.",
   "start_url": "/",
   "scope": "/",

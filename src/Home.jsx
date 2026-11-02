@@ -19,8 +19,9 @@ export default function Home({ onPlayOnline, onTable, onJoin, onStats }) {
             <PlayingCard key={c} code={c} size="lg" className="home-card" style={{ '--i': i - 2 }} />
           ))}
         </div>
-        <h1 className="home-title"><span className="brand-mark">♠</span> Spades</h1>
-        <p className="home-tagline">Family game night, scored for you.</p>
+        <h1 className="home-title"><span className="brand-mark">♠</span> Family Spades</h1>
+        <p className="home-tagline">Made Especially for Papi</p>
+        <p className="home-king">The King of Spades!</p>
       </div>
 
       <div className="home-choices">

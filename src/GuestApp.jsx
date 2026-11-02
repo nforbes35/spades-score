@@ -38,7 +38,7 @@ export default function GuestApp({ code, onLeave }) {
         <div className="wrap hero-row">
           <div className="brand">
             <span className="brand-mark">♠</span>
-            <h1>Spades</h1>
+            <h1>Family Spades</h1>
             <span className="mode-chip"><Icon name="video" size={13} /> Video</span>
           </div>
           <button type="button" className="icon-btn" onClick={() => { if (confirm('Leave this game?')) { call.leave(); onLeave(); } }}>Leave</button>

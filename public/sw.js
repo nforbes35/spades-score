@@ -1,4 +1,4 @@
-// Spades Score service worker: makes the app installable and lets it open without a connection.
+// Family Spades service worker: makes the app installable and lets it open without a connection.
 const CACHE = 'spades-score-v3';
 // The card reader's model and runtime never change under the same name: keep the first copy.
 const KEEP = /^\/models\//;

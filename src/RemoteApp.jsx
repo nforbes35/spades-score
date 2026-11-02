@@ -130,7 +130,7 @@ export default function RemoteApp({ code, seat: mySeat, onLeave }) {
         <div className="wrap hero-row">
           <div className="brand">
             <span className="brand-mark">♠</span>
-            <h1>Spades</h1>
+            <h1>Family Spades</h1>
             <span className="mode-chip"><Icon name="phone" size={13} /> Remote</span>
           </div>
           <div className="row">

@@ -841,9 +841,10 @@ h1, h2 { letter-spacing: -0.02em; }
   animation: fan-out 0.9s cubic-bezier(.2, 1, .3, 1) both; animation-delay: calc((var(--i) + 2) * 80ms);
 }
 @keyframes fan-out { from { transform: translateX(-50%) rotate(0deg) translateY(24px); opacity: 0; } }
-.home-title { display: inline-flex; align-items: center; gap: 12px; font-size: 46px; font-weight: 900; letter-spacing: -0.035em; }
+.home-title { display: inline-flex; align-items: center; gap: 12px; font-size: clamp(32px, 10vw, 46px); font-weight: 900; letter-spacing: -0.035em; }
 .home-title .brand-mark { width: 50px; height: 50px; border-radius: 14px; font-size: 34px; }
 .home-tagline { margin-top: 6px; font-size: 18px; opacity: 0.82; }
+.home-king { margin-top: 4px; font-size: 22px; font-weight: 800; color: var(--gold, #f5b82e); letter-spacing: -0.01em; }
 .home-choices { width: 100%; max-width: 560px; margin: 0 auto; padding: 8px 16px 28px; display: flex; flex-direction: column; gap: 12px; }
 .choice {
   display: flex; align-items: center; gap: 14px; width: 100%; text-align: left; color: #fff; padding: 16px 14px 16px 16px;
