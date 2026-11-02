@@ -15,6 +15,25 @@ plain words, keep text large and buttons big, check every screen fits a 320px ph
 - Hand flow: New Hand → bids (stage 'bids') → tap who won each book (stage 'play') → Score Hand.
   `HandSheet.jsx` fixes bids/books by hand.
 
+## Two modes
+- **At the table** (manual): the scorekeeper's phone keeps score of a real card game (everything below
+  "Remote play"). **Play online**: the app is the card table (`OnlineApp.jsx`).
+
+## Online mode
+- Start screen → Play online makes a game code; the host's device runs the game, others join with
+  `?join=CODE&as=online` (or the code; `JoinAs` sees role `ohost` and goes straight in).
+- Engine `src/lib/online.js` (pure, tested in `test/online.test.js`): `startGame`, `deal`, `placeBid`, `legalCards`
+  (follow suit; no leading spades until broken), `playCard`, `trickWinner`. The scoring side is the same `game`
+  object as manual mode, so scoreboards/history/TV view are shared. Computer players: `src/lib/bots.js`
+  (sim: teams make their bid ~94%).
+- Messages: players → host `o-hello`, `o-sit`, `o-stand`, `o-bid`, `o-play`; host → `o-table` (public: no
+  hands, just counts) and per player `o-hand`, encrypted for that device (`src/lib/secret.js`, ECDH + AES-GCM;
+  public keys ride in the heartbeat). Moves are resent until the table shows them; the host ignores repeats
+  (`alreadyPlayed`/`alreadyBid`) and re-sends the table every 5 s.
+- Host keeps the table in localStorage (`spades-online-table-CODE`) so a reload resumes. Device ids are kept
+  (`spades-device-id`, per tab first) so a reload rejoins the same seat; the host can let the computer stand in
+  for someone who dropped out. After a game: play again (same seats) or back to the lobby to change things.
+
 ## Remote play, video and TV
 - Devices in a game room (`src/lib/room.js`): the table's phone ("host"), remote players ("player", one per
   seat in `game.remote.seats`), video guests ("guest": extra faces at the table, family at home), TV views

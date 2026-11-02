@@ -10,7 +10,10 @@ export default function JoinAs({ code, onChoose, onLeave }) {
   const [device] = useDevice(code, { role: 'lobby' });
   const room = useRoom(code, device, (m) => { if (m.type === 'state') setGame(m.game); });
   const host = room.peers.find((p) => p.role === 'host');
+  const onlineHost = room.peers.find((p) => p.role === 'ohost');
   useEffect(() => { if (host) room.send({ type: 'hello' }, host.id); }, [host?.id, room.send]);
+  // An online game: go straight in.
+  useEffect(() => { if (onlineHost) onChoose('online', null); }, [onlineHost?.id]);
   const seats = game ? remoteSeats(game) : [];
 
   return (

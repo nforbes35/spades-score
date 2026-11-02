@@ -167,7 +167,7 @@ const SUIT_GAP = 5;
  * A hand held in a fan: cards overlap so each corner shows, curve gently, and a small gap
  * separates suits. Tap a card to lift it.
  */
-export function FannedHand({ cards, selected, onSelect, disabled }) {
+export function FannedHand({ cards, selected, onSelect, disabled, dim = [] }) {
   const box = useRef(null);
   const [width, setWidth] = useState(340);
   useLayoutEffect(() => {
@@ -196,6 +196,7 @@ export function FannedHand({ cards, selected, onSelect, disabled }) {
         const lift = selected === c ? -22 : 0;
         return (
           <PlayingCard key={c} code={c} size="held" selected={selected === c} disabled={disabled}
+            className={dim.includes(c) ? 'dim' : ''}
             onClick={onSelect ? () => onSelect(selected === c ? null : c) : undefined}
             style={{
               '--w': `${cardW}px`,

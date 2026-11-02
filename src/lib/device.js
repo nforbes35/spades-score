@@ -4,11 +4,13 @@ import { useEffect, useState } from 'react';
 import { newDeviceId } from './room.js';
 import { usePlace } from './place.js';
 
-export function useDevice(code, { role, name = '', seat = null }) {
+/** `id` keeps the same identity across reloads (online mode, so a player gets their seat back). */
+export function useDevice(code, { role, name = '', seat = null, id, pub = null }) {
   const place = usePlace(code);
-  const [me, setMe] = useState(() => ({ id: newDeviceId(), role, name, seat, place: null, call: false, mic: false }));
+  const [me, setMe] = useState(() => ({ id: id ?? newDeviceId(), role, name, seat, place: null, pub, call: false, mic: false }));
   useEffect(() => {
-    setMe((m) => (m.role === role && m.name === name && m.seat === seat && m.place === place ? m : { ...m, role, name, seat, place }));
-  }, [role, name, seat, place]);
+    setMe((m) => (m.role === role && m.name === name && m.seat === seat && m.place === place && m.pub === pub
+      ? m : { ...m, role, name, seat, place, pub }));
+  }, [role, name, seat, place, pub]);
   return [me, setMe];
 }

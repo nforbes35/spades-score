@@ -19,6 +19,8 @@ import GuestApp from './GuestApp.jsx';
 import TvApp from './TvApp.jsx';
 import CardDisplayApp from './CardDisplayApp.jsx';
 import JoinAs from './JoinAs.jsx';
+import OnlineApp from './OnlineApp.jsx';
+import { makeCode } from './lib/room.js';
 import { ScoreCard, HandRow } from './Scoreboard.jsx';
 
 const JOIN_KEY = 'spades-join';
@@ -54,11 +56,12 @@ export default function App() {
   if (join?.as === 'guest') return <GuestApp code={join.code} onLeave={leave} />;
   if (join?.as === 'tv') return <TvApp code={join.code} onLeave={leave} />;
   if (join?.as === 'card' && join.seat != null) return <CardDisplayApp code={join.code} seat={join.seat} onLeave={leave} />;
+  if (join?.as === 'online') return <OnlineApp code={join.code} isHost={Boolean(join.host)} onLeave={leave} />;
   if (join?.code) return <JoinAs code={join.code} onChoose={(as, seat) => update({ code: join.code, as, seat })} onLeave={leave} />;
-  return <HostApp onJoin={(code) => update({ code })} />;
+  return <HostApp onJoin={(code) => update({ code })} onPlayOnline={() => update({ code: makeCode(), as: 'online', host: true })} />;
 }
 
-function HostApp({ onJoin }) {
+function HostApp({ onJoin, onPlayOnline }) {
   const store = useGame();
   const [newGameOpen, setNewGameOpen] = useState(false);
   const toast = useToast();
@@ -66,7 +69,7 @@ function HostApp({ onJoin }) {
   if (!store.game) {
     return (
       <>
-        <NewGame lastSetup={store.lastSetup} onStart={store.start} onJoin={onJoin} />
+        <NewGame lastSetup={store.lastSetup} onStart={store.start} onJoin={onJoin} onPlayOnline={onPlayOnline} />
         {toast.node}
       </>
     );

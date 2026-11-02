@@ -111,18 +111,18 @@ export function useCall({ room, me, setMe, facing = 'user', receiveOnly = false 
     }
   }, [connect, close]);
 
-  /** Turn on the camera (unless this is a TV) and join the call. */
-  const join = useCallback(async () => {
+  /** Turn on the camera (unless this is a TV) and join the call. `audioOnly` joins with just the mic. */
+  const join = useCallback(async ({ audioOnly = false } = {}) => {
     setError('');
     if (!receiveOnly) {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: videoConstraints(facingRef.current),
+          video: audioOnly ? false : videoConstraints(facingRef.current),
           audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
         });
         localRef.current = stream;
         setLocal(stream);
-        setCamOn(true);
+        setCamOn(!audioOnly);
       } catch {
         setError('The camera or microphone was blocked. Allow them in this browser’s settings, then try again.');
         return;

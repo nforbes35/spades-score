@@ -4,7 +4,7 @@ import { RulesFields, Segmented, Sheet, Icon } from './components.jsx';
 
 const PRESETS = [250, 300, 500];
 
-export default function NewGame({ lastSetup, onStart, onCancel, asSheet, onJoin }) {
+export default function NewGame({ lastSetup, onStart, onCancel, asSheet, onJoin, onPlayOnline }) {
   const [teams, setTeams] = useState(lastSetup?.teams ?? [
     { name: 'Team 1', players: ['', ''] },
     { name: 'Team 2', players: ['', ''] },
@@ -62,7 +62,14 @@ export default function NewGame({ lastSetup, onStart, onCancel, asSheet, onJoin 
         <div className="wrap hero-row"><div className="brand"><span className="brand-mark">♠</span><h1>New Game</h1></div></div>
       </header>
       <main className="wrap">
+        {onPlayOnline && (
+          <button type="button" className="card join-card online-card" onClick={onPlayOnline}>
+            <Icon name="users" />
+            <span><b>Play online</b><br /><span className="muted small">Everyone plays on their own phone. The app deals, checks the rules and keeps score, with video or audio chat.</span></span>
+          </button>
+        )}
         {onJoin && <JoinCard onJoin={onJoin} />}
+        <div className="section-title mode-title">Or score a game at the table</div>
         {form}
       </main>
       <div className="bottom-bar">
