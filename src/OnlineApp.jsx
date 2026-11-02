@@ -28,6 +28,10 @@ const RESEND_MS = 2500;
 const RESYNC_MS = 5000;
 const NEXT_HAND_MS = 9000;
 const TRICK_SHOW_MS = 1600;
+const BID_TIMES = [15, 30, 45, 60, 90];
+const DEFAULT_BID_TIMER = 30;
+// Extra time the host allows past the countdown, for a bid that's on its way.
+const BID_GRACE_MS = 1500;
 const AREAS = ['bottom', 'left', 'top', 'right'];
 
 /** This device's id, kept so a reload rejoins the same seat. */
@@ -173,6 +177,25 @@ function OnlineRoom({ code, isHost, name, avatar, onLeave, onProfile }) {
     }, wait);
     return () => clearTimeout(timer);
   }, [isHost, table, peerKey]);
+
+  // Host: with a bid timer, the computer bids for anyone who runs out of time.
+  const bidTimer = table?.settings?.bidTimer ?? 0;
+  const bidTurn = table?.phase === 'bidding' ? `${table.game.hands.length}:${table.round.turn}` : null;
+  useEffect(() => {
+    if (!isHost || !bidTimer || !bidTurn) return undefined;
+    const s = tableRef.current.round.turn;
+    if (autoSeat(tableRef.current, s)) return undefined;
+    const timer = setTimeout(() => {
+      const before = tableRef.current;
+      act((x) => (x.phase === 'bidding' && `${x.game.hands.length}:${x.round.turn}` === bidTurn ? placeBid(x, s, botBid(x.round.hands[s])) : x));
+      if (tableRef.current !== before) {
+        const who = tableRef.current.seats[s];
+        if (who?.id === me.id) toast.show('Time’s up: the computer bid for you.');
+        else if (who) room.send({ type: 'o-error', text: 'Time’s up: the computer bid for you.' }, who.id);
+      }
+    }, bidTimer * 1000 + BID_GRACE_MS);
+    return () => clearTimeout(timer);
+  }, [isHost, bidTimer, bidTurn]);
 
   // Host: deal the next hand a few seconds after one is scored.
   useEffect(() => {
@@ -433,13 +456,23 @@ function Lobby({ code, table, isHost, me, people, call, icons, profile, onProfil
                   options={[250, 300, 500].map((n) => ({ id: n, label: String(n) }))}
                   onChange={(target) => hostActions.settings({ target })} />
               </div>
+              <Toggle label="Bid timer" checked={Boolean(table.settings.bidTimer)}
+                onChange={(on) => hostActions.settings({ bidTimer: on ? DEFAULT_BID_TIMER : 0 })} />
+              {Boolean(table.settings.bidTimer) && (
+                <div className="field"><span>Seconds to bid</span>
+                  <Segmented small label="Seconds to bid" value={table.settings.bidTimer}
+                    options={BID_TIMES.map((n) => ({ id: n, label: String(n) }))}
+                    onChange={(bidTimer) => hostActions.settings({ bidTimer })} />
+                </div>
+              )}
+              {Boolean(table.settings.bidTimer) && <p className="footnote">When time runs out, the computer bids for that player.</p>}
               <Toggle label="Blind nil allowed" checked={table.settings.rules.blindNilAllowed !== false}
                 onChange={(v) => hostActions.settings({ rules: { ...table.settings.rules, blindNilAllowed: v } })} />
               <button type="button" className="text-btn" onClick={() => setRulesOpen(true)}><Icon name="edit" size={16} /> More scoring rules</button>
             </div>
           </>
         ) : (
-          <p className="footnote center">The host picks the rules and starts the game. Playing to {table.settings.target}.</p>
+          <p className="footnote center">The host picks the rules and starts the game. Playing to {table.settings.target}.{table.settings.bidTimer ? ` ${table.settings.bidTimer} seconds to bid.` : ''}</p>
         )}
       </main>
       <div className="bottom-bar">
@@ -509,6 +542,10 @@ function OnlineTable({ table, mySeat, cards, me, isHost, call, room, icons, pres
   useEffect(() => { if (myTurn) { buzz(60); } }, [myTurn, r?.tricks.length, table.phase]);
 
   const handNo = game.hands.length;
+  const bidTimer = table.settings.bidTimer ?? 0;
+  const left = useCountdown(bidTimer && table.phase === 'bidding' ? `${handNo}:${r.turn}` : null, bidTimer);
+  const hurry = left != null && left <= 5;
+  useEffect(() => { if (myTurn && table.phase === 'bidding' && left === 5) buzz([80, 60, 80]); }, [left === 5]);
   const blindOk = table.settings.rules.blindNilAllowed !== false;
   // Blind nil must be decided before looking, so a new hand starts face down until you choose.
   const coverCards = table.phase === 'bidding' && blindOk && mySeat >= 0 && !hasBid(table, mySeat) && peeked !== handNo;
@@ -583,6 +620,12 @@ function OnlineTable({ table, mySeat, cards, me, isHost, call, room, icons, pres
                 </div>
               )}
               <div className="avatar">
+                {turn && left != null && (
+                  <svg className={`bid-clock${hurry ? ' hurry' : ''}`} viewBox="0 0 100 100" aria-label={`${left} seconds to bid`}>
+                    <circle cx="50" cy="50" r="46" pathLength="100" style={{ strokeDashoffset: 100 - (100 * left) / bidTimer }} />
+                  </svg>
+                )}
+                {turn && left != null && <span className={`bid-secs${hurry ? ' hurry' : ''}`}>{left}</span>}
                 {stream && (
                   <VideoTile stream={stream} muted={who.id === me.id || !call.speakerOn} mirrored={who.id === me.id}
                     micOff={who.id !== me.id && peerOf(who.id) && !peerOf(who.id).mic}
@@ -630,7 +673,8 @@ function OnlineTable({ table, mySeat, cards, me, isHost, call, room, icons, pres
       {mySeat >= 0 && (
         <div className="hand-dock online-dock">
           <div className="dock-head">
-            <span>{myTurn ? (table.phase === 'bidding' ? 'Your bid' : 'Your turn') : turnText(table)}</span>
+            <span>{myTurn ? (table.phase === 'bidding' ? 'Your bid' : 'Your turn') : turnText(table)}
+              {left != null && <b className={`dock-clock${hurry ? ' hurry' : ''}`}> · {left}s</b>}</span>
             <span>{cards ? `${cards.length} cards` : ''}</span>
           </div>
           {coverCards ? (
@@ -666,6 +710,21 @@ function OnlineTable({ table, mySeat, cards, me, isHost, call, room, icons, pres
       )}
     </>
   );
+}
+
+/** Seconds left on a countdown that restarts whenever `key` changes (null: no countdown). */
+function useCountdown(key, seconds) {
+  const started = useRef({ key: undefined, at: 0 });
+  if (started.current.key !== key) started.current = { key, at: Date.now() };
+  const start = started.current.at;
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (key == null) return undefined;
+    const timer = setInterval(() => setNow(Date.now()), 250);
+    return () => clearInterval(timer);
+  }, [key]);
+  if (key == null || !seconds) return null;
+  return Math.max(0, Math.ceil(seconds - (Math.max(now, start) - start) / 1000));
 }
 
 const hasVideo = (stream) => stream.getVideoTracks().length > 0;

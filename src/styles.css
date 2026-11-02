@@ -1122,3 +1122,14 @@ button.choice:active { transform: scale(0.98); }
 .player-spot.top .nameplate { max-width: 130px; }
 :root[data-emblem='football'] .table-logo { opacity: 0.85; color: transparent; text-shadow: none; width: 120px; height: 72px; background: var(--deck-emblem) center / contain no-repeat; filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.4)); }
 :root[data-emblem='football'] .table-logo { width: 96px; height: 58px; opacity: 0.55; }
+
+/* Bid timer: a ring that runs down around the bidder, seconds on a badge */
+.bid-clock { position: absolute; inset: -8px; width: calc(100% + 16px); height: calc(100% + 16px); z-index: 3; transform: rotate(-90deg); pointer-events: none; }
+.bid-clock circle { fill: none; stroke: var(--gold); stroke-width: 6; stroke-linecap: round; stroke-dasharray: 100; transition: stroke-dashoffset 0.25s linear, stroke 0.2s; filter: drop-shadow(0 0 4px rgba(245, 184, 46, 0.7)); }
+.bid-clock.hurry circle { stroke: #ff4d4d; filter: drop-shadow(0 0 5px rgba(255, 77, 77, 0.8)); }
+.player-spot.turn .avatar:has(.bid-clock)::before { display: none; }
+.bid-secs { position: absolute; left: -6px; top: -6px; z-index: 4; min-width: 24px; height: 24px; padding: 0 5px; border-radius: 999px; background: var(--gold); color: var(--gold-ink); font-size: 13px; font-weight: 900; display: grid; place-items: center; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.45); font-variant-numeric: tabular-nums; }
+.bid-secs.hurry { background: #ff4d4d; color: #fff; animation: secs-pulse 1s ease-in-out infinite; }
+@keyframes secs-pulse { 50% { transform: scale(1.15); } }
+.dock-clock { color: var(--gold); font-variant-numeric: tabular-nums; }
+.dock-clock.hurry { color: #ff6b6b; }
