@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import { NIL_CALLS } from './lib/scoring.js';
 import { parseCard, cardName } from './lib/cards.js';
 import { cardAt } from './lib/hand.js';
+import { useDeck } from './lib/decks.js';
 
 /** − number + with big solid buttons. Tap the number to pick a value directly. */
 export function NumberControl({ label, value, onChange, min = 0, max = 13, compact }) {
@@ -198,14 +199,18 @@ function CourtPanel({ rank, suit }) {
 }
 
 /** A playing card face. Pass onClick to make it tappable; `style` positions it (e.g. in a fan). */
-export function PlayingCard({ code, size = 'md', selected, onClick, disabled, className = '', style }) {
+export function PlayingCard({ code, size = 'md', selected, onClick, disabled, className = '', style, faces }) {
   const { rank, suit } = parseCard(code);
   const court = ['J', 'Q', 'K'].includes(rank);
+  const deck = useDeck();
+  const look = faces ?? deck.faces;
   const classes = `pcard ${size}${suit.red ? ' red' : ''}${selected ? ' sel' : ''}${court ? ' court' : ''}${rank === 'A' ? ' ace' : ''}${rank === '10' ? ' ten' : ''} ${className}`;
   const face = (
     <>
       <span className="pc-corner"><b>{rank}</b><SuitShape suit={suit.id} /></span>
-      {court ? <CourtPanel rank={rank} suit={suit.id} /> : <span className="pc-big"><SuitShape suit={suit.id} /></span>}
+      {court && look === 'classic' && <img className="pc-court pc-portrait" src={`/faces/${rank}${suit.id}.webp`} alt="" draggable="false" />}
+      {court && look !== 'classic' && <CourtPanel rank={rank} suit={suit.id} />}
+      {court ? null : <span className="pc-big"><SuitShape suit={suit.id} /></span>}
     </>
   );
   if (!onClick) return <div className={classes} style={style} role="img" aria-label={cardName(code)} data-code={code}>{face}</div>;
@@ -216,7 +221,7 @@ export function PlayingCard({ code, size = 'md', selected, onClick, disabled, cl
 }
 
 /** The back of a card. */
-export function CardBack({ size = 'md', className = '', style }) {
+export function CardBack({ size = 'md', className = '', style }) { // style can set the back's background (deck previews)
   return <div className={`pcard back ${size} ${className}`} style={style} aria-hidden="true"><span className="back-mark"><SuitShape suit="S" /></span></div>;
 }
 

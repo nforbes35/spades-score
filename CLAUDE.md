@@ -24,6 +24,10 @@ plain words, keep text large and buttons big, check every screen fits a 320px ph
   (`spades-online-name`, `spades-avatar`). Avatar = `e:<backdrop>:<emoji>` or `p:data:image/jpeg…` (photo cropped
   to 120px, ~5 KB) or null (initials). Bots get an SVG robot from their name. `useAvatars` swaps icons by device id
   (`avatar` messages: on peer join, reply on first hello, resend every 20 s). `o-sit` carries the name.
+- Decks (`src/lib/decks.js`, `DeckPicker.jsx`): per-device choice (`spades-deck`), applied as CSS vars on <html>
+  (`--deck-back`, `--deck-table`, `--deck-emblem`, `data-deck`, `data-emblem`). Classic faces = cropped public-domain
+  portraits in `public/faces/*.webp`; 'cartoon' = drawn `CourtPanel`. Photos in `public/decks/` (credits there).
+  Team decks are colours only: no team names/logos (trademarks).
 - Cards (`PlayingCard` in components.jsx) are Spades Masters style: big index top-left, big suit lower right,
   SVG suit paths (no font glyphs), drawn character portraits on J/Q/K; `CardBack` for face-down hands.
 - Start screen → Play online makes a game code; the host's device runs the game, others join with

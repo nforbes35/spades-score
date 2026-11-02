@@ -13,6 +13,8 @@ import { useKeys, seal, unseal } from './lib/secret.js';
 import { useWakeLock, chime, buzz } from './lib/fx.js';
 import { recordGame, useStatsSync } from './lib/stats.js';
 import Stats from './Stats.jsx';
+import DeckPicker from './DeckPicker.jsx';
+import { useDeck } from './lib/decks.js';
 import { Avatar, ProfileEditor } from './Avatar.jsx';
 import { loadName, saveName, loadAvatar, saveAvatar, useAvatars } from './lib/profile.js';
 import { Icon, FannedHand, PlayingCard, CardBack, Sheet, RulesFields, Toggle, Segmented, useToast, Confetti, StatusDot, CardText, useCountUp } from './components.jsx';
@@ -311,6 +313,7 @@ function hostGameActions(act) {
 function Lobby({ code, table, isHost, me, people, call, icons, profile, onProfile, onSit, onStand, hostActions, onLeave }) {
   const [qr, setQr] = useState(null);
   const [editing, setEditing] = useState(null); // the profile being edited
+  const [decksOpen, setDecksOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const [rulesOpen, setRulesOpen] = useState(false);
   const [statsOpen, setStatsOpen] = useState(false);
@@ -366,6 +369,7 @@ function Lobby({ code, table, isHost, me, people, call, icons, profile, onProfil
           <button type="button" className="profile-chip" onClick={() => setEditing(profile)}>
             <Avatar value={profile.avatar} name={profile.name} /> {profile.name} <Icon name="edit" size={14} />
           </button>
+          <button type="button" className="profile-chip" onClick={() => setDecksOpen(true)}><Icon name="cards" size={18} /> Cards &amp; table</button>
         </div>
         <div className="wrap"><p className="target">Game {code} · {isHost ? 'You’re the host' : `Host: ${host?.name ?? '…'}`}</p></div>
       </header>
@@ -448,6 +452,7 @@ function Lobby({ code, table, isHost, me, people, call, icons, profile, onProfil
         )}
       </div>
       {statsOpen && <Stats onClose={() => setStatsOpen(false)} />}
+      {decksOpen && <DeckPicker onClose={() => setDecksOpen(false)} />}
       {editing && (
         <Sheet title="You" onClose={() => setEditing(null)}
           action={{ label: 'Done', onClick: () => { if (editing.name.trim()) onProfile({ ...editing, name: editing.name.trim() }); setEditing(null); } }}>
@@ -485,6 +490,8 @@ function OnlineTable({ table, mySeat, cards, me, isHost, call, room, icons, pres
   const [selected, setSelected] = useState(null);
   const [sending, setSending] = useState(false);
   const [peeked, setPeeked] = useState(null); // hand number whose cards I've looked at
+  const [decksOpen, setDecksOpen] = useState(false);
+  const deck = useDeck();
   const [now, setNow] = useState(Date.now());
   const st = standings(game);
 
@@ -547,13 +554,17 @@ function OnlineTable({ table, mySeat, cards, me, isHost, call, room, icons, pres
           <div className="row">
             {!call.joined && <button type="button" className="icon-btn round small" aria-label="Video chat" onClick={() => call.join()}><Icon name="video" size={18} /></button>}
             {!call.joined && <button type="button" className="icon-btn round small" aria-label="Audio chat" onClick={() => call.join({ audioOnly: true })}><Icon name="mic" size={18} /></button>}
+            <button type="button" className="icon-btn round small" aria-label="Cards and table" onClick={() => setDecksOpen(true)}><Icon name="cards" size={18} /></button>
             <button type="button" className="icon-btn round small" aria-label="Leave" onClick={onLeave}><Icon name="close" size={18} /></button>
           </div>
         </div>
       </header>
 
       <div className="felt">
-        <div className="table-oval" aria-hidden="true"><span className="table-logo">♠</span></div>
+        <div className="table-oval" aria-hidden="true">
+          <span className="table-logo">♠</span>
+          {deck.verse && <p className="table-verse">“{deck.verse}”<small>{deck.verseRef}</small></p>}
+        </div>
         {SEATS.map((_, s) => {
           const who = table.seats[s];
           const entry = seatEntry(hand, s);
@@ -649,6 +660,7 @@ function OnlineTable({ table, mySeat, cards, me, isHost, call, room, icons, pres
         </div>
       )}
 
+      {decksOpen && <DeckPicker onClose={() => setDecksOpen(false)} />}
       {(table.phase === 'scored' || table.phase === 'over') && (
         <HandResult table={table} isHost={isHost} hostActions={hostActions} />
       )}

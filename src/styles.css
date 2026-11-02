@@ -1087,3 +1087,38 @@ button.choice:active { transform: scale(0.98); }
 .trick { transform: translate(-50%, -36%); }
 .profile-editor .name-input { text-transform: none; letter-spacing: 0; }
 .photo-crop .row button { padding: 12px 20px; font-size: 17px; }
+
+/* ---------- Decks: realistic face cards, themed backs and tables (lib/decks.js) ---------- */
+.pc-portrait { width: 60%; aspect-ratio: 260 / 419; object-fit: cover; border-radius: calc(var(--w) * 0.03); right: 6%; bottom: 4%; pointer-events: none; user-select: none; }
+.pcard.back { background: var(--deck-back, radial-gradient(circle at 50% 40%, #27407a, #142451 70%, #0d1838)); }
+:root:not([data-deck='classic']):not([data-deck='cartoon']) .pcard.back::before { content: none; }
+:root[data-deck]:not([data-deck='classic']):not([data-deck='cartoon']) .back-mark { display: none; }
+:root:not([data-deck='classic']):not([data-deck='cartoon']) .pcard.back::after { border-color: rgba(255, 255, 255, 0.7); }
+.table-oval { background: var(--noise), var(--deck-table, radial-gradient(70% 60% at 50% 42%, #2a9a5e, #17713f 55%, #0d4a28 100%)); background-size: auto, cover; background-position: center; }
+.table-verse { position: absolute; left: 50%; bottom: 9%; transform: translateX(-50%); width: 70%; text-align: center; color: rgba(255, 255, 255, 0.82); font: italic 600 13px/1.35 var(--court-font); text-shadow: 0 1px 4px rgba(0, 0, 0, 0.7); }
+.table-verse small { display: block; font-style: normal; font-size: 11px; opacity: 0.8; margin-top: 3px; }
+:root[data-emblem='football'] .table-logo { opacity: 0.5; }
+:root:not([data-deck='classic']):not([data-deck='cartoon']):not([data-emblem='football']) .table-logo { display: none; }
+
+.deck-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+.deck-tile { position: relative; display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 12px 8px 10px; border-radius: 18px; border: 2px solid var(--line); background: var(--surface); color: var(--ink); font-weight: 800; font-size: 14px; }
+.deck-tile.on { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(245, 184, 46, 0.35); }
+.deck-tile .deck-preview { position: relative; height: 92px; width: 120px; border-radius: 12px; overflow: hidden; }
+.deck-preview .felt-swatch { position: absolute; inset: 0; }
+.deck-preview .pcard { position: absolute; --w: 46px; top: 10px; }
+.deck-preview .pcard.back { left: 14px; transform: rotate(-8deg); }
+.deck-preview .pcard.face { left: 58px; transform: rotate(7deg); }
+.deck-group { margin-top: 6px; }
+.lobby-me { display: flex; gap: 8px; flex-wrap: wrap; }
+.pcard.back.themed .back-mark { display: none; }
+.sheet { color: var(--ink); }
+.online-meta .row { gap: 4px; }
+.online-meta .icon-btn.small { width: 34px; height: 34px; }
+.online-team { padding: 5px 8px 5px 6px; gap: 6px; }
+.team-faces .avatar-icon { width: 22px; height: 22px; font-size: 9px; }
+.team-faces .avatar-icon + .avatar-icon { margin-left: -9px; }
+.online-team b { font-size: 20px; }
+.player-spot.top { width: 130px; }
+.player-spot.top .nameplate { max-width: 130px; }
+:root[data-emblem='football'] .table-logo { opacity: 0.85; color: transparent; text-shadow: none; width: 120px; height: 72px; background: var(--deck-emblem) center / contain no-repeat; filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.4)); }
+:root[data-emblem='football'] .table-logo { width: 96px; height: 58px; opacity: 0.55; }

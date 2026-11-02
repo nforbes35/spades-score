@@ -1,0 +1,11 @@
+Card deck artwork (all public domain or CC0)
+
+faces/*.webp — court cards from Vector Playing Cards by Byron Knoll (public domain),
+  https://github.com/notpeter/Vector-Playing-Cards — cropped to the framed portrait.
+decks/space-*      — "Pillars of Creation (NIRCam Image)", NASA/ESA/CSA/STScI (public domain), Wikimedia Commons.
+decks/mountains-*  — "Oxbow Bend Fall", Grand Teton National Park / NPS (public domain), Wikimedia Commons.
+decks/reef-*       — "Coral And Fish", NOAA (public domain), Wikimedia Commons.
+decks/glass-*      — "Christ Church Newton NJ stained glass window" (public domain), Wikimedia Commons.
+decks/cross-*      — "A silhouette of a cross at sunrise" by Aaron Burden (CC0), Wikimedia Commons.
+Verse: Psalm 118:24, King James Version (public domain).
+Team decks use colours only; no team names or logos.
