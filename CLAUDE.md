@@ -20,6 +20,12 @@ plain words, keep text large and buttons big, check every screen fits a 320px ph
   "Remote play"). **Play online**: the app is the card table (`OnlineApp.jsx`).
 
 ## Online mode
+- Profiles & icons (`src/lib/profile.js`, `src/Avatar.jsx`): name + avatar string in tab-first storage
+  (`spades-online-name`, `spades-avatar`). Avatar = `e:<backdrop>:<emoji>` or `p:data:image/jpeg…` (photo cropped
+  to 120px, ~5 KB) or null (initials). Bots get an SVG robot from their name. `useAvatars` swaps icons by device id
+  (`avatar` messages: on peer join, reply on first hello, resend every 20 s). `o-sit` carries the name.
+- Cards (`PlayingCard` in components.jsx) are Spades Masters style: big index top-left, big suit lower right,
+  SVG suit paths (no font glyphs), drawn character portraits on J/Q/K; `CardBack` for face-down hands.
 - Start screen → Play online makes a game code; the host's device runs the game, others join with
   `?join=CODE&as=online` (or the code; `JoinAs` sees role `ohost` and goes straight in).
 - Engine `src/lib/online.js` (pure, tested in `test/online.test.js`): `startGame`, `deal`, `placeBid`, `legalCards`

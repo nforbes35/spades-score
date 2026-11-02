@@ -24,6 +24,20 @@ export function write(key, value) {
   } catch { /* private mode or full storage: keep going in memory */ }
 }
 
+// Per-tab first (two tabs on one device are two players), then the device's saved value, so a reload or
+// reopening the app finds the same person.
+export function tabRead(key) {
+  try { const v = sessionStorage.getItem(key); if (v) return JSON.parse(v); } catch { /* no session storage */ }
+  return read(key);
+}
+export function tabWrite(key, value) {
+  try {
+    if (value == null) sessionStorage.removeItem(key);
+    else sessionStorage.setItem(key, JSON.stringify(value));
+  } catch { /* no session storage */ }
+  write(key, value);
+}
+
 export function useGame() {
   const [state, setState] = useState(() => ({ game: normalizeGame(read(GAME_KEY)), past: [] }));
   useEffect(() => write(GAME_KEY, state.game), [state.game]);

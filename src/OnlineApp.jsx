@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import QRCode from 'qrcode';
-import { read, write } from './lib/store.js';
+import { read, write, tabRead, tabWrite } from './lib/store.js';
 import { standings, winner, signed, scoreTeam, isNil, nilLabel, STANDARD_RULES } from './lib/scoring.js';
 import { SEATS, teamOf, seatEntry } from './lib/table.js';
 import { sortHand } from './lib/cards.js';
@@ -13,12 +13,13 @@ import { useKeys, seal, unseal } from './lib/secret.js';
 import { useWakeLock, chime, buzz } from './lib/fx.js';
 import { recordGame, useStatsSync } from './lib/stats.js';
 import Stats from './Stats.jsx';
-import { Icon, FannedHand, PlayingCard, Sheet, RulesFields, Toggle, Segmented, useToast, Confetti, StatusDot, CardText, useCountUp } from './components.jsx';
+import { Avatar, ProfileEditor } from './Avatar.jsx';
+import { loadName, saveName, loadAvatar, saveAvatar, useAvatars } from './lib/profile.js';
+import { Icon, FannedHand, PlayingCard, CardBack, Sheet, RulesFields, Toggle, Segmented, useToast, Confetti, StatusDot, CardText, useCountUp } from './components.jsx';
 import { VideoTile, CallButtons, SoundNote } from './Video.jsx';
 import { HandRow } from './Scoreboard.jsx';
 import { history } from './lib/scoring.js';
 
-const NAME_KEY = 'spades-online-name';
 const ID_KEY = 'spades-device-id';
 const BOT_DELAY_MS = 900;
 const RESEND_MS = 2500;
@@ -26,17 +27,6 @@ const RESYNC_MS = 5000;
 const NEXT_HAND_MS = 9000;
 const TRICK_SHOW_MS = 1600;
 const AREAS = ['bottom', 'left', 'top', 'right'];
-
-// Per-tab first (two tabs on one device are two players), then the device's saved value, so a reload or
-// reopening the app rejoins the same seat.
-function tabRead(key) {
-  try { const v = sessionStorage.getItem(key); if (v) return JSON.parse(v); } catch { /* no session storage */ }
-  return read(key);
-}
-function tabWrite(key, value) {
-  try { sessionStorage.setItem(key, JSON.stringify(value)); } catch { /* no session storage */ }
-  write(key, value);
-}
 
 /** This device's id, kept so a reload rejoins the same seat. */
 function stableId() {
@@ -48,28 +38,33 @@ function stableId() {
 
 /** Online mode: everyone plays on their own device, the app deals, checks the rules and keeps score. */
 export default function OnlineApp({ code, isHost, onLeave }) {
-  const [name, setName] = useState(() => tabRead(NAME_KEY) ?? '');
-  const [named, setNamed] = useState(() => Boolean(tabRead(NAME_KEY)));
+  const [name, setName] = useState(loadName);
+  const [avatar, setAvatar] = useState(loadAvatar);
+  const [named, setNamed] = useState(() => Boolean(loadName()));
+  const changeAvatar = (value) => { setAvatar(value); saveAvatar(value); };
   if (!named) {
     return (
       <div className="app">
         <header className="hero"><div className="wrap hero-row"><div className="brand"><span className="brand-mark">♠</span><h1>Play online</h1></div></div></header>
         <main className="wrap">
-          <form className="card waiting-card" onSubmit={(e) => { e.preventDefault(); if (name.trim()) { tabWrite(NAME_KEY, name.trim()); setNamed(true); } }}>
-            <h2>What’s your name?</h2>
-            <p className="muted">Everyone at the table sees it.</p>
-            <input className="code-input name-input" value={name} onChange={(e) => setName(e.target.value)} placeholder="Name" autoFocus maxLength={14} />
-            <button type="submit" className="primary big" disabled={!name.trim()}>Continue</button>
+          <form className="card waiting-card profile-card" onSubmit={(e) => { e.preventDefault(); if (name.trim()) { saveName(name.trim()); setNamed(true); } }}>
+            <h2>Who’s playing?</h2>
+            <p className="muted">Everyone at the table sees your name and icon.</p>
+            <ProfileEditor name={name} avatar={avatar} onName={setName} onAvatar={changeAvatar} autoFocus={!name} />
+            <button type="submit" className="primary big go" disabled={!name.trim()}>Continue</button>
             <button type="button" className="text-btn" onClick={onLeave}>Cancel</button>
           </form>
         </main>
       </div>
     );
   }
-  return <OnlineRoom code={code} isHost={isHost} name={name.trim()} onLeave={onLeave} />;
+  return (
+    <OnlineRoom code={code} isHost={isHost} name={name.trim()} avatar={avatar} onLeave={onLeave}
+      onProfile={(next) => { setName(next.name); saveName(next.name); changeAvatar(next.avatar); }} />
+  );
 }
 
-function OnlineRoom({ code, isHost, name, onLeave }) {
+function OnlineRoom({ code, isHost, name, avatar, onLeave, onProfile }) {
   const keys = useKeys();
   const [deviceId] = useState(stableId);
   const [me, setMe] = useDevice(code, { role: isHost ? 'ohost' : 'oplayer', name, id: deviceId, pub: keys?.pub ?? null });
@@ -86,6 +81,7 @@ function OnlineRoom({ code, isHost, name, onLeave }) {
   const room = useRoom(code, me, onMessage);
   const call = useCall({ room, me, setMe, facing: 'user' });
   const statsSync = useStatsSync(room);
+  const [icons, iconMessage] = useAvatars(room, me, avatar);
   const hostPeer = isHost ? null : room.peers.find((p) => p.role === 'ohost');
   hostRef.current = hostPeer;
 
@@ -109,6 +105,7 @@ function OnlineRoom({ code, isHost, name, onLeave }) {
   function onMessage(m, from) {
     if (m.type === 'rtc') { call.handle(m); return; }
     if (statsSync(m, from)) return;
+    if (iconMessage(m, from)) return;
     if (isHost) {
       if (!from) return;
       const t = tableRef.current;
@@ -116,7 +113,7 @@ function OnlineRoom({ code, isHost, name, onLeave }) {
       let error = null;
       if (m.type === 'o-hello') sendAll(t, from);
       else if (m.type === 'o-sit') {
-        error = act((x) => sit(x, m.seat, { id: from.id, name: from.name }));
+        error = act((x) => sit(x, m.seat, { id: from.id, name: String(m.name || from.name || '').trim().slice(0, 14) || 'Player' }));
       } else if (m.type === 'o-stand') {
         error = act((x) => ({ ...x, seats: x.seats.map((s) => (s?.id === from.id ? null : s)) }));
       } else if (m.type === 'o-bid' && seat >= 0) {
@@ -217,6 +214,13 @@ function OnlineRoom({ code, isHost, name, onLeave }) {
     return () => clearInterval(timer);
   }, [pending, room.send]);
 
+  // A new name shows on your seat too.
+  useEffect(() => {
+    if (shown?.phase !== 'lobby' || mySeat < 0 || shown.seats[mySeat].name === name) return;
+    if (isHost) act((x) => sit(x, mySeat, { id: me.id, name }));
+    else if (hostPeer) room.send({ type: 'o-sit', seat: mySeat, name }, hostPeer.id);
+  }, [name, mySeat, shown?.phase, hostPeer?.id, me.name]);
+
   const people = [
     { id: me.id, name: me.name, role: me.role, here: true },
     ...room.peers.filter((p) => p.role === 'ohost' || p.role === 'oplayer').map((p) => ({ ...p, here: true })),
@@ -246,12 +250,13 @@ function OnlineRoom({ code, isHost, name, onLeave }) {
   return (
     <div className={`app online${shown.phase === 'lobby' ? '' : ' at-table'}`}>
       {shown.phase === 'lobby'
-        ? <Lobby code={code} table={shown} isHost={isHost} me={me} people={people} call={call}
-            onSit={(seat) => (isHost ? toastErr(toast, act((x) => sit(x, seat, { id: me.id, name: me.name }))) : room.send({ type: 'o-sit', seat }, hostPeer?.id))}
+        ? <Lobby code={code} table={shown} isHost={isHost} me={me} people={people} call={call} icons={icons}
+            profile={{ name, avatar }} onProfile={onProfile}
+            onSit={(seat) => (isHost ? toastErr(toast, act((x) => sit(x, seat, { id: me.id, name }))) : room.send({ type: 'o-sit', seat, name }, hostPeer?.id))}
             onStand={() => (isHost ? act((x) => ({ ...x, seats: x.seats.map((s) => (s?.id === me.id ? null : s)) })) : room.send({ type: 'o-stand' }, hostPeer?.id))}
             hostActions={isHost ? hostLobbyActions(act, toast) : null}
             onLeave={leave} />
-        : <OnlineTable table={shown} mySeat={mySeat} cards={cards} me={me} isHost={isHost} call={call} room={room}
+        : <OnlineTable table={shown} mySeat={mySeat} cards={cards} me={me} isHost={isHost} call={call} room={room} icons={icons}
             present={present} send={send} toast={toast} waiting={Boolean(pending)}
             hostActions={isHost ? hostGameActions(act) : null} onLeave={leave} />}
       {toast.node}
@@ -303,8 +308,9 @@ function hostGameActions(act) {
 // ---------------------------------------------------------------------------------------------
 // Lobby: invite people, pick seats, set the rules, start.
 
-function Lobby({ code, table, isHost, me, people, call, onSit, onStand, hostActions, onLeave }) {
+function Lobby({ code, table, isHost, me, people, call, icons, profile, onProfile, onSit, onStand, hostActions, onLeave }) {
   const [qr, setQr] = useState(null);
+  const [editing, setEditing] = useState(null); // the profile being edited
   const [copied, setCopied] = useState(false);
   const [rulesOpen, setRulesOpen] = useState(false);
   const [statsOpen, setStatsOpen] = useState(false);
@@ -330,14 +336,17 @@ function Lobby({ code, table, isHost, me, people, call, onSit, onStand, hostActi
       <div key={s} className={`lobby-seat t${teamOf(s)}${mine ? ' me' : ''}`}>
         {who ? (
           <>
-            <b>{who.name}{who.bot ? ' 🤖' : ''}</b>
+            {mine
+              ? <button type="button" className="seat-avatar-btn" aria-label="Change your name or icon" onClick={() => setEditing(profile)}><Avatar value={icons[who.id]} name={who.name} className="lobby-avatar" /><span className="edit-dot"><Icon name="edit" size={12} /></span></button>
+              : <Avatar value={icons[who.id]} name={who.name} bot={who.bot} className="lobby-avatar" />}
+            <b>{who.name}</b>
             <span className="muted small">{mine ? 'You' : who.bot ? 'Computer' : 'Seated'}</span>
             {mine && <button type="button" className="text-btn small" onClick={onStand}>Stand up</button>}
             {isHost && !mine && <button type="button" className="text-btn small" onClick={() => hostActions.clearSeat(s)}>Remove</button>}
           </>
         ) : (
           <>
-            <span className="muted">Empty</span>
+            <span className="empty-seat" aria-hidden="true">+</span>
             <button type="button" className="soft" onClick={() => onSit(s)}>Sit here</button>
             {isHost && <button type="button" className="text-btn small" onClick={() => hostActions.addBot(s)}>Add computer</button>}
           </>
@@ -352,6 +361,11 @@ function Lobby({ code, table, isHost, me, people, call, onSit, onStand, hostActi
         <div className="wrap hero-row">
           <div className="brand"><span className="brand-mark">♠</span><h1>{table.gamesPlayed ? 'Next game' : 'Online game'}</h1></div>
           <button type="button" className="icon-btn" onClick={onLeave}>{isHost ? 'Close' : 'Leave'}</button>
+        </div>
+        <div className="wrap lobby-me">
+          <button type="button" className="profile-chip" onClick={() => setEditing(profile)}>
+            <Avatar value={profile.avatar} name={profile.name} /> {profile.name} <Icon name="edit" size={14} />
+          </button>
         </div>
         <div className="wrap"><p className="target">Game {code} · {isHost ? 'You’re the host' : `Host: ${host?.name ?? '…'}`}</p></div>
       </header>
@@ -434,6 +448,13 @@ function Lobby({ code, table, isHost, me, people, call, onSit, onStand, hostActi
         )}
       </div>
       {statsOpen && <Stats onClose={() => setStatsOpen(false)} />}
+      {editing && (
+        <Sheet title="You" onClose={() => setEditing(null)}
+          action={{ label: 'Done', onClick: () => { if (editing.name.trim()) onProfile({ ...editing, name: editing.name.trim() }); setEditing(null); } }}>
+          <ProfileEditor name={editing.name} avatar={editing.avatar}
+            onName={(n) => setEditing((x) => ({ ...x, name: n }))} onAvatar={(a) => setEditing((x) => ({ ...x, avatar: a }))} />
+        </Sheet>
+      )}
       {rulesOpen && (
         <RulesSheetOnline rules={table.settings.rules} onClose={() => setRulesOpen(false)}
           onSave={(rules) => { hostActions.settings({ rules: { ...rules, blindNilAllowed: table.settings.rules.blindNilAllowed } }); setRulesOpen(false); }} />
@@ -454,7 +475,7 @@ function RulesSheetOnline({ rules, onSave, onClose }) {
 // ---------------------------------------------------------------------------------------------
 // The card table.
 
-function OnlineTable({ table, mySeat, cards, me, isHost, call, room, present, send, toast, waiting, hostActions, onLeave }) {
+function OnlineTable({ table, mySeat, cards, me, isHost, call, room, icons, present, send, toast, waiting, hostActions, onLeave }) {
   const r = table.round;
   const game = table.game;
   const hand = currentHand(table);
@@ -506,10 +527,18 @@ function OnlineTable({ table, mySeat, cards, me, isHost, call, room, present, se
       <header className="online-top">
         <div className="online-scores">
           {[0, 1].map((t) => (
-            <div key={t} className={`online-team t${t}`}>
+            <div key={t} className={`online-team t${t}`} aria-label={game.teams[t].name}>
               <span>{game.teams[t].name}</span>
-              <b><CountUp value={st[t].score} /></b>
-              {game.rules.bagsEnabled && <small>{st[t].bags} bag{st[t].bags === 1 ? '' : 's'}</small>}
+              <span className="team-faces">
+                {SEATS.map((_, s) => s).filter((s) => teamOf(s) === t).map((s) => {
+                  const who = table.seats[s];
+                  return <Avatar key={s} value={who ? icons[who.id] : null} name={who?.name ?? '?'} bot={who?.bot} />;
+                })}
+              </span>
+              <span className="team-score">
+                <b><CountUp value={st[t].score} /></b>
+                {game.rules.bagsEnabled && <small>{st[t].bags} bag{st[t].bags === 1 ? '' : 's'}</small>}
+              </span>
             </div>
           ))}
         </div>
@@ -524,6 +553,7 @@ function OnlineTable({ table, mySeat, cards, me, isHost, call, room, present, se
       </header>
 
       <div className="felt">
+        <div className="table-oval" aria-hidden="true"><span className="table-logo">♠</span></div>
         {SEATS.map((_, s) => {
           const who = table.seats[s];
           const entry = seatEntry(hand, s);
@@ -532,8 +562,15 @@ function OnlineTable({ table, mySeat, cards, me, isHost, call, room, present, se
           const stream = who && !who.bot ? videoOf(who.id) : null;
           const bidText = table.phase === 'bidding' && !hasBid(table, s) ? (turn ? 'bidding…' : '–')
             : isNil(entry.call) ? nilLabel(entry.call) : `bid ${entry.bid}`;
+          const held = s !== mySeat && table.phase !== 'scored' && table.phase !== 'over' ? r?.counts?.[s] ?? 0 : 0;
           return (
             <div key={s} className={`player-spot ${posOf(s)} t${teamOf(s)}${turn ? ' turn' : ''}${s === mySeat ? ' me' : ''}`}>
+              {held > 0 && (
+                <div className="spot-backs" aria-label={`${held} cards`}>
+                  {Array.from({ length: Math.min(held, 7) }, (_, k) => <CardBack key={k} size="xs" style={{ '--k': k - (Math.min(held, 7) - 1) / 2 }} />)}
+                  <span className="held-count">{held}</span>
+                </div>
+              )}
               <div className="avatar">
                 {stream && (
                   <VideoTile stream={stream} muted={who.id === me.id || !call.speakerOn} mirrored={who.id === me.id}
@@ -541,13 +578,15 @@ function OnlineTable({ table, mySeat, cards, me, isHost, call, room, present, se
                     className={hasVideo(stream) && (who.id !== me.id || call.camOn) ? '' : 'no-video'} />
                 )}
                 {(!stream || !hasVideo(stream) || (who.id === me.id && !call.camOn)) && (
-                  <span className="initial">{who?.bot ? '🤖' : (who?.name ?? '?').slice(0, 1).toUpperCase()}</span>
+                  <Avatar value={who ? icons[who.id] : null} name={who?.name ?? '?'} bot={who?.bot} className="seat-icon" />
                 )}
                 {r?.dealer === s && <span className="dealer-chip">D</span>}
               </div>
-              <div className="spot-name">{s === mySeat ? 'You' : who?.name}</div>
-              <div className="spot-score">
-                {table.phase === 'bidding' ? bidText : <>{entry.books}<small> / {isNil(entry.call) ? nilLabel(entry.call) : entry.bid}</small></>}
+              <div className="nameplate">
+                <span className="spot-name">{s === mySeat ? 'You' : who?.name}</span>
+                <span className="spot-score">
+                  {table.phase === 'bidding' ? bidText : <>{entry.books}<small>/{isNil(entry.call) ? nilLabel(entry.call) : entry.bid}</small></>}
+                </span>
               </div>
               {away && (
                 <div className="away">

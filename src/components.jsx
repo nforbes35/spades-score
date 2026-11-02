@@ -139,19 +139,73 @@ export function Icon({ name, size = 22 }) {
   );
 }
 
-const COURT = { J: 'J', Q: 'Q', K: 'K' };
+// Suit shapes drawn as paths (in a 100 × 100 box), so they look the same on every phone and never
+// turn into emoji.
+const SUIT_PATHS = {
+  S: 'M50 4C41 22 8 38 8 61c0 14 11 24 23 24 8 0 14-4 17-9-1 9-5 15-12 20h28c-7-5-11-11-12-20 3 5 9 9 17 9 12 0 23-10 23-24C92 38 59 22 50 4Z',
+  H: 'M50 92C22 70 5 53 5 32 5 17 16 7 29 7c9 0 16 5 21 13 5-8 12-13 21-13 13 0 24 10 24 25 0 21-17 38-45 60Z',
+  D: 'M50 3c10 17 23 33 38 47-15 14-28 30-38 47C40 80 27 64 12 50 27 36 40 20 50 3Z',
+  C: 'M50 6a20 20 0 0 0-17 30 20 20 0 1 0 13 30c-1 11-5 19-12 26h32c-7-7-11-15-12-26a20 20 0 1 0 13-30A20 20 0 0 0 50 6Z',
+};
+
+/** A suit symbol. Takes the card's colour (currentColor). */
+export function SuitShape({ suit, className = '', style }) {
+  return (
+    <svg className={`suit-shape ${className}`} style={style} viewBox="0 0 100 100" aria-hidden="true">
+      <path d={SUIT_PATHS[suit]} fill="currentColor" />
+    </svg>
+  );
+}
+
+// Court cards: a character portrait in the suit's colours. Kings have a crown and beard, queens a
+// tiara and long hair, jacks a feathered cap.
+const COURT_HAIR = { K: '#7a4a24', Q: '#e0a03a', J: '#3b2416' };
+
+function CourtPanel({ rank, suit }) {
+  const hair = COURT_HAIR[rank];
+  return (
+    <svg className="pc-court" viewBox="0 0 100 130" aria-hidden="true">
+      <defs>
+        <linearGradient id={`court-${suit}`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" className="court-top" /><stop offset="1" className="court-bottom" />
+        </linearGradient>
+        <clipPath id="court-clip"><rect x="0" y="0" width="100" height="130" rx="12" /></clipPath>
+      </defs>
+      <g clipPath="url(#court-clip)">
+        <rect width="100" height="130" fill={`url(#court-${suit})`} />
+        <circle cx="50" cy="58" r="40" className="court-glow" />
+        {rank === 'Q' && <path d="M27 58c-4 22 0 42 6 52h34c6-10 10-30 6-52-4-18-42-18-46 0Z" fill={hair} />}
+        {/* robe and gold collar */}
+        <path d="M6 132c2-26 20-40 44-40s42 14 44 40Z" className="court-robe" />
+        <path d="M30 96 50 118 70 96" className="court-trim" />
+        <g transform="translate(43 106) scale(0.14)"><path d={SUIT_PATHS[suit]} fill="#f5c542" /></g>
+        <rect x="44" y="76" width="12" height="18" rx="4" className="court-skin" />
+        <ellipse cx="50" cy="62" rx="17" ry="19" className="court-skin" />
+        {rank === 'K' && <path d="M33 62c0 20 8 30 17 30s17-10 17-30c-4 9-10 12-17 12s-13-3-17-12Z" fill={hair} />}
+        {rank === 'K' && <path d="M42 72q8-5 16 0q-8 3-16 0Z" fill={hair} />}
+        {rank === 'J' && <path d="M33 58c0-12 8-18 17-18s17 6 17 18c-4-6-10-8-17-8s-13 2-17 8Z" fill={hair} />}
+        {rank === 'Q' && <path d="M33 60c1-14 9-20 17-20s16 6 17 20c-6-8-11-11-17-11s-11 3-17 11Z" fill={hair} />}
+        <circle cx="43.5" cy="61" r="2.2" fill="#2a1a12" /><circle cx="56.5" cy="61" r="2.2" fill="#2a1a12" />
+        <circle cx="40" cy="68" r="3" fill="#f39a8f" opacity="0.6" /><circle cx="60" cy="68" r="3" fill="#f39a8f" opacity="0.6" />
+        {rank !== 'K' && <path d="M45 70q5 4 10 0" stroke="#a5452f" strokeWidth="1.8" fill="none" strokeLinecap="round" />}
+        {rank === 'K' && <g className="court-gold"><path d="M31 44 28 22l11 10 11-15 11 15 11-10-3 22Z" /><circle cx="28" cy="21" r="2.5" /><circle cx="50" cy="16" r="2.8" /><circle cx="72" cy="21" r="2.5" /></g>}
+        {rank === 'Q' && <g className="court-gold"><path d="M35 45 37 34l6 5 7-10 7 10 6-5 2 11c-5-2-10-3-15-3s-10 1-15 3Z" /><circle cx="50" cy="28" r="2.6" fill="#e3202f" /></g>}
+        {rank === 'J' && <g><path d="M27 48c2-14 12-20 24-20 12 0 21 6 23 18-14-6-32-6-47 2Z" className="court-robe" /><path d="M60 32c8-14 20-18 30-14-8 2-16 8-22 18Z" className="court-gold" /></g>}
+      </g>
+      <rect x="1.5" y="1.5" width="97" height="127" rx="11" className="court-edge" />
+    </svg>
+  );
+}
 
 /** A playing card face. Pass onClick to make it tappable; `style` positions it (e.g. in a fan). */
 export function PlayingCard({ code, size = 'md', selected, onClick, disabled, className = '', style }) {
   const { rank, suit } = parseCard(code);
-  const classes = `pcard ${size}${suit.red ? ' red' : ''}${selected ? ' sel' : ''}${COURT[rank] ? ' court' : ''} ${className}`;
+  const court = ['J', 'Q', 'K'].includes(rank);
+  const classes = `pcard ${size}${suit.red ? ' red' : ''}${selected ? ' sel' : ''}${court ? ' court' : ''}${rank === 'A' ? ' ace' : ''}${rank === '10' ? ' ten' : ''} ${className}`;
   const face = (
     <>
-      <span className="pc-corner"><b>{rank}</b><i>{suit.sym}</i></span>
-      {COURT[rank]
-        ? <span className="pc-court"><b>{rank}</b><i>{suit.sym}</i></span>
-        : <span className="pc-pip">{suit.sym}</span>}
-      <span className="pc-corner flip"><b>{rank}</b><i>{suit.sym}</i></span>
+      <span className="pc-corner"><b>{rank}</b><SuitShape suit={suit.id} /></span>
+      {court ? <CourtPanel rank={rank} suit={suit.id} /> : <span className="pc-big"><SuitShape suit={suit.id} /></span>}
     </>
   );
   if (!onClick) return <div className={classes} style={style} role="img" aria-label={cardName(code)} data-code={code}>{face}</div>;
@@ -159,6 +213,11 @@ export function PlayingCard({ code, size = 'md', selected, onClick, disabled, cl
     <button type="button" className={classes} style={style} onClick={onClick} disabled={disabled} data-code={code}
       aria-label={cardName(code)} aria-pressed={selected}>{face}</button>
   );
+}
+
+/** The back of a card. */
+export function CardBack({ size = 'md', className = '', style }) {
+  return <div className={`pcard back ${size} ${className}`} style={style} aria-hidden="true"><span className="back-mark"><SuitShape suit="S" /></span></div>;
 }
 
 const FAN_SPREAD_DEG = 12;
