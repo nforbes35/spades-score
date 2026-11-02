@@ -18,6 +18,7 @@ const teamDeck = (id, name, [main, accent, trim]) => ({
   table: `linear-gradient(transparent 48.5%, ${accent} 48.5% 51.5%, transparent 51.5%), repeating-linear-gradient(0deg, transparent 0 44px, rgba(255, 255, 255, 0.09) 44px 46px), radial-gradient(70% 60% at 50% 42%, color-mix(in srgb, ${main} 70%, #fff 12%), ${main} 60%, color-mix(in srgb, ${main} 70%, #000) 100%)`,
   emblemImage: football('#fff'),
   swatch: [main, accent],
+  button: [accent, trim],
 });
 
 const photoDeck = (id, name, group, back, table, extra = {}) => ({
@@ -31,6 +32,9 @@ const photoDeck = (id, name, group, back, table, extra = {}) => ({
 /** Today's season or holiday theme, changing by itself through the year. */
 const seasonal = () => ({ ...seasonFor(), id: 'seasonal', name: 'Changes with the date', season: seasonFor().name });
 
+// Buttons in each photo deck's colours: [colour, text colour].
+const PHOTO_BUTTONS = { mountains: ['#c8743a', '#fff'], reef: ['#1597ad', '#fff'], space: ['#7b5cff', '#fff'], faith: ['#d9a23a', '#2b1a00'] };
+
 export const DECKS = [
   seasonal(),
   ...SEASON_DECKS,
@@ -40,10 +44,10 @@ export const DECKS = [
   teamDeck('miami-aqua', 'Miami Aqua', ['#008e97', '#fc4c02', '#ffffff']),
   teamDeck('orange-green', 'Orange & Green', ['#005030', '#f47321', '#ffffff']),
   teamDeck('orange-blue', 'Orange & Blue', ['#0021a5', '#fa4616', '#ffffff']),
-  photoDeck('mountains', 'Mountains', 'Photos', 'mountains', 'mountains'),
-  photoDeck('reef', 'Ocean reef', 'Photos', 'reef', 'reef'),
-  photoDeck('space', 'Space', 'Photos', 'space', 'space'),
-  photoDeck('faith', 'Faith', 'Photos', 'glass', 'cross', {
+  photoDeck('mountains', 'Mountains', 'Photos', 'mountains', 'mountains', { button: PHOTO_BUTTONS.mountains }),
+  photoDeck('reef', 'Ocean reef', 'Photos', 'reef', 'reef', { button: PHOTO_BUTTONS.reef }),
+  photoDeck('space', 'Space', 'Photos', 'space', 'space', { button: PHOTO_BUTTONS.space }),
+  photoDeck('faith', 'Faith', 'Photos', 'glass', 'cross', { button: PHOTO_BUTTONS.faith,
     verse: 'This is the day which the LORD hath made; we will rejoice and be glad in it.',
     verseRef: 'Psalm 118:24',
   }),
@@ -65,6 +69,9 @@ function apply(deck) {
   if (deck.table) root.style.setProperty('--deck-table', deck.table); else root.style.removeProperty('--deck-table');
   if (deck.emblemImage) root.style.setProperty('--deck-emblem', deck.emblemImage); else root.style.removeProperty('--deck-emblem');
   root.toggleAttribute('data-home-photo', !!deck.home);
+  root.toggleAttribute('data-btn', !!deck.button);
+  if (deck.button) { root.style.setProperty('--btn', deck.button[0]); root.style.setProperty('--btn-ink', deck.button[1]); }
+  else { root.style.removeProperty('--btn'); root.style.removeProperty('--btn-ink'); }
   if (deck.home) root.style.setProperty('--deck-home', deck.home); else root.style.removeProperty('--deck-home');
   ['--felt-a', '--felt-b', '--felt-c'].forEach((v, i) => {
     if (deck.felt) root.style.setProperty(v, deck.felt[i]); else root.style.removeProperty(v);

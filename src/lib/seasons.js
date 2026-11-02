@@ -47,27 +47,27 @@ const medallion = (kind, ring) => svgUrl(`<svg xmlns='http://www.w3.org/2000/svg
 /** The ornament on its own, big and faint: the middle of the table. */
 const emblem = (kind) => svgUrl(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='-20 -20 40 40'>${motifs[kind]}</svg>`);
 
-// felt: the dark-to-light colours behind the table, the top bar and your hand.
+// felt: the dark-to-light colours behind the table, the top bar and your hand. button: [colour, text colour].
 const THEMES = [
-  { id: 'fall', name: 'Fall', ornament: 'leaf', ring: '#e9a23b', felt: ['#2a1206', '#5a2a0e', '#8a4316'],
+  { id: 'fall', name: 'Fall', ornament: 'leaf', ring: '#e9a23b', button: ['#c8641f', '#fff'], felt: ['#2a1206', '#5a2a0e', '#8a4316'],
     verse: 'To every thing there is a season, and a time to every purpose under the heaven.', verseRef: 'Ecclesiastes 3:1' },
-  { id: 'thanksgiving', name: 'Thanksgiving', ornament: 'wheat', ring: '#e2b04a', felt: ['#2b1408', '#5c2e12', '#8b4a1e'],
+  { id: 'thanksgiving', name: 'Thanksgiving', ornament: 'wheat', ring: '#e2b04a', button: ['#b5652a', '#fff'], felt: ['#2b1408', '#5c2e12', '#8b4a1e'],
     verse: 'O give thanks unto the LORD; for he is good: for his mercy endureth for ever.', verseRef: 'Psalm 107:1' },
-  { id: 'christmas', name: 'Christmas', ornament: 'star', ring: '#e3c06a', felt: ['#06200f', '#0f3d22', '#1b5a35'],
+  { id: 'christmas', name: 'Christmas', ornament: 'star', ring: '#e3c06a', button: ['#c62a36', '#fff'], felt: ['#06200f', '#0f3d22', '#1b5a35'],
     verse: 'For unto you is born this day in the city of David a Saviour, which is Christ the Lord.', verseRef: 'Luke 2:11' },
-  { id: 'newyear', name: 'New Year', ornament: 'sparkle', ring: '#e8c76f', felt: ['#070b1a', '#14213d', '#24365e'],
+  { id: 'newyear', name: 'New Year', ornament: 'sparkle', ring: '#e8c76f', button: ['#e0b44c', '#241800'], felt: ['#070b1a', '#14213d', '#24365e'],
     verse: 'His compassions fail not. They are new every morning: great is thy faithfulness.', verseRef: 'Lamentations 3:22–23' },
-  { id: 'winter', name: 'Winter', ornament: 'snow', ring: '#b9d6ea', felt: ['#0e2233', '#1d3b53', '#33618a'],
+  { id: 'winter', name: 'Winter', ornament: 'snow', ring: '#b9d6ea', button: ['#3f7aa6', '#fff'], felt: ['#0e2233', '#1d3b53', '#33618a'],
     verse: 'Though your sins be as scarlet, they shall be as white as snow.', verseRef: 'Isaiah 1:18' },
-  { id: 'valentines', name: 'Valentine’s', ornament: 'heart', ring: '#f2a7b8', felt: ['#2a0712', '#5a1428', '#86223e'],
+  { id: 'valentines', name: 'Valentine’s', ornament: 'heart', ring: '#f2a7b8', button: ['#c94466', '#fff'], felt: ['#2a0712', '#5a1428', '#86223e'],
     verse: 'We love him, because he first loved us.', verseRef: '1 John 4:19' },
-  { id: 'spring', name: 'Spring', ornament: 'flower', ring: '#f3b9c4', felt: ['#173018', '#2c5530', '#4c7c48'],
+  { id: 'spring', name: 'Spring', ornament: 'flower', ring: '#f3b9c4', button: ['#d9708a', '#fff'], felt: ['#173018', '#2c5530', '#4c7c48'],
     verse: 'The flowers appear on the earth; the time of the singing of birds is come.', verseRef: 'Song of Solomon 2:12' },
-  { id: 'easter', name: 'Easter', ornament: 'cross', plainTable: true, ring: '#f0c46a', felt: ['#1f1430', '#3c2a5c', '#5e4687'],
+  { id: 'easter', name: 'Easter', ornament: 'cross', plainTable: true, ring: '#f0c46a', button: ['#e6a83a', '#2b1700'], felt: ['#1f1430', '#3c2a5c', '#5e4687'],
     verse: 'He is not here: for he is risen, as he said.', verseRef: 'Matthew 28:6' },
-  { id: 'summer', name: 'Summer', ornament: 'sun', ring: '#f6c544', felt: ['#062e31', '#0f5257', '#1d7a7f'],
+  { id: 'summer', name: 'Summer', ornament: 'sun', ring: '#f6c544', button: ['#f4ae2c', '#2e1800'], felt: ['#062e31', '#0f5257', '#1d7a7f'],
     verse: 'Rejoice in the Lord alway: and again I say, Rejoice.', verseRef: 'Philippians 4:4' },
-  { id: 'patriotic', name: 'Red, White & Blue', ornament: 'star', ring: '#e8eef8', felt: ['#0b1630', '#15284f', '#25406f'],
+  { id: 'patriotic', name: 'Red, White & Blue', ornament: 'star', ring: '#e8eef8', button: ['#c8323a', '#fff'], felt: ['#0b1630', '#15284f', '#25406f'],
     verse: 'Where the Spirit of the Lord is, there is liberty.', verseRef: '2 Corinthians 3:17' },
 ];
 
@@ -78,7 +78,7 @@ export const SEASON_DECKS = THEMES.map((t) => ({
   table: `radial-gradient(75% 70% at 50% 45%, rgba(0, 0, 0, 0.12), rgba(0, 0, 0, 0.5)), url(/decks/season-${t.id}-table.webp) center / cover`,
   home: `url(/decks/season-${t.id}-table.webp)`,
   emblemImage: t.plainTable ? undefined : emblem(t.ornament),
-  felt: t.felt, verse: t.verse, verseRef: t.verseRef,
+  felt: t.felt, button: t.button, verse: t.verse, verseRef: t.verseRef,
 }));
 
 /** Which season or holiday it is. Holidays take over a week or two ahead, like Sunday Table. */
