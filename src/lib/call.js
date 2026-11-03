@@ -17,6 +17,19 @@ if (import.meta.env.VITE_TURN_URL) {
 const videoConstraints = (facing) => ({ facingMode: facing, width: { ideal: 1280 }, height: { ideal: 720 } });
 
 /**
+ * Keep the face centred, like Apple's Center Stage, where the browser lets a page ask for it (auto framing on
+ * cameras that support it). A page can't switch Center Stage itself on: on iPhone, iPad and Mac it's turned on
+ * from Control Center → Video Effects while the camera is on, and it stays on. Only for faces, not the table camera.
+ */
+async function frameFaces(track, facing) {
+  if (!track || facing !== 'user') return;
+  try {
+    const caps = track.getCapabilities?.() ?? {};
+    if (Array.isArray(caps.faceFraming) && caps.faceFraming.includes(true)) await track.applyConstraints({ faceFraming: true });
+  } catch { /* not supported here */ }
+}
+
+/**
  * `room` is useRoom's result, `me`/`setMe` this device's room identity (the call sets me.call and
  * me.mic). `facing` is the camera to start with: 'environment' (rear) for the table, 'user' for faces.
  * TV screens join with `receiveOnly`.
@@ -121,6 +134,7 @@ export function useCall({ room, me, setMe, facing = 'user', receiveOnly = false 
           audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
         });
         localRef.current = stream;
+        frameFaces(stream.getVideoTracks()[0], facingRef.current);
         setLocal(stream);
         setCamOn(!audioOnly);
       } catch {
@@ -174,6 +188,7 @@ export function useCall({ room, me, setMe, facing = 'user', receiveOnly = false 
     try {
       const fresh = await navigator.mediaDevices.getUserMedia({ video: videoConstraints(next) });
       const track = fresh.getVideoTracks()[0];
+      frameFaces(track, next);
       const old = stream.getVideoTracks()[0];
       await Promise.all([...pcs.current.values()].map(({ pc }) =>
         pc.getSenders().find((x) => x.track?.kind === 'video')?.replaceTrack(track)));

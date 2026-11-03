@@ -1422,3 +1422,47 @@ button.choice:active { transform: scale(0.98); }
 :root[data-layout='tall'] .app.online.at-table:not(.tv-mode) .player-spot.right { right: max(4px, calc(50% - min(46%, 320px) - 46px)); }
 :root[data-layout='tall'] .app.online.at-table:not(.tv-mode) .player-spot.top { top: max(6px, calc(50% - 40px - min(50% - 65px, 340px) - 44px)); }
 :root[data-layout='tall'] .app.online.at-table:not(.tv-mode) .player-spot.bottom { bottom: max(80px, calc(50% + 40px - min(50% - 65px, 340px) - 26px)); }
+
+/* Big videos: a tile per player in the table's corners (••• → Big videos in the corners). Tall tiles when the
+   phone is upright, wide tiles when it's sideways or on a computer. Seats keep their name, bid and cards. */
+.big-videos { position: absolute; inset: 0; z-index: 3; pointer-events: none; --gap: 6px; }
+:root[data-layout='tall'] .big-videos { --bw: min(34vw, 260px); --ba: 3 / 4; --bottom: 74px; }
+:root[data-layout='wide'] .big-videos { --bw: 23%; --ba: 4 / 3; --bottom: 6px; }
+.big-tile {
+  position: absolute; width: var(--bw); aspect-ratio: var(--ba); border-radius: 18px; overflow: hidden; pointer-events: auto;
+  background: #0b0f0d; box-shadow: 0 0 0 3px var(--team), 0 10px 24px rgba(0, 0, 0, 0.5); transition: box-shadow 0.2s;
+}
+.big-tile.tl { left: var(--gap); top: var(--gap); }
+.big-tile.tr { right: var(--gap); top: var(--gap); }
+.big-tile.bl { left: var(--gap); bottom: var(--bottom); }
+.big-tile.br { right: var(--gap); bottom: var(--bottom); }
+.big-tile.turn { box-shadow: 0 0 0 4px var(--gold), 0 0 26px rgba(245, 184, 46, 0.65); }
+.big-tile .vtile { position: absolute; inset: 0; }
+.big-tile .vtile video { object-fit: cover; }
+.big-tile .big-icon { position: absolute; inset: 0; width: 100%; height: 100%; border-radius: 0; font-size: 44px; }
+.big-tile .big-icon .av-emoji { font-size: 64px; }
+.big-tile .big-icon .av-robot { width: 62%; height: 62%; }
+.big-name {
+  position: absolute; left: 6px; bottom: 6px; max-width: calc(100% - 12px); display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 9px; border-radius: 999px; background: rgba(0, 0, 0, 0.6); color: #fff; font-weight: 800; font-size: 13px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.big-secs { position: absolute; top: 6px; right: 6px; min-width: 28px; padding: 2px 8px; border-radius: 999px; background: var(--gold); color: #2a1a00; font-weight: 900; font-size: 15px; text-align: center; }
+.big-secs.hurry { background: #ff4d4d; color: #fff; }
+/* The seats' own pictures step aside: the tiles show everyone */
+.felt.big-on .player-spot .avatar { display: none; }
+.call-options { width: 100%; margin: 0; }
+/* Played cards and the seats' names stay on top of the tiles; upright phones get slightly smaller tiles */
+.felt.big-on .big-videos { z-index: 1; }
+.felt.big-on .trick { z-index: 4; }
+:root[data-layout='tall'] .big-videos { --bw: min(30vw, 240px); }
+/* Heads sit in the upper middle of a camera picture: crop from there so faces stay centred in the tile */
+.big-tile .vtile video { object-position: 50% 32%; }
+:root[data-layout='tall'] .felt.big-on .player-spot.left .spot-backs { position: absolute; left: calc(100% - 6px); top: -4px; }
+:root[data-layout='tall'] .felt.big-on .player-spot.right .spot-backs { position: absolute; right: calc(100% - 6px); top: -4px; }
+/* Wide layouts (phone sideways, computers): two tiles down each side, each half the table's height, and the
+   side players' names and cards just inside them. (cqh: a share of the table area's height.) */
+.felt.big-on { container-type: size; }
+:root[data-layout='wide'] .felt.big-on .big-tile { width: auto; height: calc(50cqh - 9px); }
+:root[data-layout='wide'] .app.online.at-table:not(.tv-mode) .felt.big-on .player-spot.left { left: calc((50cqh - 9px) * 4 / 3 + 12px); }
+:root[data-layout='wide'] .app.online.at-table:not(.tv-mode) .felt.big-on .player-spot.right { right: calc((50cqh - 9px) * 4 / 3 + 12px); }

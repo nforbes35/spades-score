@@ -25,6 +25,7 @@ import { history } from './lib/scoring.js';
 const ID_KEY = 'spades-device-id';
 const TV_ID_KEY = 'spades-tv-id';
 // The last online game on this device, for the home screen's Rejoin button.
+const BIG_VIDEO_KEY = 'spades-big-video';
 export const LAST_ONLINE_KEY = 'spades-last-online';
 const BOT_DELAY_MS = 900;
 const RESEND_MS = 2500;
@@ -674,6 +675,8 @@ function OnlineTable({ code, table, mySeat, cards, me, isHost, call, room, icons
   const [decksOpen, setDecksOpen] = useState(false);
   const [tvOpen, setTvOpen] = useState(false);
   const [callOpen, setCallOpen] = useState(false);
+  const [bigVideo, setBigVideo] = useState(() => read(BIG_VIDEO_KEY) === true);
+  const big = bigVideo && call.joined && !tv;
   const deck = useDeck();
   const [now, setNow] = useState(Date.now());
   const st = standings(game);
@@ -749,7 +752,7 @@ function OnlineTable({ code, table, mySeat, cards, me, isHost, call, room, icons
         </div>
       </header>
 
-      <div className="felt">
+      <div className={`felt${big ? ' big-on' : ''}`}>
         <div className="table-oval" aria-hidden="true">
           <span className="table-logo">♠</span>
           {deck.verse && <p className="table-verse">“{deck.verse}”<small>{deck.verseRef}</small></p>}
@@ -759,7 +762,8 @@ function OnlineTable({ code, table, mySeat, cards, me, isHost, call, room, icons
           const entry = seatEntry(hand, s);
           const away = who && !who.bot && !present.has(who.id);
           const turn = r?.turn === s && ['bidding', 'playing'].includes(table.phase);
-          const stream = who && !who.bot ? videoOf(who.id) : null;
+          // With big videos on, faces move to the corner tiles (so nobody's video, or sound, plays twice).
+          const stream = who && !who.bot && !big ? videoOf(who.id) : null;
           const bidText = table.phase === 'bidding' && !hasBid(table, s) ? (turn ? 'bidding…' : '–')
             : isNil(entry.call) ? nilLabel(entry.call) : `bid ${entry.bid}`;
           const held = s !== mySeat && !dealing && table.phase !== 'scored' && table.phase !== 'over' ? r?.counts?.[s] ?? 0 : 0;
@@ -805,6 +809,10 @@ function OnlineTable({ code, table, mySeat, cards, me, isHost, call, room, icons
           );
         })}
 
+        {big && (
+          <BigVideos table={table} posOf={posOf} mySeat={mySeat} me={me} call={call} icons={icons}
+            videoOf={videoOf} peerOf={peerOf} left={left} hurry={hurry} />
+        )}
         {dealing && <DealAnimation dealer={r.dealer} posOf={posOf} />}
         <div className="trick">
           {trickCards.map(({ seat, card }) => (
@@ -827,6 +835,10 @@ function OnlineTable({ code, table, mySeat, cards, me, isHost, call, room, icons
         <Sheet title="Video chat" short onClose={() => setCallOpen(false)} closeLabel="Done">
           <div className="call-sheet">
             <CallButtons call={{ ...call, leave: () => { setCallOpen(false); call.leave(); } }} size={22} />
+            <div className="card group call-options">
+              <Toggle label="Big videos in the corners" checked={bigVideo}
+                onChange={(on) => { setBigVideo(on); write(BIG_VIDEO_KEY, on); }} />
+            </div>
             <SoundNote call={call} />
           </div>
         </Sheet>
@@ -883,6 +895,36 @@ function OnlineTable({ code, table, mySeat, cards, me, isHost, call, room, icons
         <HandResult table={table} isHost={isHost} hostActions={hostActions} />
       )}
     </>
+  );
+}
+
+// Each seat's corner, going round the table the same way the seats do: you bottom left, then clockwise.
+const CORNER = { bottom: 'bl', left: 'tl', top: 'tr', right: 'br' };
+
+/** Big video tiles in the table's corners (or a player's icon, big, when their camera is off). */
+function BigVideos({ table, posOf, mySeat, me, call, icons, videoOf, peerOf, left, hurry }) {
+  const r = table.round;
+  return (
+    <div className="big-videos">
+      {SEATS.map((_, s) => {
+        const who = table.seats[s];
+        if (!who) return null;
+        const mine = who.id === me.id;
+        const stream = who.bot ? null : videoOf(who.id);
+        const showVideo = stream && hasVideo(stream) && (!mine || call.camOn);
+        const turn = r?.turn === s && ['bidding', 'playing'].includes(table.phase);
+        const micOff = !mine && !who.bot && peerOf(who.id) && !peerOf(who.id).mic;
+        return (
+          <div key={s} className={`big-tile ${CORNER[posOf(s)]} t${teamOf(s)}${turn ? ' turn' : ''}`}>
+            {/* Audio plays from the video element even with the camera off, so it's always there. */}
+            {stream && <VideoTile stream={stream} muted={mine || !call.speakerOn} mirrored={mine} className={showVideo ? '' : 'no-video'} />}
+            {!showVideo && <Avatar value={icons[who.id]} name={who.name} bot={who.bot} className="big-icon" />}
+            <span className="big-name">{micOff && <Icon name="micOff" size={13} />}{s === mySeat ? 'You' : who.name}</span>
+            {turn && left != null && <span className={`big-secs${hurry ? ' hurry' : ''}`}>{left}</span>}
+          </div>
+        );
+      })}
+    </div>
   );
 }
 
