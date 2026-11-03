@@ -7,7 +7,7 @@ import { sortHand } from './lib/cards.js';
 import { newTable, startGame, deal, placeBid, playCard, legalCards, backToLobby, publicTable, currentHand, ONLINE_RULES } from './lib/online.js';
 import { botBid, botPlay, pickBotNames } from './lib/bots.js';
 import { useRoom, joinLink } from './lib/room.js';
-import { useDevice } from './lib/device.js';
+import { useDevice, rememberTvScreen } from './lib/device.js';
 import { useCall } from './lib/call.js';
 import { useKeys, seal, unseal } from './lib/secret.js';
 import { useWakeLock, chime, buzz, dealSound } from './lib/fx.js';
@@ -53,12 +53,12 @@ function stableId(key = ID_KEY) {
 }
 
 /** Online mode: everyone plays on their own device, the app deals, checks the rules and keeps score. */
-export default function OnlineApp({ code, isHost, tv, onLeave }) {
+export default function OnlineApp({ code, isHost, tv, onLeave, onPlayHere }) {
   const [name, setName] = useState(loadName);
   const [avatar, setAvatar] = useState(loadAvatar);
   const [named, setNamed] = useState(() => Boolean(loadName()));
   const changeAvatar = (value) => { setAvatar(value); saveAvatar(value); };
-  if (tv) return <OnlineRoom code={code} tv name="TV" avatar={null} onLeave={onLeave} onProfile={() => {}} />;
+  if (tv) return <OnlineRoom code={code} tv name="TV" avatar={null} onLeave={onLeave} onPlayHere={onPlayHere} onProfile={() => {}} />;
   if (!named) {
     return (
       <div className="app">
@@ -81,7 +81,7 @@ export default function OnlineApp({ code, isHost, tv, onLeave }) {
   );
 }
 
-function OnlineRoom({ code, isHost = false, tv = false, name, avatar, onLeave, onProfile }) {
+function OnlineRoom({ code, isHost = false, tv = false, name, avatar, onLeave, onPlayHere, onProfile }) {
   const keys = useKeys();
   const [deviceId] = useState(() => stableId(tv ? TV_ID_KEY : ID_KEY));
   const [me, setMe] = useDevice(code, { role: isHost ? 'ohost' : tv ? 'otv' : 'oplayer', name, id: deviceId, pub: keys?.pub ?? null });
@@ -326,7 +326,7 @@ function OnlineRoom({ code, isHost = false, tv = false, name, avatar, onLeave, o
     return (
       <div className={`app online tv-mode${shown.phase === 'lobby' ? '' : ' at-table'}`} style={tvFit}>
         {shown.phase === 'lobby'
-          ? <TvLobby code={code} table={shown} icons={icons} />
+          ? <TvLobby code={code} table={shown} icons={icons} onPlayHere={() => { rememberTvScreen(false); call.leave(); onPlayHere(); }} />
           : <OnlineTable code={code} table={shown} mySeat={-1} cards={null} me={me} isHost={false} call={call} room={room} icons={icons}
               present={present} send={() => {}} toast={toast} waiting={false} tv onLeave={onLeave} />}
         <TvControls call={call} onLeave={() => { call.leave(); onLeave(); }} />
@@ -1080,7 +1080,7 @@ function TvInviteCard({ code }) {
 }
 
 /** The TV before the game starts: the code to join with and who's sitting where. */
-function TvLobby({ code, table, icons }) {
+function TvLobby({ code, table, icons, onPlayHere }) {
   return (
     <div className="tv-lobby">
       <h1><span className="brand-mark">♠</span> Family Spades</h1>
@@ -1098,6 +1098,7 @@ function TvLobby({ code, table, icons }) {
         })}
       </div>
       <p className="tv-lobby-wait">Waiting for the host to start the game…</p>
+      <button type="button" className="tv-play-here" onClick={onPlayHere}><Icon name="users" size={16} /> Join as a player</button>
     </div>
   );
 }

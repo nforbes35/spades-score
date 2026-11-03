@@ -1347,3 +1347,5 @@ button.choice:active { transform: scale(0.98); }
   padding: 8px 14px; border-radius: 999px; background: rgba(0, 0, 0, 0.6); color: #fff; font-weight: 700; font-size: 16px;
   backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); animation: fade 0.3s;
 }
+.tv-play-here { display: inline-flex; align-items: center; gap: 8px; margin-top: 4px; padding: 8px 16px; border-radius: 999px; border: 1px solid rgba(255, 255, 255, 0.35); background: rgba(0, 0, 0, 0.3); color: #fff; font-weight: 700; font-size: 15px; opacity: 0.85; }
+.tv-play-here:hover, .tv-play-here:focus-visible { opacity: 1; background: rgba(255, 255, 255, 0.15); }
