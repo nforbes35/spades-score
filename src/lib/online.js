@@ -131,7 +131,7 @@ export const PLAY_STYLES = ['toss', 'slam', 'papi', 'spin'];
  * Seat `seat` plays `card` (with a play `style`, just for show). Finishing the 13th book scores the hand (and
  * maybe ends the game).
  */
-export function playCard(table, seat, card, style = 'toss') {
+export function playCard(table, seat, card, style = 'toss', thrown = false) {
   const r = table.round;
   if (table.phase !== 'playing') throw new Error('Not playing now.');
   if (r.papiGame) throw new Error('Hold on: it’s the Papi Flip!');
@@ -140,7 +140,8 @@ export function playCard(table, seat, card, style = 'toss') {
     throw new Error(r.hands[seat].includes(card) ? 'You must follow suit (or spades aren’t broken yet).' : 'That card isn’t in your hand.');
   }
   const hands = { ...r.hands, [seat]: r.hands[seat].filter((c) => c !== card) };
-  const trick = [...r.trick, { seat, card, ...(PLAY_STYLES.includes(style) && style !== 'toss' ? { style } : {}) }];
+  // `thrown`: played from the hand view (held like real cards), so it flies in from the player's side.
+  const trick = [...r.trick, { seat, card, ...(PLAY_STYLES.includes(style) && style !== 'toss' ? { style } : {}), ...(thrown ? { thrown: true } : {}) }];
   const spadesBroken = r.spadesBroken || suitOf(card) === 'S';
   if (trick.length < 4) {
     return { ...table, round: { ...r, hands, trick, spadesBroken, turn: (seat + 1) % 4 } };
@@ -183,8 +184,8 @@ export const papiSeat = (table) => table.seats.findIndex((s) => s && !s.bot && S
 export const papiAllowed = (table) => standings(table.game).every((x) => table.game.target - x.score > PAPI_POINTS);
 
 /** The host plays a card, starting the Papi Flip mini game when it's Papi's moment. */
-export function playCardAsHost(table, seat, card, style, random = cryptoRandom) {
-  let next = playCard(table, seat, card, style);
+export function playCardAsHost(table, seat, card, style, random = cryptoRandom, thrown = false) {
+  let next = playCard(table, seat, card, style, thrown);
   const p = table.papi;
   if (!p || p.done || seat !== papiSeat(table)) return next;
   const count = p.count + 1;

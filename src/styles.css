@@ -1707,3 +1707,16 @@ button.choice:active { transform: scale(0.98); }
 .papi-result.lost b { color: #ff6b60; }
 .tv-mode .papi-game { width: 520px; zoom: 1.3; }
 .papi-result .avatar-icon, .papi-guesser .avatar-icon { flex: none; }
+
+/* A card played from the hand view flies in from that player's side of the table, turning as it lands */
+.trick-card.thrown { animation: thrown-in 0.55s cubic-bezier(.18, .9, .3, 1.08) both; }
+.trick-card.thrown.bottom { --from: 0 46vh; --spin: -24deg; }
+.trick-card.thrown.top { --from: 0 -46vh; --spin: 24deg; }
+.trick-card.thrown.left { --from: -52vw 0; --spin: 30deg; }
+.trick-card.thrown.right { --from: 52vw 0; --spin: -30deg; }
+@keyframes thrown-in {
+  from { translate: var(--from); rotate: var(--spin); scale: 1.15; }
+  70% { scale: 1.04; }
+  to { translate: 0 0; rotate: 0deg; scale: 1; }
+}
+@media (prefers-reduced-motion: reduce) { .trick-card.thrown { animation-duration: 0.01s; } }

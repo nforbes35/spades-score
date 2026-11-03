@@ -177,7 +177,7 @@ function OnlineRoom({ code, isHost = false, tv = false, name, avatar, onLeave, o
         error = act((x) => placeBid(x, seat, m));
       } else if (m.type === 'o-play' && seat >= 0) {
         if (alreadyPlayed(t, seat, m.card)) return; // a resend of a card that arrived
-        error = act((x) => playCardAsHost(x, seat, m.card, m.style));
+        error = act((x) => playCardAsHost(x, seat, m.card, m.style, undefined, Boolean(m.thrown)));
       } else if (m.type === 'o-papi-pick' && seat >= 0) {
         error = act((x) => (x.round?.papiGame?.phase === 'pick' ? papiPick(x, seat, m.n) : x));
       } else if (m.type === 'o-papi-guess' && seat >= 0) {
@@ -325,7 +325,7 @@ function OnlineRoom({ code, isHost = false, tv = false, name, avatar, onLeave, o
   const [pending, setPending] = useState(null);
   const send = (type, body) => {
     if (isHost) {
-      const err = act((x) => (type === 'o-bid' ? placeBid(x, mySeat, body) : type === 'o-play' ? playCardAsHost(x, mySeat, body.card, body.style)
+      const err = act((x) => (type === 'o-bid' ? placeBid(x, mySeat, body) : type === 'o-play' ? playCardAsHost(x, mySeat, body.card, body.style, undefined, Boolean(body.thrown))
         : type === 'o-papi-pick' ? papiPick(x, mySeat, body.n) : type === 'o-papi-guess' ? papiGuess(x, mySeat, body.n) : x));
       if (err) toast.show(err);
       return err;
@@ -787,7 +787,7 @@ function OnlineTable({ reactions = [], react, code, table, mySeat, cards, me, is
     setSelected(null);
     setSending(true);
     // The host's own play is applied at once: if it was refused, let them try again straight away.
-    if (send('o-play', style ? { card, style } : { card })) setSending(false);
+    if (send('o-play', { card, ...(style ? { style } : {}), ...(handView ? { thrown: true } : {}) })) setSending(false);
   };
   // Holding a card: pick a fancier way to play it.
   const [holdCard, setHoldCard] = useState(null);
@@ -939,8 +939,8 @@ function OnlineTable({ reactions = [], react, code, table, mySeat, cards, me, is
         {dealing && <DealAnimation dealer={r.dealer} posOf={posOf} />}
         <ReactionsLayer reactions={reactions} />
         <div className="trick">
-          {trickCards.map(({ seat, card, style }) => (
-            <div key={seat} className={`trick-card ${posOf(seat)}${style ? ` play-${style}` : ''}${showingLast && r.lastTrick.winner === seat ? ' won' : ''}`}>
+          {trickCards.map(({ seat, card, style, thrown }) => (
+            <div key={seat} className={`trick-card ${posOf(seat)}${style ? ` play-${style}` : ''}${thrown && !style ? ' thrown' : ''}${showingLast && r.lastTrick.winner === seat ? ' won' : ''}`}>
               {style?.startsWith('papi') ? (
                 // The Papi Flip: lands face down, turns over after 3 seconds ('papi'), or stays down for the mini
                 // game ('papi-wait') and turns over when it's done ('papi-now').
