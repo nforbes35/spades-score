@@ -242,6 +242,9 @@ const STICKY_PX = 5;
  * line to play it, or tap it to select it. Cards not in `playable` shake and drop back.
  */
 const HOLD_MS = 480;
+// A mouse rests still before a drag more often than a finger does: wait longer before opening the menu.
+const HOLD_MOUSE_MS = 750;
+const PLAY_DIST_MAX = 72;
 const HOLD_SLOP = 8;
 
 export function FannedHand({ cards, selected, onSelect, disabled, dim = [], dealKey, onPlay, playable, onRefuse, onHold, big = false }) {
@@ -273,6 +276,9 @@ export function FannedHand({ cards, selected, onSelect, disabled, dim = [], deal
   const cardW = big ? Math.round(Math.min(170, bigMaxW, Math.max(64, (width - 64 - (n - 1) * 4) / (1 + (n - 1) * 0.3))))
     : short ? 58 : Math.round(Math.min(88, Math.max(62, width / 4.8)));
   const cardH = Math.round(cardW * 1.4);
+  // How far up to drag a card to play it: most of a small card's height, but never a long drag (big cards in
+  // the hand view, a zoomed computer screen).
+  const playDist = Math.min(cardH * PLAY_LINE, PLAY_DIST_MAX);
   const suitOf = (c) => c.slice(-1);
   const gapsBefore = cards.map((c, i) => cards.slice(0, i + 1).filter((x, j) => j > 0 && suitOf(x) !== suitOf(cards[j - 1])).length);
   const gaps = gapsBefore[n - 1] ?? 0;
@@ -317,7 +323,7 @@ export function FannedHand({ cards, selected, onSelect, disabled, dim = [], deal
         setTouch(null);
         buzzOnce(30);
         onHold(g.card);
-      }, HOLD_MS);
+      }, e.pointerType === 'mouse' ? HOLD_MOUSE_MS : HOLD_MS);
     }
   };
   const move = (e) => {
@@ -349,7 +355,7 @@ export function FannedHand({ cards, selected, onSelect, disabled, dim = [], deal
     if (!g) return;
     const dy = (e.clientY - g.y) / zoomOf();
     setTouch(null);
-    if (g.swiping && -dy > cardH * PLAY_LINE) {
+    if (g.swiping && -dy > playDist) {
       if (canPlay(g.card)) {
         setFlying(g.card);
         buzzOnce(25);
@@ -367,13 +373,20 @@ export function FannedHand({ cards, selected, onSelect, disabled, dim = [], deal
   };
   const cancel = () => { stopHold(); gesture.current = null; setTouch(null); };
 
-  const pastLine = touch?.swiping && -touch.dy > cardH * PLAY_LINE;
+  const pastLine = touch?.swiping && -touch.dy > playDist;
   return (
     <div ref={box} key={dealKey} className={`fan${dealKey != null ? ' dealing' : ''}${swipeable ? ' swipeable' : ''}`}
       style={{ height: cardH + FAN_DROP + 26 }}
-      onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={cancel}>
+      onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={cancel} onLostPointerCapture={cancel}
+      onContextMenu={(e) => {
+        // Right-click (or a two-finger click) on a card: the ways to play it.
+        if (!onHold || disabled) return;
+        e.preventDefault();
+        const i = pointAt(e);
+        if (i >= 0) { cancel(); onHold(cards[i]); }
+      }}>
       {swipeable && touch?.swiping && (
-        <div className={`play-line${pastLine ? ' ready' : ''}`} style={{ top: 18 - cardH * PLAY_LINE + cardH * 0.25 }}>
+        <div className={`play-line${pastLine ? ' ready' : ''}`} style={{ top: 18 - playDist + cardH * 0.25 }}>
           {pastLine ? (canPlay(touch.card) ? 'Let go to play' : 'Can’t play that card') : 'Swipe up to play'}
         </div>
       )}

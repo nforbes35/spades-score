@@ -328,7 +328,7 @@ function OnlineRoom({ code, isHost = false, tv = false, name, avatar, onLeave, o
       const err = act((x) => (type === 'o-bid' ? placeBid(x, mySeat, body) : type === 'o-play' ? playCardAsHost(x, mySeat, body.card, body.style)
         : type === 'o-papi-pick' ? papiPick(x, mySeat, body.n) : type === 'o-papi-guess' ? papiGuess(x, mySeat, body.n) : x));
       if (err) toast.show(err);
-      return;
+      return err;
     }
     const move = { type, ...body, hand: handNo };
     setPending(move);
@@ -786,7 +786,8 @@ function OnlineTable({ reactions = [], react, code, table, mySeat, cards, me, is
     if (!legal.includes(card)) return;
     setSelected(null);
     setSending(true);
-    send('o-play', style ? { card, style } : { card });
+    // The host's own play is applied at once: if it was refused, let them try again straight away.
+    if (send('o-play', style ? { card, style } : { card })) setSending(false);
   };
   // Holding a card: pick a fancier way to play it.
   const [holdCard, setHoldCard] = useState(null);
