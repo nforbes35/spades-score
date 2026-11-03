@@ -777,7 +777,10 @@ function OnlineTable({ reactions = [], react, teases = {}, tease, code, table, m
   const scoreText = (s) => {
     const entry = seatEntry(hand, s);
     const call = isNil(entry.call) ? nilLabel(entry.call) : entry.bid;
-    if (table.phase !== 'bidding') return <>{entry.books}<small>/{call}</small></>;
+    // (in pieces, so the upright big-video bars can stand the numbers up one over the other)
+    if (table.phase !== 'bidding') {
+      return <><span className="sc-books">{entry.books}</span><small><span className="sc-slash">/</span><span className={typeof call === 'number' ? 'sc-num' : 'sc-word'}>{call}</span></small></>;
+    }
     if (hasBid(table, s)) return isNil(entry.call) ? call : `bid ${call}`;
     return table.round?.turn === s ? 'bidding…' : '–';
   };

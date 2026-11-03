@@ -1950,3 +1950,8 @@ button.choice:active { transform: scale(0.98); }
 /* the face sits a little off the bar */
 :root[data-layout='tall'] .app.online:not(.tv-mode) .big-videos:is(.corners, .pairs) .big-tile:is(.tl, .bl) :is(.vtile, .big-icon) { left: var(--bar); }
 :root[data-layout='tall'] .app.online:not(.tv-mode) .big-videos:is(.corners, .pairs) .big-tile:is(.tr, .br) :is(.vtile, .big-icon) { right: var(--bar); }
+/* (upright phones: books and bid stand upright, one over the other, with a short line between) */
+:root[data-layout='tall'] .app.online:not(.tv-mode) .big-videos:is(.corners, .pairs) .big-score:has(.sc-books) { display: inline-flex; align-items: center; gap: 3px; padding: 6px 2px; line-height: 1; }
+:root[data-layout='tall'] .app.online:not(.tv-mode) .big-videos:is(.corners, .pairs) .big-score small { display: contents; }
+:root[data-layout='tall'] .app.online:not(.tv-mode) .big-videos:is(.corners, .pairs) :is(.sc-books, .sc-num) { text-combine-upright: all; text-orientation: upright; }
+:root[data-layout='tall'] .app.online:not(.tv-mode) .big-videos:is(.corners, .pairs) .sc-slash { display: inline-block; font-size: 0; inline-size: 2px; block-size: 11px; margin: 1px 0; background: currentColor; opacity: 0.75; border-radius: 1px; }
