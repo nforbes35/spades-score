@@ -62,6 +62,9 @@ export function CallButtons({ call, showFlip = true, size = 20 }) {
 
 export function SoundNote({ call }) {
   if (!call.soundBy) return null;
+  if (call.soundBy.role === 'otv') {
+    return <p className="sound-note"><Icon name="tv" size={15} /> Everyone’s sound plays on the TV. Your camera and microphone still go out from this phone.</p>;
+  }
   return (
     <p className="sound-note">
       <Icon name="speakerOff" size={15} /> {call.soundBy.name || 'Another device'} handles sound here, so this one starts

@@ -178,7 +178,7 @@ export function useStatsSync(room, onUpdate) {
   const peerKey = room.peers.map((p) => p.id).join(',');
   useEffect(() => {
     for (const p of room.peers) {
-      if (told.current.has(p.id) || p.role === 'tv' || p.role === 'card') continue;
+      if (told.current.has(p.id) || p.role === 'tv' || p.role === 'otv' || p.role === 'card') continue;
       told.current.add(p.id);
       room.send({ type: 'log-have', ids: logSummary(loadLog()) }, p.id);
     }

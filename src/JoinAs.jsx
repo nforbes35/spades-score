@@ -12,9 +12,34 @@ export default function JoinAs({ code, onChoose, onLeave }) {
   const host = room.peers.find((p) => p.role === 'host');
   const onlineHost = room.peers.find((p) => p.role === 'ohost');
   useEffect(() => { if (host) room.send({ type: 'hello' }, host.id); }, [host?.id, room.send]);
-  // An online game: go straight in.
-  useEffect(() => { if (onlineHost) onChoose('online', null); }, [onlineHost?.id]);
   const seats = game ? remoteSeats(game) : [];
+
+  // An online game: play on this phone, or show the table on a TV.
+  if (onlineHost) {
+    return (
+      <div className="app">
+        <header className="hero">
+          <div className="wrap hero-row">
+            <div className="brand"><span className="brand-mark">♠</span><h1>Join game {code}</h1></div>
+            <button type="button" className="icon-btn" onClick={onLeave}>Cancel</button>
+          </div>
+        </header>
+        <main className="wrap">
+          <div className="section-title">How are you joining?</div>
+          <div className="stack">
+            <button type="button" className="card join-choice" onClick={() => onChoose('online', null)}>
+              <Icon name="phone" />
+              <span><b>Play on this phone</b><br /><span className="muted small">Your cards, bids and video chat.</span></span>
+            </button>
+            <button type="button" className="card join-choice" onClick={() => onChoose('otv', null)}>
+              <Icon name="tv" />
+              <span><b>Show the table on this TV</b><br /><span className="muted small">The table big in the middle, everyone’s video and sound. Players keep their cards on their phones.</span></span>
+            </button>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="app">

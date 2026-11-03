@@ -144,11 +144,16 @@ export function useCall({ room, me, setMe, facing = 'user', receiveOnly = false 
   // One device per place handles sound (see place.js). Until someone changes it by hand, follow that.
   const leader = me.call ? soundDevice(me, room.peers) : null;
   const handlesSound = !leader || leader.id === me.id;
+  // Online games: a TV in the same home plays everyone's sound, and the phone beside it keeps its
+  // camera and microphone on but its speaker off.
+  const isTv = me.role === 'otv';
+  const tvHere = me.call && me.place && !isTv ? room.peers.find((p) => p.call && p.role === 'otv' && p.place === me.place) : null;
   useEffect(() => {
     if (touched || !me.call) return;
+    if (isTv) { setMicOn(false); setSpeakerOn(true); return; }
     setMicOn(handlesSound && !receiveOnly);
-    setSpeakerOn(handlesSound);
-  }, [handlesSound, touched, me.call, receiveOnly]);
+    setSpeakerOn(handlesSound && !tvHere);
+  }, [handlesSound, touched, me.call, receiveOnly, isTv, Boolean(tvHere)]);
 
   useEffect(() => {
     localRef.current?.getAudioTracks().forEach((t) => { t.enabled = micOn; });
@@ -194,7 +199,7 @@ export function useCall({ room, me, setMe, facing = 'user', receiveOnly = false 
   return {
     joined: Boolean(me.call), local, videos, micOn, speakerOn, camOn, error,
     mirrored: facingRef.current === 'user',
-    soundBy: handlesSound ? null : leader,
+    soundBy: tvHere ?? (handlesSound || isTv ? null : leader),
     join, leave, handle, toggleMic, toggleSpeaker, toggleCam, flip,
   };
 }

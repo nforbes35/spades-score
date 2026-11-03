@@ -69,7 +69,7 @@ export function deal(table, random) {
     ...table,
     phase: 'bidding',
     game: { ...table.game, hands: [...table.game.hands, newHand(dealer)] },
-    round: { dealer, hands, turn: first, trick: [], lead: first, tricks: [], spadesBroken: false, lastTrick: null, bidsIn: 0 },
+    round: { dealer, hands, turn: first, trick: [], lead: first, tricks: [], spadesBroken: false, lastTrick: null, bidsIn: 0, dealtAt: Date.now() },
   };
 }
 

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import QRCode from 'qrcode';
 import { read, write, tabRead, tabWrite } from './lib/store.js';
 import { standings, winner, signed, scoreTeam, isNil, nilLabel, STANDARD_RULES } from './lib/scoring.js';
@@ -10,7 +10,7 @@ import { useRoom, joinLink } from './lib/room.js';
 import { useDevice } from './lib/device.js';
 import { useCall } from './lib/call.js';
 import { useKeys, seal, unseal } from './lib/secret.js';
-import { useWakeLock, chime, buzz } from './lib/fx.js';
+import { useWakeLock, chime, buzz, dealSound, unlockSound } from './lib/fx.js';
 import { recordGame, useStatsSync } from './lib/stats.js';
 import Stats from './Stats.jsx';
 import DeckPicker from './DeckPicker.jsx';
@@ -23,10 +23,16 @@ import { HandRow } from './Scoreboard.jsx';
 import { history } from './lib/scoring.js';
 
 const ID_KEY = 'spades-device-id';
+const TV_ID_KEY = 'spades-tv-id';
 const BOT_DELAY_MS = 900;
 const RESEND_MS = 2500;
 const RESYNC_MS = 5000;
-const NEXT_HAND_MS = 9000;
+// After the last book has sat on the table, the score shows this long before the next deal.
+const NEXT_HAND_MS = 5000;
+// The dealing animation: a riffle, then 52 cards flying out (see DealAnimation).
+const RIFFLE_MS = 450;
+const DEAL_GAP_MS = 28;
+const DEAL_MS = 2500;
 const TRICK_SHOW_MS = 1600;
 const BID_TIMES = [15, 30, 45, 60, 90];
 const DEFAULT_BID_TIMER = 30;
@@ -34,20 +40,21 @@ const DEFAULT_BID_TIMER = 30;
 const BID_GRACE_MS = 1500;
 const AREAS = ['bottom', 'left', 'top', 'right'];
 
-/** This device's id, kept so a reload rejoins the same seat. */
-function stableId() {
-  let id = tabRead(ID_KEY);
+/** This device's id, kept so a reload rejoins the same seat. A TV keeps its own, so it's never mistaken for a player. */
+function stableId(key = ID_KEY) {
+  let id = tabRead(key);
   if (!id) id = Math.random().toString(36).slice(2, 10);
-  tabWrite(ID_KEY, id);
+  tabWrite(key, id);
   return id;
 }
 
 /** Online mode: everyone plays on their own device, the app deals, checks the rules and keeps score. */
-export default function OnlineApp({ code, isHost, onLeave }) {
+export default function OnlineApp({ code, isHost, tv, onLeave }) {
   const [name, setName] = useState(loadName);
   const [avatar, setAvatar] = useState(loadAvatar);
   const [named, setNamed] = useState(() => Boolean(loadName()));
   const changeAvatar = (value) => { setAvatar(value); saveAvatar(value); };
+  if (tv) return <OnlineRoom code={code} tv name="TV" avatar={null} onLeave={onLeave} onProfile={() => {}} />;
   if (!named) {
     return (
       <div className="app">
@@ -70,10 +77,10 @@ export default function OnlineApp({ code, isHost, onLeave }) {
   );
 }
 
-function OnlineRoom({ code, isHost, name, avatar, onLeave, onProfile }) {
+function OnlineRoom({ code, isHost = false, tv = false, name, avatar, onLeave, onProfile }) {
   const keys = useKeys();
-  const [deviceId] = useState(stableId);
-  const [me, setMe] = useDevice(code, { role: isHost ? 'ohost' : 'oplayer', name, id: deviceId, pub: keys?.pub ?? null });
+  const [deviceId] = useState(() => stableId(tv ? TV_ID_KEY : ID_KEY));
+  const [me, setMe] = useDevice(code, { role: isHost ? 'ohost' : tv ? 'otv' : 'oplayer', name, id: deviceId, pub: keys?.pub ?? null });
   const toast = useToast();
   const [view, setView] = useState(null); // the public table as this device sees it
   const [myHand, setMyHand] = useState(null); // { hand: game hand number, cards }
@@ -85,7 +92,7 @@ function OnlineRoom({ code, isHost, name, avatar, onLeave, onProfile }) {
   useEffect(() => { if (isHost) write(tableKey, table); }, [isHost, table]);
 
   const room = useRoom(code, me, onMessage);
-  const call = useCall({ room, me, setMe, facing: 'user' });
+  const call = useCall({ room, me, setMe, facing: 'user', receiveOnly: tv });
   const statsSync = useStatsSync(room);
   const [icons, iconMessage] = useAvatars(room, me, avatar);
   const hostPeer = isHost ? null : room.peers.find((p) => p.role === 'ohost');
@@ -171,7 +178,9 @@ function OnlineRoom({ code, isHost, name, avatar, onLeave, onProfile }) {
     if (!isHost || !table || !['bidding', 'playing'].includes(table.phase)) return undefined;
     const s = table.round.turn;
     if (!autoSeat(table, s)) return undefined;
-    const wait = table.round.trick.length === 0 && table.round.lastTrick && Date.now() - table.round.lastTrick.at < TRICK_SHOW_MS ? TRICK_SHOW_MS : BOT_DELAY_MS;
+    let wait = table.round.trick.length === 0 && table.round.lastTrick && Date.now() - table.round.lastTrick.at < TRICK_SHOW_MS ? TRICK_SHOW_MS : BOT_DELAY_MS;
+    // The first bid waits for the cards to finish being dealt.
+    if (table.phase === 'bidding' && table.round.bidsIn === 0 && table.round.dealtAt) wait = Math.max(wait, table.round.dealtAt + DEAL_MS + 400 - Date.now());
     const timer = setTimeout(() => {
       act((x) => (x.phase === 'bidding' ? placeBid(x, s, botBid(x.round.hands[s])) : playCard(x, s, botPlay(x, s))));
     }, wait);
@@ -193,30 +202,31 @@ function OnlineRoom({ code, isHost, name, avatar, onLeave, onProfile }) {
         if (who?.id === me.id) toast.show('Time’s up: the computer bid for you.');
         else if (who) room.send({ type: 'o-error', text: 'Time’s up: the computer bid for you.' }, who.id);
       }
-    }, bidTimer * 1000 + BID_GRACE_MS);
+    }, bidTimer * 1000 + BID_GRACE_MS + (tableRef.current.round.bidsIn === 0 ? DEAL_MS : 0));
     return () => clearTimeout(timer);
   }, [isHost, bidTimer, bidTurn]);
 
-  // Host: deal the next hand a few seconds after one is scored.
+  // Host: once the last book has been seen, show the score for a few seconds, then deal the next hand.
   useEffect(() => {
     if (!isHost || table?.phase !== 'scored') return undefined;
-    const timer = setTimeout(() => act((x) => (x.phase === 'scored' ? deal(x) : x)), NEXT_HAND_MS);
+    const timer = setTimeout(() => act((x) => (x.phase === 'scored' ? deal(x) : x)), TRICK_SHOW_MS + NEXT_HAND_MS);
     return () => clearTimeout(timer);
   }, [isHost, table?.phase, table?.game?.hands.length]);
 
   // ----- What this device shows -----
   const shown = isHost ? (table ? publicTable(table) : null) : view;
-  const mySeat = shown ? seatOf(shown, me.id) : -1;
+  const mySeat = shown && !tv ? seatOf(shown, me.id) : -1;
   // Every device keeps the game for stats as hands are scored (computer players noted).
   const scoredHands = shown?.game ? shown.game.hands.filter((h) => !h.inPlay).length : 0;
   useEffect(() => {
-    if (shown?.game) recordGame(shown.game, { mode: 'online', bots: shown.seats.filter((s) => s?.bot).map((s) => s.name) });
+    if (shown?.game && !tv) recordGame(shown.game, { mode: 'online', bots: shown.seats.filter((s) => s?.bot).map((s) => s.name) });
   }, [scoredHands, shown?.game?.id, shown?.phase]);
   const handNo = shown?.game?.hands.length ?? 0;
   const cards = isHost
     ? (mySeat >= 0 && table?.round?.hands ? table.round.hands[mySeat] : null)
     : (myHand && myHand.hand === handNo ? myHand.cards : null);
   useWakeLock(true);
+  const tvFit = useTvFit(tv);
 
   // Moves from this device. A player's move is resent until the table shows it (a phone that locks for a
   // moment or a weak signal can drop a message); the host ignores repeats.
@@ -272,6 +282,18 @@ function OnlineRoom({ code, isHost, name, avatar, onLeave, onProfile }) {
     onLeave();
   };
 
+  if (tv) {
+    return (
+      <div className={`app online tv-mode${shown.phase === 'lobby' ? '' : ' at-table'}`} style={tvFit}>
+        {shown.phase === 'lobby'
+          ? <TvLobby code={code} table={shown} icons={icons} />
+          : <OnlineTable code={code} table={shown} mySeat={-1} cards={null} me={me} isHost={false} call={call} room={room} icons={icons}
+              present={present} send={() => {}} toast={toast} waiting={false} tv onLeave={onLeave} />}
+        <TvControls code={code} call={call} onLeave={() => { call.leave(); onLeave(); }} />
+      </div>
+    );
+  }
+
   return (
     <div className={`app online${shown.phase === 'lobby' ? '' : ' at-table'}`}>
       {shown.phase === 'lobby'
@@ -281,7 +303,7 @@ function OnlineRoom({ code, isHost, name, avatar, onLeave, onProfile }) {
             onStand={() => (isHost ? act((x) => ({ ...x, seats: x.seats.map((s) => (s?.id === me.id ? null : s)) })) : room.send({ type: 'o-stand' }, hostPeer?.id))}
             hostActions={isHost ? hostLobbyActions(act, toast) : null}
             onLeave={leave} />
-        : <OnlineTable table={shown} mySeat={mySeat} cards={cards} me={me} isHost={isHost} call={call} room={room} icons={icons}
+        : <OnlineTable code={code} table={shown} mySeat={mySeat} cards={cards} me={me} isHost={isHost} call={call} room={room} icons={icons}
             present={present} send={send} toast={toast} waiting={Boolean(pending)}
             hostActions={isHost ? hostGameActions(act) : null} onLeave={leave} />}
       {toast.node}
@@ -435,6 +457,9 @@ function Lobby({ code, table, isHost, me, people, call, icons, profile, onProfil
           <p className="footnote center">Or open Spades, tap <b>Join a game</b> and type the code.</p>
         </div>
 
+        <div className="section-title">Companion TV</div>
+        <TvInviteCard code={code} />
+
         <div className="section-title">Video &amp; audio</div>
         <div className="card guest-controls">
           {call.joined ? <CallButtons call={call} /> : (
@@ -513,7 +538,7 @@ function RulesSheetOnline({ rules, onSave, onClose }) {
 // ---------------------------------------------------------------------------------------------
 // The card table.
 
-function OnlineTable({ table, mySeat, cards, me, isHost, call, room, icons, present, send, toast, waiting, hostActions, onLeave }) {
+function OnlineTable({ code, table, mySeat, cards, me, isHost, call, room, icons, present, send, toast, waiting, hostActions, onLeave, tv = false }) {
   const r = table.round;
   const game = table.game;
   const hand = currentHand(table);
@@ -524,6 +549,7 @@ function OnlineTable({ table, mySeat, cards, me, isHost, call, room, icons, pres
   const [sending, setSending] = useState(false);
   const [peeked, setPeeked] = useState(null); // hand number whose cards I've looked at
   const [decksOpen, setDecksOpen] = useState(false);
+  const [tvOpen, setTvOpen] = useState(false);
   const deck = useDeck();
   const [now, setNow] = useState(Date.now());
   const st = standings(game);
@@ -542,8 +568,9 @@ function OnlineTable({ table, mySeat, cards, me, isHost, call, room, icons, pres
   useEffect(() => { if (myTurn) { buzz(60); } }, [myTurn, r?.tricks.length, table.phase]);
 
   const handNo = game.hands.length;
+  const dealing = useDealing(`${game.id}:${handNo}`, table.phase === 'bidding' && r?.bidsIn === 0);
   const bidTimer = table.settings.bidTimer ?? 0;
-  const left = useCountdown(bidTimer && table.phase === 'bidding' ? `${handNo}:${r.turn}` : null, bidTimer);
+  const left = useCountdown(bidTimer && table.phase === 'bidding' ? `${handNo}:${r.turn}` : null, bidTimer, r?.bidsIn === 0 ? DEAL_MS : 0);
   const hurry = left != null && left <= 5;
   useEffect(() => { if (myTurn && table.phase === 'bidding' && left === 5) buzz([80, 60, 80]); }, [left === 5]);
   const blindOk = table.settings.rules.blindNilAllowed !== false;
@@ -589,10 +616,11 @@ function OnlineTable({ table, mySeat, cards, me, isHost, call, room, icons, pres
         <div className="online-meta">
           <span>Hand {handNo} · to {game.target}</span>
           <div className="row">
-            {!call.joined && <button type="button" className="icon-btn round small" aria-label="Video chat" onClick={() => call.join()}><Icon name="video" size={18} /></button>}
-            {!call.joined && <button type="button" className="icon-btn round small" aria-label="Audio chat" onClick={() => call.join({ audioOnly: true })}><Icon name="mic" size={18} /></button>}
-            <button type="button" className="icon-btn round small" aria-label="Cards and table" onClick={() => setDecksOpen(true)}><Icon name="cards" size={18} /></button>
-            <button type="button" className="icon-btn round small" aria-label="Leave" onClick={onLeave}><Icon name="close" size={18} /></button>
+            {!tv && !call.joined && <button type="button" className="icon-btn round small" aria-label="Video chat" onClick={() => call.join()}><Icon name="video" size={18} /></button>}
+            {!tv && !call.joined && <button type="button" className="icon-btn round small" aria-label="Audio chat" onClick={() => call.join({ audioOnly: true })}><Icon name="mic" size={18} /></button>}
+            {!tv && <button type="button" className="icon-btn round small" aria-label="Add a TV" onClick={() => setTvOpen(true)}><Icon name="tv" size={18} /></button>}
+            {!tv && <button type="button" className="icon-btn round small" aria-label="Cards and table" onClick={() => setDecksOpen(true)}><Icon name="cards" size={18} /></button>}
+            {!tv && <button type="button" className="icon-btn round small" aria-label="Leave" onClick={onLeave}><Icon name="close" size={18} /></button>}
           </div>
         </div>
       </header>
@@ -610,7 +638,7 @@ function OnlineTable({ table, mySeat, cards, me, isHost, call, room, icons, pres
           const stream = who && !who.bot ? videoOf(who.id) : null;
           const bidText = table.phase === 'bidding' && !hasBid(table, s) ? (turn ? 'bidding…' : '–')
             : isNil(entry.call) ? nilLabel(entry.call) : `bid ${entry.bid}`;
-          const held = s !== mySeat && table.phase !== 'scored' && table.phase !== 'over' ? r?.counts?.[s] ?? 0 : 0;
+          const held = s !== mySeat && !dealing && table.phase !== 'scored' && table.phase !== 'over' ? r?.counts?.[s] ?? 0 : 0;
           return (
             <div key={s} className={`player-spot ${posOf(s)} t${teamOf(s)}${turn ? ' turn' : ''}${s === mySeat ? ' me' : ''}`}>
               {held > 0 && (
@@ -652,6 +680,7 @@ function OnlineTable({ table, mySeat, cards, me, isHost, call, room, icons, pres
           );
         })}
 
+        {dealing && <DealAnimation dealer={r.dealer} posOf={posOf} />}
         <div className="trick">
           {trickCards.map(({ seat, card }) => (
             <div key={seat} className={`trick-card ${posOf(seat)}${showingLast && r.lastTrick.winner === seat ? ' won' : ''}`}>
@@ -665,7 +694,7 @@ function OnlineTable({ table, mySeat, cards, me, isHost, call, room, icons, pres
         </div>
       </div>
 
-      {call.joined && (
+      {call.joined && !tv && (
         <div className="online-call"><CallButtons call={call} size={18} /><SoundNote call={call} /></div>
       )}
 
@@ -677,7 +706,9 @@ function OnlineTable({ table, mySeat, cards, me, isHost, call, room, icons, pres
               {left != null && <b className={`dock-clock${hurry ? ' hurry' : ''}`}> · {left}s</b>}</span>
             <span>{cards ? `${cards.length} cards` : ''}</span>
           </div>
-          {coverCards ? (
+          {dealing ? (
+            <p className="dock-hint">Dealing…</p>
+          ) : coverCards ? (
             <div className="blind-choice">
               <p>New hand dealt. Thinking about <b>blind nil</b>? Decide before you look.</p>
               <div className="row">
@@ -705,7 +736,8 @@ function OnlineTable({ table, mySeat, cards, me, isHost, call, room, icons, pres
       )}
 
       {decksOpen && <DeckPicker onClose={() => setDecksOpen(false)} />}
-      {(table.phase === 'scored' || table.phase === 'over') && (
+      {tvOpen && <Sheet title="Companion TV" short onClose={() => setTvOpen(false)} closeLabel="Done"><TvInviteCard code={code} /></Sheet>}
+      {(table.phase === 'scored' || table.phase === 'over') && !showingLast && (
         <HandResult table={table} isHost={isHost} hostActions={hostActions} />
       )}
     </>
@@ -713,9 +745,9 @@ function OnlineTable({ table, mySeat, cards, me, isHost, call, room, icons, pres
 }
 
 /** Seconds left on a countdown that restarts whenever `key` changes (null: no countdown). */
-function useCountdown(key, seconds) {
+function useCountdown(key, seconds, delayMs = 0) {
   const started = useRef({ key: undefined, at: 0 });
-  if (started.current.key !== key) started.current = { key, at: Date.now() };
+  if (started.current.key !== key) started.current = { key, at: Date.now() + delayMs };
   const start = started.current.at;
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
@@ -846,5 +878,153 @@ function HandList({ game }) {
         <HandRow key={h.id} hand={h} number={i + 1} standing={hist[i]} game={game} />
       ))}
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------------------------
+// Dealing: a riffle, then the cards fly out around the table, with sound.
+
+/** True for a moment after a new hand arrives (not when you open the app mid-hand). */
+function useDealing(key, fresh) {
+  const [dealing, setDealing] = useState(false);
+  const seen = useRef(null);
+  useEffect(() => {
+    if (seen.current === key) return;
+    seen.current = key;
+    if (!fresh) return;
+    setDealing(true);
+    dealSound({ cards: 52, gap: DEAL_GAP_MS / 1000, riffle: RIFFLE_MS / 1000 });
+    setTimeout(() => setDealing(false), DEAL_MS); // not cleared: a re-render mustn't leave it dealing
+  }, [key]);
+  return dealing;
+}
+
+/** 52 card backs dealt one at a time, clockwise from the dealer's left, each landing on that player. */
+function DealAnimation({ dealer, posOf }) {
+  const box = useRef(null);
+  const [to, setTo] = useState(null); // area -> [dx, dy] from the middle of the deal to that player
+  const [jitter] = useState(() => Array.from({ length: 52 }, () => [Math.random() * 18 - 9, Math.random() * 14 - 7, Math.random() * 36 - 18]));
+  useLayoutEffect(() => {
+    const b = box.current.getBoundingClientRect();
+    const zoom = b.width / box.current.offsetWidth || 1; // the TV is zoomed: measure in its own pixels
+    const cx = b.left + b.width / 2, cy = b.top + b.height / 2;
+    const found = {};
+    for (const area of AREAS) {
+      const el = box.current.parentElement.querySelector(`.player-spot.${area} .avatar`);
+      const r = el?.getBoundingClientRect();
+      found[area] = r ? [(r.left + r.width / 2 - cx) / zoom, (r.top + r.height / 2 - cy) / zoom] : [0, 0];
+    }
+    setTo(found);
+  }, []);
+  return (
+    <div className="deal-layer" ref={box} aria-hidden="true" style={{ '--riffle': `${RIFFLE_MS}ms`, '--gap': `${DEAL_GAP_MS}ms` }}>
+      <div className="deal-deck">{[0, 1, 2, 3, 4].map((k) => <CardBack key={k} size="sm" style={{ '--k': k }} />)}</div>
+      {to && jitter.map(([jx, jy, rot], i) => {
+        const [dx, dy] = to[posOf((dealer + 1 + i) % 4)];
+        return <CardBack key={i} size="sm" className="deal-card" style={{ '--i': i, '--tx': `${dx + jx}px`, '--ty': `${dy + jy}px`, '--rot': `${rot}deg` }} />;
+      })}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------------------------
+// Companion TV: the table big on a TV, with everyone's video and sound.
+
+const tvLink = (code) => joinLink(code, { as: 'otv' });
+
+/** The TV draws the phone layout's sizes scaled up to fill the screen (laid out for a 720-high screen). */
+function useTvFit(on) {
+  const measure = () => {
+    const zoom = Math.max(1, window.innerHeight / 720);
+    return { zoom, height: window.innerHeight / zoom, minHeight: 0 };
+  };
+  const [fit, setFit] = useState(measure);
+  useEffect(() => {
+    if (!on) return undefined;
+    const resize = () => setFit(measure());
+    addEventListener('resize', resize);
+    return () => removeEventListener('resize', resize);
+  }, [on]);
+  return on ? fit : undefined;
+}
+
+/** How to put the game on a TV: the address and code to type, or a link/QR for a laptop or iPad. */
+function TvInviteCard({ code }) {
+  const [qr, setQr] = useState(null);
+  const [copied, setCopied] = useState(false);
+  useEffect(() => { QRCode.toDataURL(tvLink(code), { margin: 1, width: 240 }).then(setQr).catch(() => {}); }, [code]);
+  return (
+    <div className="card tv-invite">
+      <p>Show the table big on a TV, with everyone’s video and sound. Your phone keeps your cards, camera and mic.</p>
+      <ol>
+        <li>On the TV’s web browser (or a laptop or iPad hooked up to it), go to <b>{location.host}</b></li>
+        <li>Tap <b>Join a game</b> and type <b className="tv-code">{code}</b></li>
+        <li>Pick <b>Show the table on this TV</b></li>
+      </ol>
+      <div className="row tv-invite-row">
+        {qr && <img className="qr small" src={qr} alt="QR code to open the TV view" />}
+        <button type="button" className="soft" onClick={() => navigator.clipboard?.writeText(tvLink(code)).then(() => setCopied(true)).catch(() => {})}>
+          <Icon name="share" size={16} /> {copied ? 'TV link copied' : 'Copy TV link'}
+        </button>
+      </div>
+      <p className="footnote">No TV? Everything works on the phone alone too.</p>
+    </div>
+  );
+}
+
+/** The TV before the game starts: the code to join with and who's sitting where. */
+function TvLobby({ code, table, icons }) {
+  return (
+    <div className="tv-lobby">
+      <h1><span className="brand-mark">♠</span> Family Spades</h1>
+      <p className="tv-lobby-code">Game <b>{code}</b></p>
+      <div className="tv-lobby-seats">
+        {SEATS.map((_, s) => {
+          const who = table.seats[s];
+          return (
+            <div key={s} className={`tv-lobby-seat t${teamOf(s)}`}>
+              {who ? <Avatar value={icons[who.id]} name={who.name} bot={who.bot} className="tv-lobby-avatar" /> : <span className="empty-seat">+</span>}
+              <b>{who?.name ?? 'Open seat'}</b>
+              <span>Team {teamOf(s) + 1}</span>
+            </div>
+          );
+        })}
+      </div>
+      <p className="tv-lobby-wait">Waiting for the host to start the game…</p>
+    </div>
+  );
+}
+
+/** A tap to start (so the TV may play sound), then small controls in the corner. */
+function TvControls({ code, call, onLeave }) {
+  const [started, setStarted] = useState(false);
+  const start = () => {
+    setStarted(true);
+    unlockSound();
+    call.join();
+    document.documentElement.requestFullscreen?.().catch(() => {});
+  };
+  return (
+    <>
+      <div className="tv-corner">
+        <button type="button" onClick={call.toggleSpeaker} aria-label={call.speakerOn ? 'Turn sound off' : 'Turn sound on'}>
+          <Icon name={call.speakerOn ? 'speaker' : 'speakerOff'} size={18} />
+        </button>
+        <button type="button" onClick={() => document.documentElement.requestFullscreen?.().catch(() => {})} aria-label="Full screen">
+          <Icon name="expand" size={18} />
+        </button>
+        <button type="button" onClick={() => { if (confirm('Close the TV view?')) onLeave(); }} aria-label="Close TV view">
+          <Icon name="close" size={18} />
+        </button>
+      </div>
+      {!started && (
+        <button type="button" className="tv-start" onClick={start}>
+          <span className="brand-mark">♠</span>
+          <b>Family Spades on the TV</b>
+          <span>Game {code}</span>
+          <span className="tv-start-go">Click or tap to start</span>
+        </button>
+      )}
+    </>
   );
 }

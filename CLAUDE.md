@@ -28,6 +28,12 @@ plain words, keep text large and buttons big, check every screen fits a 320px ph
   (`--deck-back`, `--deck-table`, `--deck-emblem`, `data-deck`, `data-emblem`). Classic faces = cropped public-domain
   portraits in `public/faces/*.webp`; 'cartoon' = drawn `CourtPanel`. Photos in `public/decks/` (credits there).
   Team decks are colours only: no team names/logos (trademarks).
+- Online companion TV: role 'otv' (link `?join=CODE&as=otv`, or Join a game → "Show the table on this TV"). It's
+  `OnlineRoom` with `tv`: own id key (`spades-tv-id`, so it's never mistaken for a player), never seated, call
+  `receiveOnly`, the phone layout zoomed to fit (`useTvFit`, laid out for 720px high). In call.js a phone with an
+  'otv' in the same place keeps mic/camera on and its speaker off; the TV plays everyone's sound.
+- Between hands: the last book shows TRICK_SHOW_MS, the score NEXT_HAND_MS (5 s), then the host deals. Each deal
+  plays `DealAnimation` + `dealSound` (fx.js, synthesized); `round.dealtAt` makes the first bid and bid timer wait DEAL_MS.
 - Seasons & holidays (`src/lib/seasons.js`): photo themes like the Sunday Table project (same Unsplash photos, saved as
   `public/decks/season-*.webp`). The default deck 'seasonal' follows the date (`seasonFor`, tested in test/seasons.test.js);
   themes also set `--felt-*`, `--deck-home` + `data-home-photo` (home screen, lobby header, online room). KJV verses.
