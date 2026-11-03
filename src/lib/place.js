@@ -45,7 +45,7 @@ export function usePlace(code) {
   return place;
 }
 
-const SOUND_ORDER = { host: 0, player: 1, ohost: 1, oplayer: 1, guest: 2, tv: 3, otv: 4 };
+const SOUND_ORDER = { host: 0, player: 1, guest: 2, tv: 3 };
 
 /**
  * Only one device per place should use its microphone and speaker; any more and sound loops between
@@ -54,9 +54,11 @@ const SOUND_ORDER = { host: 0, player: 1, ohost: 1, oplayer: 1, guest: 2, tv: 3,
  * if this device has the place to itself.
  */
 export function soundDevice(me, peers) {
-  if (!me.place) return null;
-  // An online game's TV only plays sound; the mic belongs to a phone.
-  const here = peers.filter((p) => p.call && p.place === me.place && p.role !== 'otv');
+  // Online games: every phone keeps its own sound. Players are usually in different homes, and phones on
+  // cellular data can share an internet address with strangers, so "same place" can't be trusted there.
+  // (A phone beside an online game's TV turns its speaker off instead: see call.js.)
+  if (!me.place || !(me.role in SOUND_ORDER)) return null;
+  const here = peers.filter((p) => p.call && p.place === me.place && p.role in SOUND_ORDER);
   if (!here.length) return null;
   const all = [me, ...here].sort((a, b) => (SOUND_ORDER[a.role] - SOUND_ORDER[b.role]) || (a.since - b.since));
   return all[0];

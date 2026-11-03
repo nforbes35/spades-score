@@ -36,9 +36,11 @@ export function joinLink(code, { as, seat } = {}) {
 
 export const newDeviceId = () => Math.random().toString(36).slice(2, 10);
 
-function openRoom(code, getMe, { onMessage, onPeers, onStatus }) {
+function openRoom(code, getMe, { onMessage, onPeers, onStatus, onHeard, known = [] }) {
   const name = `spades-${code.toUpperCase()}`;
-  const peers = new Map();
+  // A reconnect starts from the devices we already knew about, so they (and video calls with them) don't
+  // vanish for a moment; anyone really gone drops out after GONE_MS as usual.
+  const peers = new Map(known.map((p) => [p.id, p]));
   let transport;
 
   const post = (m) => transport.post({ ...m, from: getMe().id });
@@ -48,6 +50,7 @@ function openRoom(code, getMe, { onMessage, onPeers, onStatus }) {
   function receive(m) {
     const me = getMe();
     if (!m || m.from === me.id || (m.to && m.to !== me.id)) return;
+    onHeard?.();
     if (m.type === 'bye') {
       if (peers.delete(m.from)) publish();
       return;
@@ -95,8 +98,9 @@ function openRoom(code, getMe, { onMessage, onPeers, onStatus }) {
   return {
     send: (m, to) => post(to ? { ...m, to } : m),
     announce: () => beat(),
-    close() {
-      post({ type: 'bye' });
+    /** `quietly`: a reconnect, so don't tell the others we've left. */
+    close(quietly = false) {
+      if (!quietly) post({ type: 'bye' });
       clearInterval(timer);
       transport.close();
     },
@@ -117,18 +121,34 @@ export function useRoom(code, me, onMessage) {
   const room = useRef(null);
   // Bumped to drop the connection and open a fresh one (after a lost signal, or a phone that slept).
   const [attempt, setAttempt] = useState(0);
-  const reconnect = useCallback(() => setAttempt((n) => n + 1), []);
+  const reconnecting = useRef(false);
+  const reconnect = useCallback(() => { reconnecting.current = true; setAttempt((n) => n + 1); }, []);
+  const peersRef = useRef([]);
+  peersRef.current = peers;
+  const heardAt = useRef(0);
+  const statusRef = useRef(status);
+  statusRef.current = status;
 
   useEffect(() => {
     if (!code) return undefined;
-    setStatus('connecting');
+    const again = reconnecting.current;
+    reconnecting.current = false;
+    if (!again) setStatus('connecting');
     const r = openRoom(code, () => meRef.current, {
       onMessage: (m, from) => handler.current(m, from),
       onPeers: setPeers,
       onStatus: setStatus,
+      onHeard: () => { heardAt.current = Date.now(); },
+      known: again ? peersRef.current : [],
     });
     room.current = r;
-    return () => { r.close(); room.current = null; setPeers([]); };
+    return () => {
+      // A reconnect keeps the peer list (and video calls) as they are; leaving the game clears it.
+      const quietly = reconnecting.current;
+      r.close(quietly);
+      room.current = null;
+      if (!quietly) setPeers([]);
+    };
   }, [code, me.id, attempt]);
 
   // Lost the connection: try again every few seconds. Coming back online, or back to the app after the
@@ -142,8 +162,11 @@ export function useRoom(code, me, onMessage) {
     if (!code) return undefined;
     let hiddenAt = 0;
     const onVisible = () => {
-      if (document.visibilityState === 'hidden') hiddenAt = Date.now();
-      else if (hiddenAt && Date.now() - hiddenAt > SLEEP_MS) reconnect();
+      if (document.visibilityState === 'hidden') { hiddenAt = Date.now(); return; }
+      // Back after a while: reconnect only if the connection has actually gone quiet.
+      const offline = statusRef.current !== 'online' && statusRef.current !== 'local';
+      const stale = offline || Date.now() - heardAt.current > GONE_MS;
+      if (hiddenAt && Date.now() - hiddenAt > SLEEP_MS && stale) reconnect();
     };
     document.addEventListener('visibilitychange', onVisible);
     addEventListener('online', reconnect);
