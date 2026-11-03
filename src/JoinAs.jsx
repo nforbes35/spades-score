@@ -1,11 +1,18 @@
 import { useEffect, useState } from 'react';
 import { playerName, remoteSeats } from './lib/table.js';
 import { useRoom } from './lib/room.js';
-import { useDevice } from './lib/device.js';
+import { useDevice, isTvScreen, rememberTvScreen } from './lib/device.js';
 import { Icon } from './components.jsx';
 
 /** After typing a game code: play as one of the remote seats, join the video, or be the TV. */
-export default function JoinAs({ code, onChoose, onLeave }) {
+export default function JoinAs({ code, onChoose: choose, onLeave }) {
+  // Picking TV (or not) is remembered, so a TV goes straight to the table next time.
+  const onChoose = (as, seat) => {
+    if (['otv', 'tv'].includes(as)) rememberTvScreen(true);
+    else if (['online', 'player', 'card'].includes(as)) rememberTvScreen(false);
+    choose(as, seat);
+  };
+  const [tvScreen] = useState(isTvScreen);
   const [game, setGame] = useState(null);
   const [device] = useDevice(code, { role: 'lobby' });
   const room = useRoom(code, device, (m) => { if (m.type === 'state') setGame(m.game); });
@@ -13,6 +20,12 @@ export default function JoinAs({ code, onChoose, onLeave }) {
   const onlineHost = room.peers.find((p) => p.role === 'ohost');
   useEffect(() => { if (host) room.send({ type: 'hello' }, host.id); }, [host?.id, room.send]);
   const seats = game ? remoteSeats(game) : [];
+  // A TV goes straight to the table view as soon as the game is found.
+  useEffect(() => {
+    if (!tvScreen) return;
+    if (onlineHost) choose('otv', null);
+    else if (game) choose('tv', null);
+  }, [tvScreen, Boolean(onlineHost), Boolean(game)]);
   // Nobody answers after a while: probably an old code for a game that's over.
   const [slow, setSlow] = useState(false);
   useEffect(() => {

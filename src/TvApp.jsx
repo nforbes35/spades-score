@@ -69,7 +69,7 @@ export default function TvApp({ code, onLeave }) {
         </button>
       </div>
       {!started && (
-        <button type="button" className="tv-start" onClick={start}>
+        <button type="button" className="tv-start" onClick={start} autoFocus>
           <span className="brand-mark">♠</span>
           <b>Spades TV view</b>
           <span>Game {code}</span>

@@ -1125,7 +1125,7 @@ function TvControls({ code, call, onLeave }) {
         </button>
       </div>
       {!started && (
-        <button type="button" className="tv-start" onClick={start}>
+        <button type="button" className="tv-start" onClick={start} autoFocus>
           <span className="brand-mark">♠</span>
           <b>Family Spades on the TV</b>
           <span>Game {code}</span>
