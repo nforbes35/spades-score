@@ -767,7 +767,7 @@ function OnlineTable({ reactions = [], react, code, table, mySeat, cards, me, is
   // A slammed card lands with a thud (on every screen, as it lands).
   const lastPlayed = r?.trick.at(-1) ?? (r?.lastTrick && Date.now() - r.lastTrick.at < 1000 ? r.lastTrick.cards.at(-1) : null);
   const slamKey = lastPlayed?.style === 'slam' ? `${handNo}:${r.tricks.length}:${lastPlayed.seat}` : null;
-  useEffect(() => { if (slamKey) setTimeout(thud, 240); }, [slamKey]);
+  useEffect(() => { if (slamKey) setTimeout(thud, 400); }, [slamKey]);
   const dealing = useDealing(`${game.id}:${handNo}`, table.phase === 'bidding' && r?.bidsIn === 0 && Date.now() - (r?.dealtAt ?? 0) < JUST_DEALT_MS);
   const bidTimer = table.settings.bidTimer ?? 0;
   const left = useCountdown(bidTimer && table.phase === 'bidding' ? `${handNo}:${r.turn}` : null, bidTimer, r?.bidsIn === 0 ? DEAL_MS : 0);
