@@ -11,7 +11,7 @@ import { useRoom, joinLink } from './lib/room.js';
 import { useDevice, rememberTvScreen } from './lib/device.js';
 import { useCall } from './lib/call.js';
 import { useKeys, seal, unseal } from './lib/secret.js';
-import { useWakeLock, chime, buzz, dealSound, thud } from './lib/fx.js';
+import { useWakeLock, chime, buzz, dealSound, thud, glassBreak } from './lib/fx.js';
 import { recordGame, useStatsSync, nameKey } from './lib/stats.js';
 import Stats from './Stats.jsx';
 import DeckPicker from './DeckPicker.jsx';
@@ -798,6 +798,14 @@ function OnlineTable({ reactions = [], react, teases = {}, tease, code, table, m
   // A slammed card lands with a thud (on every screen, as it lands).
   const lastPlayed = r?.trick.at(-1) ?? (r?.lastTrick && Date.now() - r.lastTrick.at < 1000 ? r.lastTrick.cards.at(-1) : null);
   const slamKey = lastPlayed?.style === 'slam' ? `${handNo}:${r.tricks.length}:${lastPlayed.seat}` : null;
+  // Glass breaking when spades are broken (the moment it happens, not when joining a hand already broken).
+  const broken = Boolean(r?.spadesBroken);
+  const wasBroken = useRef({ hand: handNo, broken });
+  useEffect(() => {
+    const w = wasBroken.current;
+    if (broken && !(w.hand === handNo && w.broken)) glassBreak({ delay: 0.25 });
+    wasBroken.current = { hand: handNo, broken };
+  }, [broken, handNo]);
   // The thud, and a hard double buzz on anything that can vibrate, as the slammed card hits the table.
   useEffect(() => {
     if (slamKey) setTimeout(() => { thud(); if (document.visibilityState === 'visible') buzz([70, 40, 120]); }, 400);
