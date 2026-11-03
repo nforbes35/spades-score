@@ -1401,7 +1401,7 @@ button.choice:active { transform: scale(0.98); }
 .facedown-fan .pcard { position: absolute; left: 50%; top: 6px; --w: 54px; margin-left: -27px; transform-origin: 50% 160%; transform: rotate(calc(var(--k) * 5deg)); box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.8) inset, 0 4px 10px rgba(0, 0, 0, 0.35); }
 .blind-choice > .primary.big { min-width: 220px; }
 .blind-link { color: rgba(255, 255, 255, 0.6); font-size: 13px; font-weight: 600; padding: 6px 10px; text-decoration: underline; text-underline-offset: 3px; }
-.blind-confirm { display: flex; flex-direction: column; gap: 12px; padding-top: 4px; }
+.blind-confirm { display: flex; flex-direction: column; gap: 12px; padding-top: 14px; }
 .blind-confirm p { margin: 0; font-size: 17px; }
 .blind-confirm .big { width: 100%; }
 .danger { display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 16px; font-weight: 800; color: #fff; background: linear-gradient(180deg, #ef5a4f, #c8322a); box-shadow: 0 8px 20px rgba(200, 50, 42, 0.3); }
