@@ -29,6 +29,14 @@ const photoDeck = (id, name, group, back, table, extra = {}) => ({
   ...extra,
 });
 
+// Real tables: photographed wood tabletops (CC0) with a finish laid over them, and the room around in
+// the same wood, darker. Classic card backs.
+const realTable = (id, name, finish, felt, button) => ({
+  id, name, group: 'Real tables', faces: 'classic', felt, button,
+  table: `${finish}, url(/decks/real-${id}-table.jpg) center / cover`,
+  home: `url(/decks/real-${id}-table.jpg)`,
+});
+
 /** Today's season or holiday theme, changing by itself through the year. */
 const seasonal = () => ({ ...seasonFor(), id: 'seasonal', name: 'Changes with the date', season: seasonFor().name });
 
@@ -44,6 +52,14 @@ export const DECKS = [
   teamDeck('miami-aqua', 'Miami Aqua', ['#008e97', '#fc4c02', '#ffffff']),
   teamDeck('orange-green', 'Orange & Green', ['#005030', '#f47321', '#ffffff']),
   teamDeck('orange-blue', 'Orange & Blue', ['#0021a5', '#fa4616', '#ffffff']),
+  realTable('oak', 'Oak table', 'radial-gradient(80% 60% at 50% 30%, rgba(255, 236, 200, 0.18), rgba(40, 18, 4, 0.18))',
+    ['#1d1006', '#3b2210', '#5c3719'], ['#b06a2c', '#fff']),
+  realTable('walnut', 'Walnut table', 'radial-gradient(80% 60% at 50% 30%, rgba(255, 225, 190, 0.12), rgba(45, 20, 6, 0.42))',
+    ['#140a04', '#2e1a0c', '#4a2c16'], ['#9c5a2a', '#fff']),
+  realTable('cherry', 'Cherry table', 'radial-gradient(80% 60% at 50% 30%, rgba(255, 210, 180, 0.1), rgba(110, 32, 12, 0.5))',
+    ['#1c0805', '#3d140b', '#622214'], ['#b4452a', '#fff']),
+  realTable('farmhouse', 'Farmhouse table', 'radial-gradient(80% 60% at 50% 30%, rgba(255, 245, 225, 0.1), rgba(20, 16, 12, 0.3))',
+    ['#121110', '#26231f', '#3d3933'], ['#8a7a64', '#fff']),
   photoDeck('mountains', 'Mountains', 'Photos', 'mountains', 'mountains', { button: PHOTO_BUTTONS.mountains }),
   photoDeck('reef', 'Ocean reef', 'Photos', 'reef', 'reef', { button: PHOTO_BUTTONS.reef }),
   photoDeck('space', 'Space', 'Photos', 'space', 'space', { button: PHOTO_BUTTONS.space }),

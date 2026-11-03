@@ -15,3 +15,7 @@ Seasons & holidays (season-*.webp): photos from Unsplash (Unsplash License), the
   winter: jaanu ramesh · valentines: Matea Gvozdenovic · spring: AJ · easter: Samuel McGarrigle ·
   summer: Jeb Buchman · patriotic: Muhammad Nabeel.
   Verses: King James Version (public domain).
+
+Real tables (real-*-table.jpg), all CC0 from Wikimedia Commons:
+  oak: "Oak wood planks diff 8k" (Poly Haven) · walnut: "Black walnut veneer 02 diff 8k" (Poly Haven) ·
+  cherry: "Cherry veneer diff 8k" (Poly Haven) · farmhouse: "Weatherworn top of wooden table".
