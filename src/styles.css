@@ -1223,6 +1223,18 @@ button.choice:active { transform: scale(0.98); }
 .tv-mode .result-card { zoom: 1.35; }
 .tv-mode .tv-corner { position: fixed; z-index: 60; right: 14px; bottom: 12px; font-size: 18px; opacity: 0.5; }
 .tv-mode .tv-corner:hover { opacity: 1; }
+.tv-mode .tv-corner .tv-big { width: auto; border-radius: 999px; padding: 0 14px; display: inline-flex; gap: 6px; font-weight: 800; font-size: 15px; }
+.tv-mode .tv-corner .tv-big.on { background: var(--btn, #2f9e62); color: var(--btn-ink, #fff); }
+/* Large video chat on the TV: taller tiles (phones send upright video) two down each side, a narrower
+   table between them, and the side players' names just inside the tiles. */
+/* (the bottom tiles stop short of the corner buttons) */
+.tv-mode .felt.big-on .big-videos { --bottom: 56px; }
+.app.online.at-table.tv-mode .felt.big-on .big-tile { width: auto; height: calc(50cqh - 34px); aspect-ratio: 3 / 4; }
+.tv-mode .felt.big-on .big-name { font-size: 20px; padding: 3px 12px; }
+.tv-mode .felt.big-on .big-secs { font-size: 22px; }
+.app.online.at-table.tv-mode .felt.big-on .table-oval { width: calc(100% - 2 * (50cqh - 34px) * 3 / 4 - 40px); }
+.tv-mode .felt.big-on .player-spot.left { left: calc((50cqh - 34px) * 3 / 4 + 16px); }
+.tv-mode .felt.big-on .player-spot.right { right: calc((50cqh - 34px) * 3 / 4 + 16px); }
 .tv-mode .tv-start { position: fixed; z-index: 70; font-size: 26px; }
 
 .tv-lobby { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; text-align: center; padding: 24px; }
@@ -1559,7 +1571,10 @@ button.choice:active { transform: scale(0.98); }
 .hand-view {
   flex: 1; min-height: 0; display: flex; flex-direction: column; color: #fff;
   padding: calc(8px + env(safe-area-inset-top)) 12px calc(10px + env(safe-area-inset-bottom));
-  background: var(--noise), radial-gradient(120% 90% at 50% 30%, var(--felt-c), var(--felt-b) 55%, var(--felt-a));
+  /* the selected theme's table (its photo, team field or felt), a little darker so the cards stand out */
+  background: linear-gradient(rgba(0, 0, 0, 0.12), rgba(0, 0, 0, 0.3)),
+    var(--deck-table, radial-gradient(120% 90% at 50% 30%, var(--felt-c), var(--felt-b) 55%, var(--felt-a)));
+  background-position: center; background-size: cover;
 }
 .hv-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .hv-back { display: inline-flex; align-items: center; gap: 6px; border: 0; border-radius: 999px; padding: 8px 14px; background: rgba(0, 0, 0, 0.35); color: #fff; font-weight: 800; font-size: 15px; }
