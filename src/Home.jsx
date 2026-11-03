@@ -43,7 +43,7 @@ export default function Home({ onPlayOnline, onTable, onJoin, onStats, rejoin, o
         <button type="button" className="choice primary-choice" onClick={onPlayOnline}>
           <span className="choice-icon"><Icon name="users" size={26} /></span>
           <span className="choice-text">
-            <b>Play online</b>
+            <b>Play Online</b>
             <span>Everyone on their own phone. The app deals, checks the rules and keeps score, with video chat.</span>
           </span>
           <Icon name="chevron" size={20} />

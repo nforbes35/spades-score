@@ -61,7 +61,7 @@ export default function OnlineApp({ code, isHost, tv, onLeave }) {
   if (!named) {
     return (
       <div className="app">
-        <header className="hero"><div className="wrap hero-row"><div className="brand"><span className="brand-mark">♠</span><h1>Play online</h1></div></div></header>
+        <header className="hero"><div className="wrap hero-row"><div className="brand"><span className="brand-mark">♠</span><h1>Play Online</h1></div></div></header>
         <main className="wrap">
           <form className="card waiting-card profile-card" onSubmit={(e) => { e.preventDefault(); if (name.trim()) { saveName(name.trim()); setNamed(true); } }}>
             <h2>Who’s playing?</h2>
