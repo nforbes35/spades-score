@@ -1169,3 +1169,10 @@ button.choice:active { transform: scale(0.98); }
   color: var(--btn-ink); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45), 0 14px 34px color-mix(in srgb, var(--btn) 40%, transparent);
 }
 :root[data-btn] .soft { background: color-mix(in srgb, var(--btn) 14%, transparent); color: color-mix(in srgb, var(--btn) 75%, var(--ink)); }
+/* Your own seat: on the bottom edge of the table, straight across from your partner */
+/* The table sits a little higher so your seat on its bottom edge stays clear of your hand. */
+.app.online.at-table .table-oval { top: calc(50% - 40px); height: min(calc(100% - 130px), 560px); }
+.player-spot.bottom { top: auto; bottom: 80px; left: 50%; transform: translateX(-50%); flex-direction: row; align-items: center; gap: 6px; width: auto; }
+.player-spot.bottom .avatar { width: 48px; height: 48px; margin-left: 0; }
+.player-spot.bottom .avatar .seat-icon { font-size: 18px; }
+.table-verse { bottom: 15%; width: 46%; font-size: 12px; }
