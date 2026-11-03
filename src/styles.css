@@ -1581,7 +1581,16 @@ button.choice:active { transform: scale(0.98); }
 .hv-back { display: inline-flex; align-items: center; gap: 6px; border: 0; border-radius: 999px; padding: 8px 14px; background: rgba(0, 0, 0, 0.35); color: #fff; font-weight: 800; font-size: 15px; }
 .hv-scores { display: flex; gap: 6px; }
 .hv-score { min-width: 48px; text-align: center; padding: 4px 10px; border-radius: 12px; background: rgba(0, 0, 0, 0.3); border-top: 3px solid var(--team); font-weight: 900; font-size: 18px; font-variant-numeric: tabular-nums; }
-.hv-call { gap: 4px; }
+.hv-call { gap: 8px; }
+/* Bigger buttons up here: they're the only video chat controls in hand view */
+.hv-call .my-call { gap: 8px; }
+.hv-call .my-call button, .hv-call .icon-btn.small { width: 42px; height: 42px; }
+/* Sideways phones: keep clear of the rounded corners and the notch */
+:root[data-layout='wide'] .hand-view {
+  padding-left: max(24px, calc(env(safe-area-inset-left) + 8px));
+  padding-right: max(24px, calc(env(safe-area-inset-right) + 8px));
+  padding-top: max(12px, env(safe-area-inset-top));
+}
 .hv-status { display: flex; align-items: baseline; justify-content: center; flex-wrap: wrap; gap: 4px 12px; margin-top: 14px; font-size: 18px; text-align: center; }
 .hv-status b { font-size: 22px; }
 .hand-view.my-turn .hv-status b { color: var(--gold, #f5b82e); }
