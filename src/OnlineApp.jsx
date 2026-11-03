@@ -851,6 +851,8 @@ function OnlineTable({ reactions = [], react, teases = {}, tease, code, table, m
   const trickCards = showingLast ? r.lastTrick.cards : r?.trick ?? [];
 
   const { layout } = useTableLayout();
+  // Large video chat on an upright phone: the videos fill the top, the played cards sit just above your hand.
+  const videosTop = big && !videoOnly && !tv && layout === 'tall';
   // The spade bluff slider: under your cards when upright, just to their right when sideways.
   const bluff = tease && cards && !dealing && !coverCards && ['bidding', 'playing'].includes(table.phase) && (
     <label className="spade-bluff">
@@ -941,7 +943,7 @@ function OnlineTable({ reactions = [], react, teases = {}, tease, code, table, m
         </div>
       </header>
 
-      <div className={`felt${big ? ' big-on' : ''}${tableMode !== 'full' ? ' no-table' : ''}${videoOnly ? ' video-only' : ''}`}>
+      <div className={`felt${big ? ' big-on' : ''}${videosTop ? ' videos-top' : ''}${tableMode !== 'full' ? ' no-table' : ''}${videoOnly ? ' video-only' : ''}`}>
         <div className="table-oval" aria-hidden="true">
           <span className="table-logo">♠</span>
           {deck.verse && <p className="table-verse">“{deck.verse}”<small>{deck.verseRef}</small></p>}
@@ -1002,7 +1004,7 @@ function OnlineTable({ reactions = [], react, teases = {}, tease, code, table, m
 
         {big && (
           <BigVideos onTap={tapSeat} table={table} posOf={posOf} mySeat={mySeat} me={me} call={call} icons={icons}
-            videoOf={videoOf} peerOf={peerOf} left={left} hurry={hurry} scoreText={scoreText} tv={tv} teases={teases} fill={videoOnly}
+            videoOf={videoOf} peerOf={peerOf} left={left} hurry={hurry} scoreText={scoreText} tv={tv} teases={teases} fill={videoOnly} top={videosTop}
             played={videoOnly ? Object.fromEntries(trickCards.map((t) => [t.seat, t.card])) : null}
             wonBy={videoOnly && showingLast ? r.lastTrick.winner : null}
             onMore={() => setCallOpen(true)} />
@@ -1403,7 +1405,7 @@ function SpadeTease({ level }) {
 const CORNER = { bottom: 'bl', left: 'tl', top: 'tr', right: 'br' };
 
 /** Big video tiles in the table's corners (or a player's icon, big, when their camera is off). */
-function BigVideos({ onTap, table, posOf, mySeat, me, call, icons, videoOf, peerOf, left, hurry, scoreText, tv, onMore, teases = {}, fill = false, played = null, wonBy = null }) {
+function BigVideos({ onTap, table, posOf, mySeat, me, call, icons, videoOf, peerOf, left, hurry, scoreText, tv, onMore, teases = {}, fill = false, top = false, played = null, wonBy = null }) {
   const r = table.round;
   const box = useRef(null);
   const [layout, setLayout] = useState(null);
@@ -1432,6 +1434,11 @@ function BigVideos({ onTap, table, posOf, mySeat, me, call, icons, videoOf, peer
         const r = g.firstElementChild.getBoundingClientRect();
         return { left: (r.left - a.left) * k - pad, right: (r.right - a.left) * k + pad, top: (r.top - a.top) * k - pad, bottom: (r.bottom - a.top) * k + pad };
       });
+      // Videos at the top: they fill everything above the played cards
+      if (top) {
+        setLayout(gridLayout({ width: W, height: Math.min(...cards.map((c) => c.top)), gap: 6 }));
+        return;
+      }
       setLayout(bigLayout({ width: W, height: H, gap: tv ? 12 : 6, bottom, cards, tallBias: !tv && H > W ? 0.4 : 0 }));
     };
     measure();
@@ -1441,7 +1448,7 @@ function BigVideos({ onTap, table, posOf, mySeat, me, call, icons, videoOf, peer
     if (ghosts) ro.observe(ghosts);
     if (dockEl) ro.observe(dockEl); // it grows and shrinks between bidding and playing
     return () => ro.disconnect();
-  }, [tv, fill]);
+  }, [tv, fill, top]);
   return (
     <div className={`big-videos${layout ? ` ${layout.kind}` : ''}`} ref={box}>
       {SEATS.map((_, s) => {
