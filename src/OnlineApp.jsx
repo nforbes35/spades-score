@@ -17,7 +17,7 @@ import DeckPicker from './DeckPicker.jsx';
 import { useDeck } from './lib/decks.js';
 import { Avatar, ProfileEditor } from './Avatar.jsx';
 import { loadName, saveName, loadAvatar, saveAvatar, useAvatars } from './lib/profile.js';
-import { Icon, FannedHand, PlayingCard, CardBack, Sheet, RulesFields, Toggle, Segmented, useToast, Confetti, StatusDot, CardText, useCountUp } from './components.jsx';
+import { useTableLayout, Icon, FannedHand, PlayingCard, CardBack, Sheet, RulesFields, Toggle, Segmented, useToast, Confetti, StatusDot, CardText, useCountUp } from './components.jsx';
 import { VideoTile, CallButtons, SoundNote, useTvStart, SoundPrompt } from './Video.jsx';
 import { HandRow } from './Scoreboard.jsx';
 import { history } from './lib/scoring.js';
@@ -246,6 +246,7 @@ function OnlineRoom({ code, isHost = false, tv = false, name, avatar, onLeave, o
     : (myHand && myHand.hand === handNo ? myHand.cards : null);
   useWakeLock(true);
   const tvFit = useTvFit(tv);
+  const tableLayout = useTableLayout();
   // No host after a while: the game may be over (an old link or code).
   const [slow, setSlow] = useState(false);
   useEffect(() => {
@@ -337,8 +338,11 @@ function OnlineRoom({ code, isHost = false, tv = false, name, avatar, onLeave, o
     );
   }
 
+  // A laptop or desktop: the table drawn as on a sideways phone, scaled up to fill the window.
+  const deskFit = shown.phase !== 'lobby' && tableLayout.zoom > 1
+    ? { zoom: tableLayout.zoom, height: window.innerHeight / tableLayout.zoom, minHeight: 0 } : undefined;
   return (
-    <div className={`app online${shown.phase === 'lobby' ? '' : ' at-table'}`}>
+    <div className={`app online${shown.phase === 'lobby' ? '' : ' at-table'}`} style={deskFit}>
       {shown.phase === 'lobby'
         ? <Lobby code={code} table={shown} isHost={isHost} me={me} people={people} call={call} icons={icons}
             profile={{ name, avatar }} onProfile={onProfile}

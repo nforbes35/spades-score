@@ -1267,56 +1267,50 @@ button.choice:active { transform: scale(0.98); }
 
 /* ---------- Online table on a phone turned sideways: the table fills the screen, your hand is a strip along
    the bottom with the bid buttons beside it, players sit around the table's edge ---------- */
-@media (orientation: landscape) and (max-height: 520px) {
-  .app.online.at-table:not(.tv-mode) .online-top { padding: 4px 10px; }
-  .app.online.at-table:not(.tv-mode) .felt { margin-bottom: calc(126px + env(safe-area-inset-bottom)); }
-  .app.online.at-table:not(.tv-mode) .table-oval { top: 50%; width: min(60%, 560px); height: 88%; }
-  .app.online.at-table:not(.tv-mode) .table-verse { display: none; }
-  .app.online.at-table:not(.tv-mode) .table-logo { zoom: 0.6; }
-
-  .app.online.at-table:not(.tv-mode) .player-spot { width: auto; }
-  .app.online.at-table:not(.tv-mode) .player-spot .nameplate { max-width: 150px; }
-  .app.online.at-table:not(.tv-mode) .player-spot .avatar { width: 48px; height: 48px; }
-  .app.online.at-table:not(.tv-mode) .player-spot .avatar .seat-icon { font-size: 17px; }
-  .app.online.at-table:not(.tv-mode) .player-spot.top { top: 2px; left: 50%; transform: translateX(-50%); flex-direction: row; gap: 6px; }
-  .app.online.at-table:not(.tv-mode) .player-spot.top .spot-backs { top: 8px; }
-  .app.online.at-table:not(.tv-mode) .player-spot.left { left: 3%; top: 50%; transform: translateY(-50%); }
-  .app.online.at-table:not(.tv-mode) .player-spot.right { right: 3%; left: auto; top: 50%; transform: translateY(-50%); }
-  .app.online.at-table:not(.tv-mode) .player-spot .spot-backs { position: absolute; top: 4px; order: 0; }
-  .app.online.at-table:not(.tv-mode) .player-spot.top .spot-backs { left: calc(100% + 4px); }
-  .app.online.at-table:not(.tv-mode) .player-spot.left .spot-backs { left: calc(100% + 2px); }
-  .app.online.at-table:not(.tv-mode) .player-spot.right .spot-backs { right: calc(100% + 2px); }
-  /* You: a small badge on the table's bottom edge, across from your partner */
-  .app.online.at-table:not(.tv-mode) .player-spot.bottom { bottom: 2px; top: auto; left: 50%; transform: translateX(-50%); flex-direction: row; }
-  .app.online.at-table:not(.tv-mode) .player-spot.bottom .avatar { width: 34px; height: 34px; }
-  .app.online.at-table:not(.tv-mode) .player-spot.bottom .avatar .seat-icon { font-size: 13px; }
-
-  .app.online.at-table:not(.tv-mode) .trick { width: 150px; height: 150px; transform: translate(-50%, -50%); }
-  .app.online.at-table:not(.tv-mode) .trick-card .pcard { --w: 44px; }
-  .app.online.at-table:not(.tv-mode) .trick-card.top { transform: translate(-50%, -76%); }
-  .app.online.at-table:not(.tv-mode) .trick-card.bottom { transform: translate(-50%, -24%); }
-  .app.online.at-table:not(.tv-mode) .trick-card.left { transform: translate(-170%, -50%) rotate(-6deg); }
-  .app.online.at-table:not(.tv-mode) .trick-card.right { transform: translate(70%, -50%) rotate(6deg); }
-  .app.online.at-table:not(.tv-mode) .trick-msg.winner-msg { top: 50%; bottom: auto; z-index: 5; padding: 3px 10px; border-radius: 999px; background: rgba(0, 0, 0, 0.6); }
-
-  .hand-dock.online-dock {
+:root[data-layout='wide'] .app.online.at-table:not(.tv-mode) .online-top { padding: 4px 10px; }
+:root[data-layout='wide'] .app.online.at-table:not(.tv-mode) .felt { margin-bottom: calc(126px + env(safe-area-inset-bottom)); }
+:root[data-layout='wide'] .app.online.at-table:not(.tv-mode) .table-oval { top: 50%; width: min(60%, 560px); height: 88%; }
+:root[data-layout='wide'] .app.online.at-table:not(.tv-mode) .table-verse { display: none; }
+:root[data-layout='wide'] .app.online.at-table:not(.tv-mode) .table-logo { zoom: 0.6; }
+:root[data-layout='wide'] .app.online.at-table:not(.tv-mode) .player-spot { width: auto; }
+:root[data-layout='wide'] .app.online.at-table:not(.tv-mode) .player-spot .nameplate { max-width: 150px; }
+:root[data-layout='wide'] .app.online.at-table:not(.tv-mode) .player-spot .avatar { width: 48px; height: 48px; }
+:root[data-layout='wide'] .app.online.at-table:not(.tv-mode) .player-spot .avatar .seat-icon { font-size: 17px; }
+:root[data-layout='wide'] .app.online.at-table:not(.tv-mode) .player-spot.top { top: 2px; left: 50%; transform: translateX(-50%); flex-direction: row; gap: 6px; }
+:root[data-layout='wide'] .app.online.at-table:not(.tv-mode) .player-spot.top .spot-backs { top: 8px; }
+:root[data-layout='wide'] .app.online.at-table:not(.tv-mode) .player-spot.left { left: 3%; top: 50%; transform: translateY(-50%); }
+:root[data-layout='wide'] .app.online.at-table:not(.tv-mode) .player-spot.right { right: 3%; left: auto; top: 50%; transform: translateY(-50%); }
+:root[data-layout='wide'] .app.online.at-table:not(.tv-mode) .player-spot .spot-backs { position: absolute; top: 4px; order: 0; }
+:root[data-layout='wide'] .app.online.at-table:not(.tv-mode) .player-spot.top .spot-backs { left: calc(100% + 4px); }
+:root[data-layout='wide'] .app.online.at-table:not(.tv-mode) .player-spot.left .spot-backs { left: calc(100% + 2px); }
+:root[data-layout='wide'] .app.online.at-table:not(.tv-mode) .player-spot.right .spot-backs { right: calc(100% + 2px); }
+:root[data-layout='wide'] .app.online.at-table:not(.tv-mode) .player-spot.bottom { bottom: 2px; top: auto; left: 50%; transform: translateX(-50%); flex-direction: row; }
+:root[data-layout='wide'] .app.online.at-table:not(.tv-mode) .player-spot.bottom .avatar { width: 34px; height: 34px; }
+:root[data-layout='wide'] .app.online.at-table:not(.tv-mode) .player-spot.bottom .avatar .seat-icon { font-size: 13px; }
+:root[data-layout='wide'] .app.online.at-table:not(.tv-mode) .trick { width: 150px; height: 150px; transform: translate(-50%, -50%); }
+:root[data-layout='wide'] .app.online.at-table:not(.tv-mode) .trick-card .pcard { --w: 44px; }
+:root[data-layout='wide'] .app.online.at-table:not(.tv-mode) .trick-card.top { transform: translate(-50%, -76%); }
+:root[data-layout='wide'] .app.online.at-table:not(.tv-mode) .trick-card.bottom { transform: translate(-50%, -24%); }
+:root[data-layout='wide'] .app.online.at-table:not(.tv-mode) .trick-card.left { transform: translate(-170%, -50%) rotate(-6deg); }
+:root[data-layout='wide'] .app.online.at-table:not(.tv-mode) .trick-card.right { transform: translate(70%, -50%) rotate(6deg); }
+:root[data-layout='wide'] .app.online.at-table:not(.tv-mode) .trick-msg.winner-msg { top: 50%; bottom: auto; z-index: 5; padding: 3px 10px; border-radius: 999px; background: rgba(0, 0, 0, 0.6); }
+:root[data-layout='wide'] .hand-dock.online-dock {
     display: grid; grid-template-columns: minmax(0, 1fr) 300px; grid-template-rows: auto 1fr; column-gap: 14px;
     padding: 2px 12px calc(4px + env(safe-area-inset-bottom)); border-radius: 18px 18px 0 0;
   }
-  .hand-dock.online-dock:has(.dock-action:empty) { grid-template-columns: minmax(0, 1fr); }
-  .hand-dock.online-dock > * { max-width: none; margin: 0; }
-  .online-dock .dock-head { display: none; }
-  .online-dock .fan, .online-dock .blind-choice, .online-dock > .dock-hint { grid-column: 1; grid-row: 2; }
-  .online-dock .dock-action { grid-column: 2; grid-row: 1 / span 2; min-height: 0; align-self: center; }
-  .online-dock .dock-action:empty { display: none; }
-  .online-dock .blind-choice { padding: 4px; gap: 6px; flex-direction: row; flex-wrap: wrap; justify-content: center; }
-  .online-dock .blind-choice p { margin: 0; font-size: 14px; }
-  .online-dock .bid-pad { gap: 6px; }
-  .online-dock .bid-grid { gap: 4px; }
-  .online-dock .bid-grid button { height: 32px; font-size: 15px; }
-  .online-dock .bid-pad .big { min-height: 42px; }
-  .online-dock .dock-action .dock-hint { font-size: 13px; text-align: center; }
-}
+:root[data-layout='wide'] .hand-dock.online-dock:has(.dock-action:empty) { grid-template-columns: minmax(0, 1fr); }
+:root[data-layout='wide'] .hand-dock.online-dock > * { max-width: none; margin: 0; }
+:root[data-layout='wide'] .online-dock .dock-head { display: none; }
+:root[data-layout='wide'] .online-dock .fan, :root[data-layout='wide'] .online-dock .blind-choice, :root[data-layout='wide'] .online-dock > .dock-hint { grid-column: 1; grid-row: 2; }
+:root[data-layout='wide'] .online-dock .dock-action { grid-column: 2; grid-row: 1 / span 2; min-height: 0; align-self: center; }
+:root[data-layout='wide'] .online-dock .dock-action:empty { display: none; }
+:root[data-layout='wide'] .online-dock .blind-choice { padding: 4px; gap: 6px; flex-direction: row; flex-wrap: wrap; justify-content: center; }
+:root[data-layout='wide'] .online-dock .blind-choice p { margin: 0; font-size: 14px; }
+:root[data-layout='wide'] .online-dock .bid-pad { gap: 6px; }
+:root[data-layout='wide'] .online-dock .bid-grid { gap: 4px; }
+:root[data-layout='wide'] .online-dock .bid-grid button { height: 32px; font-size: 15px; }
+:root[data-layout='wide'] .online-dock .bid-pad .big { min-height: 42px; }
+:root[data-layout='wide'] .online-dock .dock-action .dock-hint { font-size: 13px; text-align: center; }
 
 /* Lost connection: a strip across the top until the game is back */
 .conn-banner {
@@ -1405,12 +1399,10 @@ button.choice:active { transform: scale(0.98); }
 .blind-confirm p { margin: 0; font-size: 17px; }
 .blind-confirm .big { width: 100%; }
 .danger { display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 16px; font-weight: 800; color: #fff; background: linear-gradient(180deg, #ef5a4f, #c8322a); box-shadow: 0 8px 20px rgba(200, 50, 42, 0.3); }
-@media (orientation: landscape) and (max-height: 520px) {
-  .online-dock .blind-choice { flex-wrap: nowrap; justify-content: center; align-items: center; gap: 22px; padding: 10px 8px 6px; }
-  .online-dock .facedown-fan { height: 76px; width: 200px; flex: none; }
-  .online-dock .facedown-fan .pcard { --w: 44px; margin-left: -22px; top: 14px; }
-  .online-dock .blind-choice > .primary.big { width: auto; min-width: 220px; min-height: 48px; }
-}
+:root[data-layout='wide'] .online-dock .blind-choice { flex-wrap: nowrap; justify-content: center; align-items: center; gap: 22px; padding: 10px 8px 6px; }
+:root[data-layout='wide'] .online-dock .facedown-fan { height: 76px; width: 200px; flex: none; }
+:root[data-layout='wide'] .online-dock .facedown-fan .pcard { --w: 44px; margin-left: -22px; top: 14px; }
+:root[data-layout='wide'] .online-dock .blind-choice > .primary.big { width: auto; min-width: 220px; min-height: 48px; }
 
 /* Video chat controls: on your own seat, beside your name, wherever the seat is on the screen */
 .my-call { display: flex; gap: 4px; align-items: center; }
@@ -1425,10 +1417,8 @@ button.choice:active { transform: scale(0.98); }
 /* Bigger screens (tablets, laptops) held upright: a bigger table, and everyone seated right at its edge
    instead of out at the screen's edges. The table is centred 40px above the middle (see above); its size is
    W = min(92%, 640px) wide by H = min(100% - 130px, 680px) high, so each seat is placed from those. */
-@media not all and (orientation: landscape) and (max-height: 520px) {
-  .app.online.at-table:not(.tv-mode) .table-oval { width: min(92%, 640px); height: min(calc(100% - 130px), 680px); }
-  .app.online.at-table:not(.tv-mode) .player-spot.left { left: max(4px, calc(50% - min(46%, 320px) - 46px)); }
-  .app.online.at-table:not(.tv-mode) .player-spot.right { right: max(4px, calc(50% - min(46%, 320px) - 46px)); }
-  .app.online.at-table:not(.tv-mode) .player-spot.top { top: max(6px, calc(50% - 40px - min(50% - 65px, 340px) - 44px)); }
-  .app.online.at-table:not(.tv-mode) .player-spot.bottom { bottom: max(80px, calc(50% + 40px - min(50% - 65px, 340px) - 26px)); }
-}
+:root[data-layout='tall'] .app.online.at-table:not(.tv-mode) .table-oval { width: min(92%, 640px); height: min(calc(100% - 130px), 680px); }
+:root[data-layout='tall'] .app.online.at-table:not(.tv-mode) .player-spot.left { left: max(4px, calc(50% - min(46%, 320px) - 46px)); }
+:root[data-layout='tall'] .app.online.at-table:not(.tv-mode) .player-spot.right { right: max(4px, calc(50% - min(46%, 320px) - 46px)); }
+:root[data-layout='tall'] .app.online.at-table:not(.tv-mode) .player-spot.top { top: max(6px, calc(50% - 40px - min(50% - 65px, 340px) - 44px)); }
+:root[data-layout='tall'] .app.online.at-table:not(.tv-mode) .player-spot.bottom { bottom: max(80px, calc(50% + 40px - min(50% - 65px, 340px) - 26px)); }

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { NIL_CALLS } from './lib/scoring.js';
 import { parseCard, cardName } from './lib/cards.js';
 import { cardAt } from './lib/hand.js';
@@ -280,8 +280,11 @@ export function FannedHand({ cards, selected, onSelect, disabled, dim = [], deal
       if (i >= 0) return i;
     }
     const r = box.current.getBoundingClientRect();
-    return cardAt(e.clientX - r.left, lefts, cardW);
+    return cardAt((e.clientX - r.left) / zoomOf(), lefts, cardW);
   };
+  // On a big screen the table is drawn zoomed (useTableFit): finger movements are in screen pixels, the
+  // hand's own sizes aren't.
+  const zoomOf = () => (box.current ? box.current.getBoundingClientRect().width / box.current.offsetWidth || 1 : 1);
   const buzzOnce = (ms) => { try { navigator.vibrate?.(ms); } catch { /* not supported */ } };
 
   const down = (e) => {
@@ -295,8 +298,9 @@ export function FannedHand({ cards, selected, onSelect, disabled, dim = [], deal
   const move = (e) => {
     const g = gesture.current;
     if (!g) return;
-    const dx = e.clientX - g.x;
-    const dy = e.clientY - g.y;
+    const z = zoomOf();
+    const dx = (e.clientX - g.x) / z;
+    const dy = (e.clientY - g.y) / z;
     if (!g.swiping && -dy > SWIPE_START && Math.abs(dy) > Math.abs(dx) * 0.8) g.swiping = true;
     if (g.swiping) {
       setTouch({ card: g.card, dx, dy: Math.min(dy, 0), swiping: true });
@@ -316,7 +320,7 @@ export function FannedHand({ cards, selected, onSelect, disabled, dim = [], deal
     const g = gesture.current;
     gesture.current = null;
     if (!g) return;
-    const dy = e.clientY - g.y;
+    const dy = (e.clientY - g.y) / zoomOf();
     setTouch(null);
     if (g.swiping && -dy > cardH * PLAY_LINE) {
       if (canPlay(g.card)) {
@@ -446,16 +450,38 @@ export function StatusDot({ on, label }) {
   return <span className={`status-dot${on ? ' on' : ''}`}><i />{label}</span>;
 }
 
-/** True on a short screen (a phone turned sideways). */
+/**
+ * The online table's layout for this screen, kept on <html data-layout> for the CSS:
+ *  'wide': a phone turned sideways, or a laptop / desktop / tablet held sideways. The table goes across the
+ *  screen with your hand in a strip along the bottom; on a big screen it's all drawn bigger (`zoom`).
+ *  'tall': a phone or tablet held upright.
+ */
+function measureLayout() {
+  if (typeof window === 'undefined') return { layout: 'tall', zoom: 1 };
+  const w = window.innerWidth, h = window.innerHeight;
+  const phoneSideways = w > h && h <= 520;
+  const bigSideways = w >= 900 && h > 520 && w > h * 1.15;
+  // Big screens: lay out as on a sideways phone about 900 wide, then scale up to fill the window.
+  const zoom = bigSideways ? Math.max(1, Math.min(h / 440, w / 900)) : 1;
+  return { layout: phoneSideways || bigSideways ? 'wide' : 'tall', zoom };
+}
+let current = measureLayout();
+const layoutListeners = new Set();
+if (typeof window !== 'undefined') {
+  document.documentElement.dataset.layout = current.layout;
+  addEventListener('resize', () => {
+    const next = measureLayout();
+    if (next.layout === current.layout && next.zoom === current.zoom) return;
+    current = next;
+    document.documentElement.dataset.layout = next.layout;
+    layoutListeners.forEach((fn) => fn());
+  });
+}
+export function useTableLayout() {
+  return useSyncExternalStore((fn) => { layoutListeners.add(fn); return () => layoutListeners.delete(fn); }, () => current);
+}
+
+/** True when the hand should use small cards (the wide layout). */
 export function useShortScreen() {
-  const query = '(orientation: landscape) and (max-height: 520px)';
-  const [short, setShort] = useState(() => window.matchMedia?.(query).matches ?? false);
-  useEffect(() => {
-    const mq = window.matchMedia?.(query);
-    if (!mq) return undefined;
-    const change = () => setShort(mq.matches);
-    mq.addEventListener('change', change);
-    return () => mq.removeEventListener('change', change);
-  }, []);
-  return short;
+  return useTableLayout().layout === 'wide';
 }

@@ -32,6 +32,9 @@ plain words, keep text large and buttons big, check every screen fits a 320px ph
   `OnlineRoom` with `tv`: own id key (`spades-tv-id`, so it's never mistaken for a player), never seated, call
   `receiveOnly`, the phone layout zoomed to fit (`useTvFit`, laid out for 720px high). In call.js a phone with an
   'otv' in the same place keeps mic/camera on and its speaker off; the TV plays everyone's sound.
+- Online table layouts: `<html data-layout>` from components.jsx `useTableLayout` — 'wide' (a phone sideways, or a
+  laptop/desktop/tablet sideways: table across, hand strip with bid buttons beside it) or 'tall'. On big screens
+  the wide layout is drawn ~900 wide and zoomed up to fill the window (FannedHand divides pointer moves by the zoom).
 - Rejoining: useRoom reconnects by itself (error/offline retry, back online, back to the app after 8 s away).
   Leaving mid-game keeps the seat (standIn: the computer plays). A device that says o-hello mid-game with the
   name of an away seat gets that seat (another browser/phone, e.g. iPhone home-screen app vs Safari). Home shows
