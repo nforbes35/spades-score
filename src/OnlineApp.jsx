@@ -972,7 +972,10 @@ function OnlineTable({ reactions = [], react, teases = {}, tease, code, table, m
                     className={hasVideo(stream) && (who.id !== me.id || call.camOn) ? '' : 'no-video'} />
                 )}
                 {(!stream || !hasVideo(stream) || (who.id === me.id && !call.camOn)) && (
-                  <Avatar value={who ? icons[who.id] : null} name={who?.name ?? '?'} bot={who?.bot} className="seat-icon" />
+                  <>
+                    <Avatar value={who ? icons[who.id] : null} name={who?.name ?? '?'} bot={who?.bot} className="seat-icon" />
+                    {stream && <SpeakingRings stream={stream} />}
+                  </>
                 )}
                 {teases[s] > 0 && <SpadeTease level={teases[s]} />}
                 {r?.dealer === s && <span className="dealer-chip">D</span>}
@@ -1334,6 +1337,55 @@ function TableMenu({ items }) {
   );
 }
 
+/**
+ * How loud a call stream is right now, 0 to 1, checked about eight times a second (0 with no sound, or
+ * until the page has been tapped once and sound is allowed).
+ */
+let levelContext;
+function useLevel(stream) {
+  const [level, setLevel] = useState(0);
+  useEffect(() => {
+    if (!stream?.getAudioTracks().length) return undefined;
+    let src, analyser, timer;
+    try {
+      levelContext ??= new (window.AudioContext || window.webkitAudioContext)();
+      if (levelContext.state === 'suspended') levelContext.resume().catch(() => {});
+      src = levelContext.createMediaStreamSource(stream);
+      analyser = levelContext.createAnalyser();
+      analyser.fftSize = 512;
+      src.connect(analyser); // (not to the speakers: the call's own audio element plays it)
+      const buf = new Float32Array(analyser.fftSize);
+      let smooth = 0;
+      timer = setInterval(() => {
+        analyser.getFloatTimeDomainData(buf);
+        let sum = 0;
+        for (let i = 0; i < buf.length; i++) sum += buf[i] * buf[i];
+        const rms = Math.sqrt(sum / buf.length);
+        // Quiet room noise counts as silence; normal talking lands around 0.3 to 0.8
+        const now = Math.min(1, Math.max(0, (rms - 0.012) * 9));
+        smooth = now > smooth ? now : smooth * 0.7 + now * 0.3;
+        const q = Math.round(smooth * 10) / 10;
+        setLevel((old) => (old === q ? old : q));
+      }, 120);
+    } catch { /* no level available */ }
+    return () => { clearInterval(timer); try { src?.disconnect(); } catch { /* gone */ } };
+  }, [stream]);
+  return level;
+}
+
+/** Ripples spreading from someone's picture while they talk (audio only), stronger when louder. */
+function SpeakingRings({ stream, tile = false }) {
+  const level = useLevel(stream);
+  if (level < 0.1) return null;
+  return tile
+    ? <span className="speak-glow" style={{ '--lv': level }} aria-hidden="true" />
+    : (
+      <span className="speak-rings" style={{ '--lv': level }} aria-hidden="true">
+        <i /><i style={{ animationDelay: '0.4s' }} /><i style={{ animationDelay: '0.8s' }} />
+      </span>
+    );
+}
+
 /** The spade bluff over a player's video or picture, as strong as their slider says. */
 function SpadeTease({ level }) {
   return (
@@ -1402,6 +1454,7 @@ function BigVideos({ onTap, table, posOf, mySeat, me, call, icons, videoOf, peer
         if (!rect) return null;
         return (
           <div key={s} className={`big-tile ${CORNER[posOf(s)]} t${teamOf(s)}${turn ? ' turn' : ''}`} data-seat={s} onClick={() => onTap(s)} style={rect}>
+            {stream && !showVideo && <SpeakingRings stream={stream} tile />}
             {/* Audio plays from the video element even with the camera off, so it's always there. */}
             {stream && <VideoTile stream={stream} muted={mine || !call.speakerOn} mirrored={mine} className={showVideo ? '' : 'no-video'} />}
             {!showVideo && <Avatar value={icons[who.id]} name={who.name} bot={who.bot} className="big-icon" />}

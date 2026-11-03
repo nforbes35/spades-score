@@ -1871,3 +1871,22 @@ button.choice:active { transform: scale(0.98); }
 /* ---------- Hiding the table (••• menu): just the backdrop, or just the video chat ---------- */
 .felt.no-table .table-oval { display: none; }
 .felt.video-only :is(.player-spot, .trick, .trick-ghost, .deal-layer) { display: none; }
+
+/* ---------- Who's talking (audio only): ripples from their picture, a glow round their big tile ---------- */
+.speak-rings { position: absolute; inset: 0; pointer-events: none; z-index: -1; }
+.speak-rings i {
+  position: absolute; inset: -2px; border-radius: 50%; border: 4px solid color-mix(in srgb, var(--team) 75%, #fff);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--team) 70%, transparent);
+  animation: speak-ripple 1.2s ease-out infinite both;
+}
+@keyframes speak-ripple {
+  0% { scale: 1; opacity: calc(0.4 + var(--lv) * 0.6); }
+  100% { scale: calc(1.25 + var(--lv) * 0.55); opacity: 0; }
+}
+.speak-glow {
+  position: absolute; inset: 0; z-index: 2; pointer-events: none; border-radius: inherit;
+  box-shadow: inset 0 0 0 calc(3px + var(--lv) * 7px) var(--team), inset 0 0 calc(20px + var(--lv) * 40px) color-mix(in srgb, var(--team) 60%, transparent);
+  transition: box-shadow 0.12s linear;
+}
+@media (prefers-reduced-motion: reduce) { .speak-rings i { animation: none; opacity: 0.8; scale: 1.15; } }
+.player-spot .avatar { isolation: isolate; }
