@@ -1288,8 +1288,9 @@ button.choice:active { transform: scale(0.98); }
 :root[data-layout='wide'] .app.online.at-table:not(.tv-mode) .player-spot .avatar .seat-icon { font-size: 17px; }
 :root[data-layout='wide'] .app.online.at-table:not(.tv-mode) .player-spot.top { top: 2px; left: 50%; transform: translateX(-50%); flex-direction: row; gap: 6px; }
 :root[data-layout='wide'] .app.online.at-table:not(.tv-mode) .player-spot.top .spot-backs { top: 8px; }
-:root[data-layout='wide'] .app.online.at-table:not(.tv-mode) .player-spot.left { left: 3%; top: 50%; transform: translateY(-50%); }
-:root[data-layout='wide'] .app.online.at-table:not(.tv-mode) .player-spot.right { right: 3%; left: auto; top: 50%; transform: translateY(-50%); }
+:root[data-layout='wide'] .app.online.at-table:not(.tv-mode) .player-spot.left { left: max(3%, calc(env(safe-area-inset-left) + 8px)); top: 50%; transform: translateY(-50%); }
+:root[data-layout='wide'] .app.online.at-table:not(.tv-mode) .player-spot.right { right: max(3%, calc(env(safe-area-inset-right) + 8px)); left: auto; top: 50%; transform: translateY(-50%); }
+/* (sideways iPhones: max() keeps the side players clear of the Dynamic Island and the rounded corners) */
 :root[data-layout='wide'] .app.online.at-table:not(.tv-mode) .player-spot .spot-backs { position: absolute; top: 4px; order: 0; }
 :root[data-layout='wide'] .app.online.at-table:not(.tv-mode) .player-spot.top .spot-backs { left: calc(100% + 4px); }
 :root[data-layout='wide'] .app.online.at-table:not(.tv-mode) .player-spot.left .spot-backs { left: calc(100% + 2px); }
