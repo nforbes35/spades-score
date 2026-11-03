@@ -666,6 +666,7 @@ function OnlineTable({ code, table, mySeat, cards, me, isHost, call, room, icons
   const [selected, setSelected] = useState(null);
   const [sending, setSending] = useState(false);
   const [peeked, setPeeked] = useState(null); // hand number whose cards I've looked at
+  const [blindAsk, setBlindAsk] = useState(false); // confirming a blind nil bid
   const [decksOpen, setDecksOpen] = useState(false);
   const [tvOpen, setTvOpen] = useState(false);
   const deck = useDeck();
@@ -827,13 +828,13 @@ function OnlineTable({ code, table, mySeat, cards, me, isHost, call, room, icons
           {dealing ? (
             <p className="dock-hint">Dealing…</p>
           ) : coverCards ? (
+            // Your new hand, face down until you look (blind nil has to be bid before looking).
             <div className="blind-choice">
-              <p>New hand dealt. Thinking about <b>blind nil</b>? Decide before you look.</p>
-              <div className="row">
-                <button type="button" className="secondary" onClick={() => setPeeked(handNo)}>Look at my cards</button>
-                {myTurn && <button type="button" className="primary" onClick={() => send('o-bid', { call: 'blind' })}>Blind nil</button>}
+              <div className="facedown-fan" aria-hidden="true">
+                {Array.from({ length: 13 }, (_, k) => <CardBack key={k} size="sm" style={{ '--k': k - 6 }} />)}
               </div>
-              {!myTurn && <p className="small">You can bid blind nil when it’s your turn.</p>}
+              <button type="button" className="primary big" onClick={() => setPeeked(handNo)}>Show my cards</button>
+              {myTurn && <button type="button" className="text-btn blind-link" onClick={() => setBlindAsk(true)}>Bid blind nil…</button>}
             </div>
           ) : cards ? (
             <FannedHand cards={sorted} selected={selected} dealKey={handNo}
@@ -854,6 +855,16 @@ function OnlineTable({ code, table, mySeat, cards, me, isHost, call, room, icons
       )}
 
       {decksOpen && <DeckPicker onClose={() => setDecksOpen(false)} />}
+      {blindAsk && myTurn && table.phase === 'bidding' && (
+        <Sheet title="Bid blind nil?" short onClose={() => setBlindAsk(false)} closeLabel="Cancel">
+          <div className="blind-confirm">
+            <p>You’d bid <b>without looking at your cards</b>.</p>
+            <p>Take no books and your team gets <b className="pos">+{table.settings.rules.blindNilValue}</b>. Take even one and your team loses <b className="neg">−{table.settings.rules.blindNilValue}</b>.</p>
+            <button type="button" className="danger big" onClick={() => { setBlindAsk(false); send('o-bid', { call: 'blind' }); }}>Yes, bid blind nil</button>
+            <button type="button" className="secondary big" onClick={() => { setBlindAsk(false); setPeeked(handNo); }}>No, show my cards</button>
+          </div>
+        </Sheet>
+      )}
       {tvOpen && <Sheet title="Companion TV" short onClose={() => setTvOpen(false)} closeLabel="Done"><TvInviteCard code={code} /></Sheet>}
       {(table.phase === 'scored' || table.phase === 'over') && !showingLast && (
         <HandResult table={table} isHost={isHost} hostActions={hostActions} />
