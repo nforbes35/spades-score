@@ -1145,7 +1145,8 @@ button.choice:active { transform: scale(0.98); }
 .dock-clock.hurry { color: #ff6b6b; }
 
 /* Seasons & holidays (lib/seasons.js): an ornament in the middle of the table, the photo behind the home screen */
-:root[data-emblem='ornament'] .table-logo { display: block; color: transparent; text-shadow: none; width: 92px; height: 92px; opacity: 0.4; background: var(--deck-emblem) center / contain no-repeat; filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.5)); }
+/* Seasonal themes: nothing in the middle of the table (the ornament stays on the card backs) */
+:root[data-emblem='ornament'] .table-logo { display: none; }
 :root[data-home-photo] .home {
   background: linear-gradient(180deg, rgba(0, 0, 0, 0.38), rgba(0, 0, 0, 0.55) 40%, color-mix(in srgb, var(--felt-a) 88%, transparent) 72%, var(--felt-a)), var(--deck-home) center top / cover no-repeat, var(--felt-a);
 }
