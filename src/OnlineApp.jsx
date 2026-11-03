@@ -35,6 +35,9 @@ const NEXT_HAND_MS = 5000;
 const RIFFLE_MS = 450;
 const DEAL_GAP_MS = 28;
 const DEAL_MS = 2500;
+// A hand dealt longer ago than this isn't animated: you've opened the app or come back to it mid-hand.
+// (A little slack: the host's clock and this phone's may differ by a second or two.)
+const JUST_DEALT_MS = 6000;
 const TRICK_SHOW_MS = 1600;
 const BANNER_DELAY_MS = 4000;
 const NOT_FOUND_MS = 15000;
@@ -683,7 +686,7 @@ function OnlineTable({ code, table, mySeat, cards, me, isHost, call, room, icons
   useEffect(() => { if (myTurn) { buzz(60); } }, [myTurn, r?.tricks.length, table.phase]);
 
   const handNo = game.hands.length;
-  const dealing = useDealing(`${game.id}:${handNo}`, table.phase === 'bidding' && r?.bidsIn === 0);
+  const dealing = useDealing(`${game.id}:${handNo}`, table.phase === 'bidding' && r?.bidsIn === 0 && Date.now() - (r?.dealtAt ?? 0) < JUST_DEALT_MS);
   const bidTimer = table.settings.bidTimer ?? 0;
   const left = useCountdown(bidTimer && table.phase === 'bidding' ? `${handNo}:${r.turn}` : null, bidTimer, r?.bidsIn === 0 ? DEAL_MS : 0);
   const hurry = left != null && left <= 5;
@@ -999,7 +1002,7 @@ function HandList({ game }) {
 // ---------------------------------------------------------------------------------------------
 // Dealing: a riffle, then the cards fly out around the table, with sound.
 
-/** True for a moment after a new hand arrives (not when you open the app mid-hand). */
+/** True for a moment after a new hand arrives (not when you open the app or come back to it mid-hand). */
 function useDealing(key, fresh) {
   const [dealing, setDealing] = useState(false);
   const seen = useRef(null);

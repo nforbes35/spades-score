@@ -58,11 +58,16 @@ function loadDeal(a) {
 
 /** The cards being dealt, starting `delay` seconds from now (when they start flying out). */
 export function dealSound({ delay = 0, volume = 0.75 } = {}) {
+  // Only while the app is on screen: a phone that's locked or in another app holds sounds back and plays
+  // them all when it comes back, which would sound like deals at random moments.
+  if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return;
   try {
     const a = context();
+    if (a.state !== 'running') return;
     const at = a.currentTime + delay;
     loadDeal(a).then((buffer) => {
-      if (!buffer) return;
+      // Still on time? (The first load can take a moment; a late deal sound is worse than none.)
+      if (!buffer || a.state !== 'running' || a.currentTime > at + 0.3 || document.visibilityState !== 'visible') return;
       const src = a.createBufferSource();
       src.buffer = buffer;
       const gain = a.createGain();
