@@ -30,7 +30,7 @@ export const laborDay = (y) => nthWeekday(y, 9, 1, 1);
 
 const W = 'rgba(255,255,255,';
 const motifs = {
-  leaf: `<path d="M0-14C9-12 13-2 8 8 4 13-4 13-8 8-13-2-9-12 0-14Z" fill="${W}0.95)"/><path d="M0-12V16" stroke="rgba(0,0,0,0.25)" stroke-width="1.2"/>`,
+  leaf: `<g transform="rotate(-14) translate(0 1)"><path d="M0 -15 2.6 -9.5 5.2 -11 4.4 -4.2 9.6 -8.6 9.8 -5.4 13.6 -6.4 11.4 -1.8 13 0.2 6.8 3.6 7.8 6.6 1.9 5 0.9 6.4 0.7 12.5 -0.7 12.5 -0.9 6.4 -1.9 5 -7.8 6.6 -6.8 3.6 -13 0.2 -11.4 -1.8 -13.6 -6.4 -9.8 -5.4 -9.6 -8.6 -4.4 -4.2 -5.2 -11 -2.6 -9.5 0 -15Z" fill="${W}0.95)" stroke="${W}0.95)" stroke-width="0.8" stroke-linejoin="round"/><path d="M0 6V-12M0 3 11-4.5M0 3-11-4.5M0 5 6 4.6M0 5-6 4.6" stroke="rgba(0,0,0,0.14)" stroke-width="0.55" fill="none" stroke-linecap="round"/></g>`,
   wheat: `<g fill="${W}0.95)"><path d="M0 18V-14" stroke="${W}0.9)" stroke-width="1.3"/>${[-10, -4, 2, 8].map((d) => `<ellipse cx="-4" cy="${d}" rx="2.4" ry="5" transform="rotate(-30 -4 ${d})"/><ellipse cx="4" cy="${d}" rx="2.4" ry="5" transform="rotate(30 4 ${d})"/>`).join('')}<ellipse cx="0" cy="-16" rx="2.2" ry="4.5"/></g>`,
   star: `<path d="M0-12 3.5-3.8 12.4-3.7 5.6 2 8.2 10.6 0 5.5-8.2 10.6-5.6 2-12.4-3.7-3.5-3.8Z" fill="${W}0.97)"/>`,
   sparkle: `<path d="M0-13 2.5-2.5 13 0 2.5 2.5 0 13-2.5 2.5-13 0-2.5-2.5Z" fill="${W}0.97)"/>`,
