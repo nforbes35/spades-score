@@ -1822,11 +1822,17 @@ button.choice:active { transform: scale(0.98); }
 .hand-view .spade-bluff { margin: 12px 4px 0 auto; max-width: 220px; }
 /* A black spade with a white glow, so it shows on any video or picture */
 .spade-tease {
-  position: absolute; left: 50%; top: 50%; z-index: 1; width: 74%; height: 74%; translate: -50% -50%; pointer-events: none;
+  /* a badge in the top right corner of their video or picture */
+  position: absolute; right: -4px; top: -4px; z-index: 3; width: 42%; height: 42%; pointer-events: none;
   fill: #0b0b0b; transition: opacity 0.12s linear;
   filter: drop-shadow(0 0 1.5px #fff) drop-shadow(0 0 6px #fff) drop-shadow(0 0 14px rgba(255, 255, 255, 0.7));
 }
-.big-tile .spade-tease { width: auto; height: 62%; max-width: 80%; top: calc(50% + 14px); }
+.big-tile .spade-tease { width: auto; height: clamp(34px, 22%, 90px); right: 8px; top: auto; translate: none; }
+/* below the title bar (or in the corner when the title bar is at the bottom) */
+.big-tile .spade-tease { top: calc(var(--title-h, 32px) + 8px); }
+.big-videos.grid-4x1 .big-tile .spade-tease { --title-h: 25%; }
+.big-videos.grid-2x2 .big-tile:is(.tl, .tr) .spade-tease { top: 8px; }
+.big-videos.grid-2x2 .big-tile:is(.tl, .tr) .big-secs { right: auto; left: 6px; }
 /* Sideways and on computers: a short upright slider just past your last card (full strength at the top) */
 .fan-aside { position: absolute; top: 46%; translate: 0 -50%; z-index: 120; touch-action: none; }
 /* Playing (no bid pad): the cards stay centred across the whole width, and the Play button that appears

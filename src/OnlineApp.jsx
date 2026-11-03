@@ -890,8 +890,7 @@ function OnlineTable({ reactions = [], react, teases = {}, tease, code, table, m
             {myTurn && table.phase === 'bidding' && !coverCards && <BidPad onBid={(b) => send('o-bid', b)} />}
             {myTurn && table.phase === 'playing' && (selected
               ? <button type="button" className="primary big go" disabled={sending} onClick={play}>Play <CardText code={selected} /></button>
-              // (sideways and on computers the cards speak for themselves: no hint, so they can sit centred)
-              : layout !== 'wide' && <p className="dock-hint">Swipe a card up to play it, or tap it. Dimmed cards can’t be played.</p>)}
+              : null)}
     </>
   );
 
