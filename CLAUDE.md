@@ -37,7 +37,7 @@ plain words, keep text large and buttons big, check every screen fits a 320px ph
   name of an away seat gets that seat (another browser/phone, e.g. iPhone home-screen app vs Safari). Home shows
   "Rejoin game" from `spades-last-online` for a day. ConnectionBanner shows when the room or host is lost.
 - Between hands: the last book shows TRICK_SHOW_MS, the score NEXT_HAND_MS (5 s), then the host deals. Each deal
-  plays `DealAnimation` + `dealSound` (fx.js: the recorded shuffle in public/sounds, CC0 Kenney; the first tap anywhere unlocks sound); `round.dealtAt` makes the first bid and bid timer wait DEAL_MS.
+  plays `DealAnimation` + `dealSound` (fx.js: public/sounds/deal.m4a, built from CC0 Kenney card-slide recordings; the first tap anywhere unlocks sound); `round.dealtAt` makes the first bid and bid timer wait DEAL_MS.
 - Seasons & holidays (`src/lib/seasons.js`): photo themes like the Sunday Table project (same Unsplash photos, saved as
   `public/decks/season-*.webp`). The default deck 'seasonal' follows the date (`seasonFor`, tested in test/seasons.test.js);
   themes also set `--felt-*`, `--deck-home` + `data-home-photo` (home screen, lobby header, online room). KJV verses.

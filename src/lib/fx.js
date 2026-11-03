@@ -39,40 +39,41 @@ export function chime(high = false) {
 
 export const buzz = (pattern = 60) => { try { navigator.vibrate?.(pattern); } catch { /* not supported */ } };
 
-// The shuffle at each deal: a real recording (public/sounds, CC0 from Kenney's Casino Audio), loaded once and
-// played through Web Audio so it starts on time.
-const SHUFFLE_URL = '/sounds/shuffle.m4a';
-let shuffleBuffer;
+// The sound of a deal: real card-slide recordings (CC0, Kenney's Casino Audio) laid out as a quick run of
+// cards landing (public/sounds/deal.m4a), loaded once and played through Web Audio so it starts on time.
+const DEAL_URL = '/sounds/deal.m4a';
+let dealBuffer;
 const context = () => {
   audio ??= new (window.AudioContext || window.webkitAudioContext)();
   if (audio.state === 'suspended') audio.resume().catch(() => {});
   return audio;
 };
-function loadShuffle(a) {
-  shuffleBuffer ??= fetch(SHUFFLE_URL)
+function loadDeal(a) {
+  dealBuffer ??= fetch(DEAL_URL)
     .then((r) => r.arrayBuffer())
     .then((data) => new Promise((resolve, reject) => a.decodeAudioData(data, resolve, reject)))
-    .catch(() => { shuffleBuffer = undefined; return null; });
-  return shuffleBuffer;
+    .catch(() => { dealBuffer = undefined; return null; });
+  return dealBuffer;
 }
 
-/** Shuffle sound for a new deal. */
-export function dealSound({ volume = 0.8 } = {}) {
+/** The cards being dealt, starting `delay` seconds from now (when they start flying out). */
+export function dealSound({ delay = 0, volume = 0.75 } = {}) {
   try {
     const a = context();
-    loadShuffle(a).then((buffer) => {
+    const at = a.currentTime + delay;
+    loadDeal(a).then((buffer) => {
       if (!buffer) return;
       const src = a.createBufferSource();
       src.buffer = buffer;
       const gain = a.createGain();
       gain.gain.value = volume;
       src.connect(gain).connect(a.destination);
-      src.start();
+      src.start(Math.max(at, a.currentTime));
     });
   } catch { /* no sound available */ }
 }
 
-/** Browsers only allow sound after a tap: call this from one so later sounds can play. Also loads the shuffle. */
+/** Browsers only allow sound after a tap: call this from one so later sounds can play. Also loads the deal sound. */
 export function unlockSound() {
   try {
     const a = context();
@@ -81,7 +82,7 @@ export function unlockSound() {
     src.buffer = a.createBuffer(1, 1, 22050);
     src.connect(a.destination);
     src.start();
-    loadShuffle(a);
+    loadDeal(a);
   } catch { /* no sound available */ }
 }
 

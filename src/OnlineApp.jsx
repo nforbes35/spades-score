@@ -1000,7 +1000,7 @@ function useDealing(key, fresh) {
     seen.current = key;
     if (!fresh) return;
     setDealing(true);
-    dealSound();
+    dealSound({ delay: RIFFLE_MS / 1000 });
     setTimeout(() => setDealing(false), DEAL_MS); // not cleared: a re-render mustn't leave it dealing
   }, [key]);
   return dealing;

@@ -1,2 +1,3 @@
-shuffle.m4a: "card-shuffle" from Casino Audio by Kenney (www.kenney.nl), Creative Commons Zero (CC0).
-Trimmed to 2.5 s, levelled and converted to AAC.
+deal.m4a: made from the "card-slide" recordings in Casino Audio by Kenney (www.kenney.nl), Creative Commons Zero
+(CC0): the crisp part of each slide, laid out as 18 cards landing about 12 a second with small changes in timing,
+pitch and volume, levelled and converted to AAC.
