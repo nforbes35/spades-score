@@ -939,7 +939,7 @@ function OnlineTable({ reactions = [], react, teases = {}, tease, code, table, m
             <TableMenu items={[
               call.joined
                 ? { icon: 'video', label: 'Video chat settings', onClick: () => setCallOpen(true) }
-                : { icon: 'video', label: 'Join video chat', onClick: () => setJoinOpen(true) },
+                : { icon: 'video', label: 'Join A/V Chat', onClick: () => setJoinOpen(true) },
               { icon: 'users', label: 'Video chat only', note: 'Hide the table, fill it with video', on: tableMode === 'video', onClick: () => setTableMode(tableMode === 'video' ? 'full' : 'video') },
               { icon: 'expand', label: 'Hide the table', note: 'Just the backdrop', on: tableMode === 'backdrop', onClick: () => setTableMode(tableMode === 'backdrop' ? 'full' : 'backdrop') },
               mySeat >= 0 && { icon: 'hand', label: 'Hand view', note: 'Just your cards, big', onClick: () => setHandView(true) },
