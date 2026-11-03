@@ -71,7 +71,8 @@ export default function Home({ onPlayOnline, onTable, onJoin, onStats, rejoin, o
           <form className="choice join-open" onSubmit={(e) => { e.preventDefault(); if (clean.length === 4) onJoin(clean); }}>
             <label htmlFor="home-code"><b>Game code</b></label>
             <input id="home-code" className="code-input" value={clean} onChange={(e) => setCode(e.target.value)}
-              autoCapitalize="characters" autoComplete="off" placeholder="ABCD" autoFocus />
+              autoCapitalize="characters" autoComplete="off" autoCorrect="off" spellCheck={false} enterKeyHint="go"
+              data-1p-ignore data-lpignore="true" placeholder="ABCD" autoFocus />
             <div className="row">
               <button type="button" className="secondary" onClick={() => setJoining(false)}>Cancel</button>
               <button type="submit" className="primary go" disabled={clean.length !== 4}>Join</button>
