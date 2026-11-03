@@ -48,7 +48,7 @@ export default function GuestApp({ code, onLeave }) {
             <div className="scores">
               {[0, 1].map((t) => (
                 <ScoreCard key={t} t={t} team={game.teams[t]} standing={standings(game)[t]} target={game.target}
-                  showBags={game.rules.bagsEnabled} compact />
+                  showBags={game.rules.bagsEnabled} bagLimit={game.rules.bagsLimit} compact />
               ))}
             </div>
           )}

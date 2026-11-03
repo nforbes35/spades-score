@@ -18,7 +18,7 @@ import DeckPicker from './DeckPicker.jsx';
 import { useDeck } from './lib/decks.js';
 import { Avatar, ProfileEditor } from './Avatar.jsx';
 import { loadName, saveName, loadAvatar, saveAvatar, useAvatars } from './lib/profile.js';
-import { useTableLayout, Icon, FannedHand, PlayingCard, CardBack, Sheet, RulesFields, Toggle, Segmented, useToast, Confetti, StatusDot, CardText, useCountUp } from './components.jsx';
+import { useTableLayout, Icon, FannedHand, BagMeter, PlayingCard, CardBack, Sheet, RulesFields, Toggle, Segmented, useToast, Confetti, StatusDot, CardText, useCountUp } from './components.jsx';
 import { VideoTile, CallButtons, SoundNote, useTvStart, SoundPrompt } from './Video.jsx';
 import { HandRow } from './Scoreboard.jsx';
 import { history } from './lib/scoring.js';
@@ -1426,20 +1426,6 @@ function BookFly() {
     });
   }, []);
   return <span ref={ref} className="book-fly" style={at ?? { display: 'none' }} aria-hidden="true" />;
-}
-
-/**
- * A team's bags as a row of dots that fill towards the penalty (amber when close, red one away), with the
- * count beside them.
- */
-function BagMeter({ bags, limit = 10 }) {
-  const n = Math.max(1, Math.min(limit || 10, 15));
-  const level = bags >= n - 1 ? ' bags-danger' : bags >= n - 3 ? ' bags-warn' : '';
-  return (
-    <span className={`bag-meter${level}`} aria-label={`${bags} of ${n} bags`}>
-      <span className="bag-dots" aria-hidden="true">{Array.from({ length: n }, (_, i) => <i key={i} className={i < bags ? 'on' : ''} />)}</span>
-    </span>
-  );
 }
 
 /** The spade bluff over a player's video or picture, as strong as their slider says. */

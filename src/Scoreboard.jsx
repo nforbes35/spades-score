@@ -1,16 +1,19 @@
 import { signed, contractBid, totalBooks, isNil, nilLabel } from './lib/scoring.js';
-import { useCountUp } from './components.jsx';
+import { useCountUp, BagMeter } from './components.jsx';
 
-export function ScoreCard({ t, team, standing, target, showBags, isWinner, compact }) {
+export function ScoreCard({ t, team, standing, target, showBags, bagLimit = 10, isWinner, compact }) {
   const score = useCountUp(standing.score);
   const pct = Math.min(Math.max(standing.score, 0), target) / Math.max(target, 1);
   return (
     <div className={`score-card t${t}${isWinner ? ' won' : ''}${compact ? ' compact' : ''}`}>
       <div className="team-name">{team.name}</div>
       {!compact && <div className="players">{team.players.join(' & ')}</div>}
-      <div className={`score${standing.score < 0 ? ' neg' : ''}`}>{score}</div>
+      {/* the score, with the team's bags as dots beside it */}
+      <div className="score-row">
+        <div className={`score${standing.score < 0 ? ' neg' : ''}`}>{score}</div>
+        {showBags && <BagMeter bags={standing.bags} limit={bagLimit} />}
+      </div>
       <div className="progress"><div style={{ width: `${pct * 100}%` }} /></div>
-      {showBags && <div className="bags">{standing.bags} bag{standing.bags === 1 ? '' : 's'}</div>}
     </div>
   );
 }

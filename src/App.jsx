@@ -234,7 +234,7 @@ function GameScreen({ store, toast, onNewGame, onJoin, onPlayOnline }) {
           <div className="scores">
             {[0, 1].map((t) => (
               <ScoreCard key={t} t={t} team={game.teams[t]} standing={stand[t]} target={game.target}
-                showBags={game.rules.bagsEnabled} isWinner={win === t} />
+                showBags={game.rules.bagsEnabled} bagLimit={game.rules.bagsLimit} isWinner={win === t} />
             ))}
           </div>
           <p className="target">Playing to {game.target}</p>

@@ -150,7 +150,7 @@ export default function RemoteApp({ code, seat: mySeat, onLeave }) {
             <div className="scores">
               {[0, 1].map((t) => (
                 <ScoreCard key={t} t={t} team={game.teams[t]} standing={standings(game)[t]} target={game.target}
-                  showBags={game.rules.bagsEnabled} isWinner={win === t} compact />
+                  showBags={game.rules.bagsEnabled} bagLimit={game.rules.bagsLimit} isWinner={win === t} compact />
               ))}
             </div>
           )}

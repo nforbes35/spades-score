@@ -504,6 +504,20 @@ export function Confetti() {
 }
 
 /** A card written inline in a sentence or button, as a little white chip in the card's color. */
+/**
+ * A team's bags as a row of dots that fill towards the penalty (amber when close, red one away), with the
+ * count beside them.
+ */
+export function BagMeter({ bags, limit = 10 }) {
+  const n = Math.max(1, Math.min(limit || 10, 15));
+  const level = bags >= n - 1 ? ' bags-danger' : bags >= n - 3 ? ' bags-warn' : '';
+  return (
+    <span className={`bag-meter${level}`} aria-label={`${bags} of ${n} bags`}>
+      <span className="bag-dots" aria-hidden="true">{Array.from({ length: n }, (_, i) => <i key={i} className={i < bags ? 'on' : ''} />)}</span>
+    </span>
+  );
+}
+
 export function CardText({ code }) {
   const { rank, suit } = parseCard(code);
   return <span className={`card-chip${suit.red ? ' red' : ''}`}>{rank}{suit.sym}</span>;

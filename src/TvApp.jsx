@@ -5,7 +5,7 @@ import { useRoom } from './lib/room.js';
 import { useDevice } from './lib/device.js';
 import { useCall } from './lib/call.js';
 import { useWakeLock } from './lib/fx.js';
-import { Icon, PlayingCard } from './components.jsx';
+import { Icon, PlayingCard, BagMeter } from './components.jsx';
 import { VideoTile, useTvStart, SoundPrompt } from './Video.jsx';
 
 /**
@@ -103,7 +103,7 @@ function TvScoreboard({ game }) {
         {[0, 1].map((t) => (
           <div key={t} className={`tv-team t${t}${win === t ? ' won' : ''}`}>
             <span>{game.teams[t].name}</span>
-            <b>{stand[t].score}</b>
+            <b>{stand[t].score}{game.rules.bagsEnabled && <BagMeter bags={stand[t].bags} limit={game.rules.bagsLimit} />}</b>
           </div>
         ))}
       </div>
