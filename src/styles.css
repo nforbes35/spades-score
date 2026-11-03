@@ -1379,3 +1379,18 @@ button.choice:active { transform: scale(0.98); }
 .tv-mode .trick-card.bottom { transform: translate(-50%, -20%); }
 .tv-mode .trick-card.left { transform: translate(-175%, -50%) rotate(-6deg); }
 .tv-mode .trick-card.right { transform: translate(75%, -50%) rotate(6deg); }
+
+/* TV waiting screen, bigger to match the table (useTvFit's 720-high units) */
+.tv-lobby { gap: 26px; }
+.tv-lobby h1 { font-size: 76px; gap: 20px; }
+.tv-lobby h1 .brand-mark { width: 82px; height: 82px; font-size: 52px; border-radius: 22px; }
+.tv-lobby-code { font-size: 34px; }
+.tv-lobby-code b { font-size: 48px; }
+.tv-lobby-seats { gap: 28px; }
+.tv-lobby-seat { width: 262px; padding: 26px 12px; gap: 12px; border-radius: 28px; border-width: 3px; }
+.tv-lobby-seat b { font-size: 32px; }
+.tv-lobby-seat > span:last-child { font-size: 20px; }
+.tv-lobby-avatar, .tv-lobby-seat .empty-seat { width: 150px; height: 150px; font-size: 58px; }
+.tv-lobby-avatar { box-shadow: 0 0 0 5px var(--team); }
+.tv-lobby-wait { font-size: 26px; }
+.tv-play-here { font-size: 18px; padding: 10px 20px; }
