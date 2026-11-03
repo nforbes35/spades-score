@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import QRCode from 'qrcode';
 import { read, write, tabRead, tabWrite } from './lib/store.js';
+import { bigLayout } from './lib/bigLayout.js';
 import { standings, winner, signed, scoreTeam, isNil, nilLabel, STANDARD_RULES } from './lib/scoring.js';
 import { SEATS, teamOf, seatEntry } from './lib/table.js';
 import { sortHand, cardLabel } from './lib/cards.js';
@@ -748,6 +749,14 @@ function OnlineTable({ reactions = [], react, code, table, mySeat, cards, me, is
   const [handView, setHandView] = useState(false);
   const [bigVideo, setBigVideo] = useState(() => read(BIG_VIDEO_KEY) === true);
   const big = tv ? tvBig : bigVideo && call.joined;
+  // A seat's books/bid ('bidding…' or '–' until they've bid), for its nameplate or its big video tile.
+  const scoreText = (s) => {
+    const entry = seatEntry(hand, s);
+    const call = isNil(entry.call) ? nilLabel(entry.call) : entry.bid;
+    if (table.phase !== 'bidding') return <>{entry.books}<small>/{call}</small></>;
+    if (hasBid(table, s)) return isNil(entry.call) ? call : `bid ${call}`;
+    return table.round?.turn === s ? 'bidding…' : '–';
+  };
   const deck = useDeck();
   const [now, setNow] = useState(Date.now());
   const st = standings(game);
@@ -885,17 +894,14 @@ function OnlineTable({ reactions = [], react, code, table, mySeat, cards, me, is
         </div>
         {SEATS.map((_, s) => {
           const who = table.seats[s];
-          const entry = seatEntry(hand, s);
           const away = who && !who.bot && !present.has(who.id);
           const turn = r?.turn === s && ['bidding', 'playing'].includes(table.phase);
           // With big videos on, faces move to the corner tiles (so nobody's video, or sound, plays twice).
           const stream = who && !who.bot && !big ? videoOf(who.id) : null;
-          const bidText = table.phase === 'bidding' && !hasBid(table, s) ? (turn ? 'bidding…' : '–')
-            : isNil(entry.call) ? nilLabel(entry.call) : `bid ${entry.bid}`;
           const held = s !== mySeat && !dealing && table.phase !== 'scored' && table.phase !== 'over' ? r?.counts?.[s] ?? 0 : 0;
           return (
             <div key={s} className={`player-spot ${posOf(s)} t${teamOf(s)}${turn ? ' turn' : ''}${s === mySeat ? ' me' : ''}`}>
-              {held > 0 && (
+              {held > 0 && !big && (
                 <div className="spot-backs" aria-label={`${held} cards`}>
                   {Array.from({ length: Math.min(held, 7) }, (_, k) => <CardBack key={k} size="xs" style={{ '--k': k - (Math.min(held, 7) - 1) / 2 }} />)}
                   <span className="held-count">{held}</span>
@@ -918,13 +924,14 @@ function OnlineTable({ reactions = [], react, code, table, mySeat, cards, me, is
                 )}
                 {r?.dealer === s && <span className="dealer-chip">D</span>}
               </div>
-              <div className="nameplate">
-                <span className="spot-name">{s === mySeat ? 'You' : who?.name}</span>
-                <span className="spot-score">
-                  {table.phase === 'bidding' ? bidText : <>{entry.books}<small>/{isNil(entry.call) ? nilLabel(entry.call) : entry.bid}</small></>}
-                </span>
-              </div>
-              {s === mySeat && call.joined && <MyCallButtons call={call} onMore={() => setCallOpen(true)} />}
+              {/* With big videos on, each player's name and books/bid are in the title bar over their tile instead */}
+              {!big && (
+                <div className="nameplate">
+                  <span className="spot-name">{s === mySeat ? 'You' : who?.name}</span>
+                  <span className="spot-score">{scoreText(s)}</span>
+                </div>
+              )}
+              {s === mySeat && call.joined && !big && <MyCallButtons call={call} onMore={() => setCallOpen(true)} />}
               {away && (
                 <div className="away">
                   {who.standIn ? 'computer playing' : 'reconnecting…'}
@@ -937,10 +944,16 @@ function OnlineTable({ reactions = [], react, code, table, mySeat, cards, me, is
 
         {big && (
           <BigVideos onTap={tapSeat} table={table} posOf={posOf} mySeat={mySeat} me={me} call={call} icons={icons}
-            videoOf={videoOf} peerOf={peerOf} left={left} hurry={hurry} />
+            videoOf={videoOf} peerOf={peerOf} left={left} hurry={hurry} scoreText={scoreText} tv={tv}
+            onMore={() => setCallOpen(true)} />
         )}
         {dealing && <DealAnimation dealer={r.dealer} posOf={posOf} />}
         <ReactionsLayer reactions={reactions} />
+        {big && (
+          <div className="trick trick-ghost" aria-hidden="true">
+            {['bottom', 'left', 'top', 'right'].map((p) => <div key={p} className={`trick-card ${p}`}><PlayingCard code="AS" size="md" /></div>)}
+          </div>
+        )}
         <div className="trick">
           {trickCards.map(({ seat, card, style, thrown }) => (
             <div key={seat} className={`trick-card ${posOf(seat)}${style ? ` play-${style}` : ''}${thrown && !style ? ' thrown' : ''}${showingLast && r.lastTrick.winner === seat ? ' won' : ''}`}>
@@ -1212,10 +1225,42 @@ function HandView({ reactions, onReact, mySeat, table, st, myTurn, left, hurry, 
 const CORNER = { bottom: 'bl', left: 'tl', top: 'tr', right: 'br' };
 
 /** Big video tiles in the table's corners (or a player's icon, big, when their camera is off). */
-function BigVideos({ onTap, table, posOf, mySeat, me, call, icons, videoOf, peerOf, left, hurry }) {
+function BigVideos({ onTap, table, posOf, mySeat, me, call, icons, videoOf, peerOf, left, hurry, scoreText, tv, onMore }) {
   const r = table.round;
+  const box = useRef(null);
+  const [layout, setLayout] = useState(null);
+  // Measure the table area and the played cards' spot in it, and fit the tiles around them.
+  useLayoutEffect(() => {
+    const el = box.current;
+    const ghosts = el?.parentElement?.querySelector('.trick-ghost');
+    if (!el || !ghosts) return undefined;
+    const measure = () => {
+      const a = el.getBoundingClientRect();
+      const k = el.offsetWidth / (a.width || 1); // screen pixels to the page's own (zoomed tables)
+      const pad = 8;
+      const W = el.offsetWidth, H = el.offsetHeight;
+      // Keep clear of your hand and bid buttons where they overlap the table (upright phones), and of the
+      // TV's corner buttons; the played cards go in the middle of what's left.
+      const dock = el.closest('.app')?.querySelector('.hand-dock')?.getBoundingClientRect();
+      const bottom = Math.max(dock && dock.height ? Math.max(0, a.bottom - dock.top) * k : 0, tv ? 50 : 0);
+      el.parentElement.style.setProperty('--big-bottom', `${bottom}px`);
+      // Where each player's card lands (invisible stand-ins, placed exactly like real played cards).
+      const cards = [...ghosts.children].map((g) => {
+        const r = g.firstElementChild.getBoundingClientRect();
+        return { left: (r.left - a.left) * k - pad, right: (r.right - a.left) * k + pad, top: (r.top - a.top) * k - pad, bottom: (r.bottom - a.top) * k + pad };
+      });
+      setLayout(bigLayout({ width: W, height: H, gap: tv ? 12 : 6, bottom, cards }));
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    const dockEl = el.closest('.app')?.querySelector('.hand-dock');
+    ro.observe(ghosts);
+    if (dockEl) ro.observe(dockEl); // it grows and shrinks between bidding and playing
+    return () => ro.disconnect();
+  }, [tv]);
   return (
-    <div className="big-videos">
+    <div className={`big-videos${layout ? ` ${layout.kind}` : ''}`} ref={box}>
       {SEATS.map((_, s) => {
         const who = table.seats[s];
         if (!who) return null;
@@ -1224,13 +1269,20 @@ function BigVideos({ onTap, table, posOf, mySeat, me, call, icons, videoOf, peer
         const showVideo = stream && hasVideo(stream) && (!mine || call.camOn);
         const turn = r?.turn === s && ['bidding', 'playing'].includes(table.phase);
         const micOff = !mine && !who.bot && peerOf(who.id) && !peerOf(who.id).mic;
+        const rect = layout?.rects[CORNER[posOf(s)]];
+        if (!rect) return null;
         return (
-          <div key={s} className={`big-tile ${CORNER[posOf(s)]} t${teamOf(s)}${turn ? ' turn' : ''}`} data-seat={s} onClick={() => onTap(s)}>
+          <div key={s} className={`big-tile ${CORNER[posOf(s)]} t${teamOf(s)}${turn ? ' turn' : ''}`} data-seat={s} onClick={() => onTap(s)} style={rect}>
             {/* Audio plays from the video element even with the camera off, so it's always there. */}
             {stream && <VideoTile stream={stream} muted={mine || !call.speakerOn} mirrored={mine} className={showVideo ? '' : 'no-video'} />}
             {!showVideo && <Avatar value={icons[who.id]} name={who.name} bot={who.bot} className="big-icon" />}
-            <span className="big-name">{micOff && <Icon name="micOff" size={13} />}{s === mySeat ? 'You' : who.name}</span>
+            <div className="big-title">
+              <span className="big-name">{micOff && <Icon name="micOff" size={13} />}{s === mySeat ? 'You' : who.name}{r?.dealer === s && <span className="big-dealer">D</span>}</span>
+              <span className="big-score">{scoreText(s)}</span>
+            </div>
             {turn && left != null && <span className={`big-secs${hurry ? ' hurry' : ''}`}>{left}</span>}
+            {/* your own mic, camera and ••• ride on your tile */}
+            {mine && call.joined && <div className="big-mine" onClick={(e) => e.stopPropagation()}><MyCallButtons call={call} onMore={onMore} /></div>}
           </div>
         );
       })}
