@@ -909,13 +909,18 @@ function OnlineTable({ reactions = [], react, teases = {}, tease, code, table, m
         </div>
         <div className="online-meta">
           <span>Hand {handNo} · to {game.target}</span>
-          <div className="row">
-            {!tv && !call.joined && <button type="button" className="icon-btn round small" aria-label="Video chat" onClick={() => setJoinOpen(true)}><Icon name="video" size={18} /></button>}
-            {!tv && <button type="button" className="icon-btn round small" aria-label="Add a TV" onClick={() => setTvOpen(true)}><Icon name="tv" size={18} /></button>}
-            {!tv && mySeat >= 0 && <button type="button" className="icon-btn round small" aria-label="Hand view: just my cards" onClick={() => setHandView(true)}><Icon name="hand" size={18} /></button>}
-            {!tv && <button type="button" className="icon-btn round small" aria-label="Cards and table" onClick={() => setDecksOpen(true)}><Icon name="cards" size={18} /></button>}
-            {!tv && <button type="button" className="icon-btn round small" aria-label="Leave" onClick={onLeave}><Icon name="close" size={18} /></button>}
-          </div>
+          {!tv && (
+            <TableMenu items={[
+              call.joined
+                ? { icon: 'video', label: 'Video chat settings', onClick: () => setCallOpen(true) }
+                : { icon: 'video', label: 'Join video chat', onClick: () => setJoinOpen(true) },
+              call.joined && { icon: 'grow', label: 'Large video chat', on: bigVideo, onClick: () => { setBigVideo(!bigVideo); write(BIG_VIDEO_KEY, !bigVideo); } },
+              mySeat >= 0 && { icon: 'hand', label: 'Hand view', note: 'Just your cards, big', onClick: () => setHandView(true) },
+              { icon: 'tv', label: 'Add a TV', onClick: () => setTvOpen(true) },
+              { icon: 'cards', label: 'Cards & table', onClick: () => setDecksOpen(true) },
+              { icon: 'close', label: isHost ? 'End game' : 'Leave game', danger: true, onClick: onLeave },
+            ]} />
+          )}
         </div>
       </header>
 
@@ -1251,6 +1256,38 @@ function HandView({ reactions, onReact, mySeat, table, st, myTurn, left, hurry, 
       </div>
       <div className="hv-hand">{handArea}</div>
       <div className="hv-action">{actionArea}</div>
+    </div>
+  );
+}
+
+/** Everything that used to sit in the top right, in one drop-down: tap ••• and pick. */
+function TableMenu({ items }) {
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    if (!open) return undefined;
+    const key = (e) => { if (e.key === 'Escape') setOpen(false); };
+    window.addEventListener('keydown', key);
+    return () => window.removeEventListener('keydown', key);
+  }, [open]);
+  return (
+    <div className="table-menu">
+      <button type="button" className={`icon-btn round small${open ? ' on' : ''}`} aria-label="Menu" aria-haspopup="menu" aria-expanded={open}
+        onClick={() => setOpen(!open)}><Icon name="more" size={20} /></button>
+      {open && (
+        <>
+          <div className="table-menu-shade" onClick={() => setOpen(false)} />
+          <div className="table-menu-list" role="menu">
+            {items.filter(Boolean).map((it) => (
+              <button key={it.label} type="button" role={it.on != null ? 'menuitemcheckbox' : 'menuitem'} aria-checked={it.on ?? undefined}
+                className={`${it.danger ? 'danger-item' : ''}${it.on ? ' on' : ''}`} onClick={() => { setOpen(false); it.onClick(); }}>
+                <Icon name={it.icon} size={19} />
+                <span>{it.label}{it.note && <small>{it.note}</small>}</span>
+                {it.on != null && <span className={`menu-switch${it.on ? ' on' : ''}`} aria-hidden="true" />}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
     </div>
   );
 }
