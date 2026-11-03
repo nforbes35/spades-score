@@ -1964,10 +1964,11 @@ button.choice:active { transform: scale(0.98); }
 /* Large video chat on an upright phone: the videos fill the top of the table and the played cards sit in
    a short strip just above your hand (side players' cards out wide, yours and your partner's overlapped
    in the middle). */
-.app.online.at-table .felt.big-on.videos-top .trick { top: calc(100% - var(--big-bottom, 0px) - 64px); width: 220px; height: 120px; transform: translate(-50%, -50%); }
-.app.online.at-table .felt.big-on.videos-top .trick-card.left { transform: translate(-195%, -50%) rotate(-6deg); }
-.app.online.at-table .felt.big-on.videos-top .trick-card.right { transform: translate(95%, -50%) rotate(6deg); }
-.app.online.at-table .felt.big-on.videos-top .trick-card.top { transform: translate(-50%, -76%); }
-.app.online.at-table .felt.big-on.videos-top .trick-card.bottom { transform: translate(-50%, -24%); z-index: 2; }
+/* (one straight row, upright, in the same order as the videos above: left player, you, partner, right player) */
+.app.online.at-table .felt.big-on.videos-top .trick { top: calc(100% - var(--big-bottom, 0px) - 46px); width: 240px; height: 80px; transform: translate(-50%, -50%); }
+.app.online.at-table .felt.big-on.videos-top .trick-card.left { transform: translate(calc(-200% - 9px), -50%); }
+.app.online.at-table .felt.big-on.videos-top .trick-card.bottom { transform: translate(calc(-100% - 3px), -50%); }
+.app.online.at-table .felt.big-on.videos-top .trick-card.top { transform: translate(3px, -50%); }
+.app.online.at-table .felt.big-on.videos-top .trick-card.right { transform: translate(calc(100% + 9px), -50%); }
 .app.online.at-table .felt.big-on.videos-top .trick-msg { top: 50%; }
 .app.online.at-table .felt.big-on.videos-top .table-oval { opacity: 0.35; }
