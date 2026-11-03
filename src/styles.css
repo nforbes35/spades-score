@@ -2061,3 +2061,10 @@ button.choice:active { transform: scale(0.98); }
 .tv-team b { display: inline-flex; align-items: center; gap: 0.6vw; }
 .tv-team .bag-dots { grid-template-columns: repeat(5, 0.5vw); gap: 0.25vw; }
 .tv-team .bag-dots i { width: 0.5vw; height: 0.5vw; }
+
+/* TV: the numbers fill their bubbles (bid/books pill on each nameplate, card count circle) */
+.tv-mode .nameplate .spot-score { font-size: 17px; line-height: 1.15; padding: 0 6px; font-weight: 900; letter-spacing: -0.02em; }
+.tv-mode .nameplate .spot-score small { font-size: 14px; opacity: 0.9; }
+.tv-mode .held-count { font-size: 15.5px; min-width: 21px; height: 21px; padding: 0 3px; letter-spacing: -0.04em; line-height: 1; }
+.tv-mode .nameplate .spot-name { font-size: 17px; font-weight: 800; }
+.tv-mode .nameplate { max-width: 230px; }
