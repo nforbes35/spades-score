@@ -669,6 +669,7 @@ function OnlineTable({ code, table, mySeat, cards, me, isHost, call, room, icons
   const [blindAsk, setBlindAsk] = useState(false); // confirming a blind nil bid
   const [decksOpen, setDecksOpen] = useState(false);
   const [tvOpen, setTvOpen] = useState(false);
+  const [callOpen, setCallOpen] = useState(false);
   const deck = useDeck();
   const [now, setNow] = useState(Date.now());
   const st = standings(game);
@@ -789,6 +790,7 @@ function OnlineTable({ code, table, mySeat, cards, me, isHost, call, room, icons
                   {table.phase === 'bidding' ? bidText : <>{entry.books}<small>/{isNil(entry.call) ? nilLabel(entry.call) : entry.bid}</small></>}
                 </span>
               </div>
+              {s === mySeat && call.joined && <MyCallButtons call={call} onMore={() => setCallOpen(true)} />}
               {away && (
                 <div className="away">
                   {who.standIn ? 'computer playing' : 'reconnecting…'}
@@ -813,8 +815,17 @@ function OnlineTable({ code, table, mySeat, cards, me, isHost, call, room, icons
         </div>
       </div>
 
-      {call.joined && !tv && (
-        <div className="online-call"><CallButtons call={call} size={18} /><SoundNote call={call} /></div>
+      {/* Not seated (watching): the call controls sit under the top bar instead of on a seat. */}
+      {call.joined && !tv && mySeat < 0 && (
+        <div className="online-call watching"><CallButtons call={call} size={18} /><SoundNote call={call} /></div>
+      )}
+      {callOpen && call.joined && (
+        <Sheet title="Video chat" short onClose={() => setCallOpen(false)} closeLabel="Done">
+          <div className="call-sheet">
+            <CallButtons call={{ ...call, leave: () => { setCallOpen(false); call.leave(); } }} size={22} />
+            <SoundNote call={call} />
+          </div>
+        </Sheet>
       )}
 
       {/* This player's hand and controls */}
@@ -868,6 +879,25 @@ function OnlineTable({ code, table, mySeat, cards, me, isHost, call, room, icons
         <HandResult table={table} isHost={isHost} hostActions={hostActions} />
       )}
     </>
+  );
+}
+
+/** Your mic and camera, on your own seat so they're never in the way; the rest is one tap away. */
+function MyCallButtons({ call, onMore }) {
+  return (
+    <div className="my-call">
+      {call.local && (
+        <button type="button" className={call.micOn ? '' : 'off'} onClick={call.toggleMic} aria-label={call.micOn ? 'Mute microphone' : 'Unmute microphone'}>
+          <Icon name={call.micOn ? 'mic' : 'micOff'} size={16} />
+        </button>
+      )}
+      {call.local && call.local.getVideoTracks().length > 0 && (
+        <button type="button" className={call.camOn ? '' : 'off'} onClick={call.toggleCam} aria-label={call.camOn ? 'Turn camera off' : 'Turn camera on'}>
+          <Icon name={call.camOn ? 'video' : 'videoOff'} size={16} />
+        </button>
+      )}
+      <button type="button" onClick={onMore} aria-label="More video chat controls"><Icon name="more" size={16} /></button>
+    </div>
   );
 }
 
