@@ -778,9 +778,10 @@ function OnlineTable({ reactions = [], react, teases = {}, tease, code, table, m
     const entry = seatEntry(hand, s);
     const call = isNil(entry.call) ? nilLabel(entry.call) : entry.bid;
     if (table.phase !== 'bidding') {
-      // Video chat only: the winner's new book only shows once the gold has flown into it (see BookFly)
-      const books = entry.books - (flyUntil && Date.now() < flyUntil && s === r.lastTrick.winner ? 1 : 0);
-      return <><span key={books} className="sc-books">{books}</span><small>/{call}</small></>;
+      // The winner's new book only shows once the gold has flown into it (see BookFly), then pops in
+      const flying = flyUntil && s === r.lastTrick.winner;
+      const books = entry.books - (flying && Date.now() < flyUntil ? 1 : 0);
+      return <><span key={books} className={`sc-books${flying && Date.now() >= flyUntil ? ' bump' : ''}`}>{books}</span><small>/{call}</small></>;
     }
     if (hasBid(table, s)) return isNil(entry.call) ? call : `bid ${call}`;
     return table.round?.turn === s ? 'bidding…' : '–';
@@ -792,9 +793,9 @@ function OnlineTable({ reactions = [], react, teases = {}, tease, code, table, m
   // Let the finished book sit on the table for a moment.
   const lastShow = showMs(r?.lastTrick);
   const showingLast = r?.lastTrick && r.trick.length === 0 && now - r.lastTrick.at < lastShow;
-  // Video chat only: when a book is won, the winning card's gold outline flies into the winner's books count
+  // When a book is won, the winning card's gold outline flies into the winner's books count
   // (BOOK_FLY_DELAY_MS after the trick ends, for BOOK_FLY_MS), and the count goes up as it lands.
-  const flyUntil = videoOnly && showingLast ? r.lastTrick.at + BOOK_FLY_DELAY_MS + BOOK_FLY_MS : 0;
+  const flyUntil = showingLast && r.lastTrick.cards?.length === 4 ? r.lastTrick.at + BOOK_FLY_DELAY_MS + BOOK_FLY_MS : 0;
   const [, setFlyTick] = useState(0);
   useEffect(() => {
     if (!flyUntil) return undefined;
@@ -1013,11 +1014,12 @@ function OnlineTable({ reactions = [], react, teases = {}, tease, code, table, m
           <BigVideos onTap={tapSeat} table={table} posOf={posOf} mySeat={mySeat} me={me} call={call} icons={icons}
             videoOf={videoOf} peerOf={peerOf} left={left} hurry={hurry} scoreText={scoreText} tv={tv} teases={teases} fill={videoOnly}
             played={videoOnly ? Object.fromEntries(trickCards.map((t) => [t.seat, t.card])) : null}
-            wonBy={showingLast ? r.lastTrick.winner : null} flyKey={flyUntil && Date.now() < flyUntil ? r.lastTrick.at : null}
+            wonBy={showingLast ? r.lastTrick.winner : null}
             onMore={() => setCallOpen(true)} />
         )}
         {dealing && <DealAnimation dealer={r.dealer} posOf={posOf} />}
         <ReactionsLayer reactions={reactions} names={table.seats.map((w, s) => (s === mySeat ? 'You' : w?.name))} />
+        {flyUntil > 0 && Date.now() < flyUntil && <BookFly key={r.lastTrick.at} />}
         {big && (
           <div className="trick trick-ghost" aria-hidden="true">
             {['bottom', 'left', 'top', 'right'].map((p) => <div key={p} className={`trick-card ${p}`}><PlayingCard code="AS" size="md" /></div>)}
@@ -1407,12 +1409,15 @@ function BookFly() {
   const ref = useRef(null);
   const [at, setAt] = useState(null);
   useLayoutEffect(() => {
-    const tile = ref.current?.parentElement;
-    const from = tile?.querySelector('.big-played');
-    const to = tile?.querySelector('.sc-books');
+    const felt = ref.current?.parentElement;
+    if (!felt) return;
+    // From: the winning card (its box in video chat only, or the card on the table).
+    // To: the winner's books count (on their video tile, or their nameplate).
+    const from = felt.querySelector('.big-tile.won .big-played') ?? felt.querySelector('.trick .trick-card.won .pcard');
+    const to = felt.querySelector('.big-tile.won .sc-books') ?? felt.querySelector('.player-spot.won .sc-books');
     if (!from || !to) return;
-    const t = tile.getBoundingClientRect(), a = from.getBoundingClientRect(), b = to.getBoundingClientRect();
-    const k = tile.offsetWidth / (t.width || 1); // (zoomed tables)
+    const t = felt.getBoundingClientRect(), a = from.getBoundingClientRect(), b = to.getBoundingClientRect();
+    const k = felt.offsetWidth / (t.width || 1); // (zoomed tables)
     setAt({
       '--fx': `${(a.left + a.width / 2 - t.left) * k}px`, '--fy': `${(a.top + a.height / 2 - t.top) * k}px`,
       '--fw': `${a.width * k}px`, '--fh': `${a.height * k}px`,
@@ -1436,7 +1441,7 @@ function SpadeTease({ level }) {
 const CORNER = { bottom: 'bl', left: 'tl', top: 'tr', right: 'br' };
 
 /** Big video tiles in the table's corners (or a player's icon, big, when their camera is off). */
-function BigVideos({ onTap, table, posOf, mySeat, me, call, icons, videoOf, peerOf, left, hurry, scoreText, tv, onMore, teases = {}, fill = false, played = null, wonBy = null, flyKey = null }) {
+function BigVideos({ onTap, table, posOf, mySeat, me, call, icons, videoOf, peerOf, left, hurry, scoreText, tv, onMore, teases = {}, fill = false, played = null, wonBy = null }) {
   const r = table.round;
   const box = useRef(null);
   const [layout, setLayout] = useState(null);
@@ -1501,7 +1506,6 @@ function BigVideos({ onTap, table, posOf, mySeat, me, call, icons, videoOf, peer
               <span className="big-score">{scoreText(s)}</span>
             </div>
             {turn && left != null && <span className={`big-secs${hurry ? ' hurry' : ''}`}>{left}</span>}
-            {flyKey && wonBy === s && <BookFly key={flyKey} />}
             {/* your own mic, camera and ••• ride on your tile */}
             {mine && call.joined && <div className="big-mine" onClick={(e) => e.stopPropagation()}><MyCallButtons call={call} onMore={onMore} /></div>}
           </div>
