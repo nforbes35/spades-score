@@ -129,6 +129,7 @@ const ICONS = {
   speaker: <><path d="M11 5 6 9H2v6h4l5 4V5Z" /><path d="M15.5 8.5a5 5 0 0 1 0 7" /><path d="M19 5a10 10 0 0 1 0 14" /></>,
   speakerOff: <><path d="M11 5 6 9H2v6h4l5 4V5Z" /><path d="m22 9-6 6" /><path d="m16 9 6 6" /></>,
   home: <><path d="M3 10.5 12 3l9 7.5" /><path d="M5 9.5V20h5v-6h4v6h5V9.5" /></>,
+  hand: <><rect x="2.5" y="7" width="8" height="12" rx="1.5" transform="rotate(-16 6.5 13)" /><rect x="8" y="5" width="8" height="12" rx="1.5" /><rect x="13.5" y="7" width="8" height="12" rx="1.5" transform="rotate(16 17.5 13)" /></>,
   tv: <><rect x="2" y="7" width="20" height="13" rx="2" /><path d="m17 2-5 5-5-5" /></>,
   users: <><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></>,
   expand: <><path d="M8 3H5a2 2 0 0 0-2 2v3" /><path d="M21 8V5a2 2 0 0 0-2-2h-3" /><path d="M3 16v3a2 2 0 0 0 2 2h3" /><path d="M16 21h3a2 2 0 0 0 2-2v-3" /></>,
@@ -240,10 +241,13 @@ const STICKY_PX = 5;
  * suits. With `onPlay`, slide a finger along the hand to pick a card (it rises), swipe it up past the
  * line to play it, or tap it to select it. Cards not in `playable` shake and drop back.
  */
-export function FannedHand({ cards, selected, onSelect, disabled, dim = [], dealKey, onPlay, playable, onRefuse }) {
+export function FannedHand({ cards, selected, onSelect, disabled, dim = [], dealKey, onPlay, playable, onRefuse, big = false }) {
   const box = useRef(null);
   const [width, setWidth] = useState(340);
   const short = useShortScreen();
+  const tableLayout = useTableLayout();
+  // Big cards also fit the screen's height (in the zoomed layout's own pixels): under a third of it when wide.
+  const bigMaxW = (window.innerHeight / tableLayout.zoom) * (tableLayout.layout === 'wide' ? 0.28 : 0.24);
   const [touch, setTouch] = useState(null); // { card, dx, dy, swiping }
   const [refused, setRefused] = useState(null);
   const [flying, setFlying] = useState(null);
@@ -258,7 +262,11 @@ export function FannedHand({ cards, selected, onSelect, disabled, dim = [], deal
 
   const n = cards.length;
   // A phone on its side has little height: smaller cards, so the table still fits above them.
-  const cardW = short ? 58 : Math.round(Math.min(88, Math.max(62, width / 4.8)));
+  // Hand view: big cards, overlapping more, as if held in the hand.
+  // The biggest card that still shows every card's corner (each needs ~30% of a card's width uncovered),
+  // leaving room at the edges for the fan's tilt.
+  const cardW = big ? Math.round(Math.min(170, bigMaxW, Math.max(64, (width - 64 - (n - 1) * 4) / (1 + (n - 1) * 0.3))))
+    : short ? 58 : Math.round(Math.min(88, Math.max(62, width / 4.8)));
   const cardH = Math.round(cardW * 1.4);
   const suitOf = (c) => c.slice(-1);
   const gapsBefore = cards.map((c, i) => cards.slice(0, i + 1).filter((x, j) => j > 0 && suitOf(x) !== suitOf(cards[j - 1])).length);

@@ -35,6 +35,9 @@ plain words, keep text large and buttons big, check every screen fits a 320px ph
 - Online table layouts: `<html data-layout>` from components.jsx `useTableLayout` — 'wide' (a phone sideways, or a
   laptop/desktop/tablet sideways: table across, hand strip with bid buttons beside it) or 'tall'. On big screens
   the wide layout is drawn ~900 wide and zoomed up to fill the window (FannedHand divides pointer moves by the zoom).
+- Hand view (top bar's hand button, players only; never remembered, the table view comes first): `HandView` shows
+  only your cards big (FannedHand `big`; two overlapping rows on an upright phone), the bid pad, status, scores and
+  chat, for playing with the table on a TV. `handArea` / `actionArea` are shared with the table view's hand strip.
 - Rejoining: useRoom reconnects by itself (error/offline retry, back online, back to the app after 8 s away).
   Leaving mid-game keeps the seat (standIn: the computer plays). A device that says o-hello mid-game with the
   name of an away seat gets that seat (another browser/phone, e.g. iPhone home-screen app vs Safari). Home shows

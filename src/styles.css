@@ -1554,3 +1554,44 @@ button.choice:active { transform: scale(0.98); }
   :root[data-layout='tall'] .app.online.at-table:not(.tv-mode) .player-spot.bottom .spot-backs { left: calc(100% + 2px); top: 2px; }
 }
 @media (max-width: 350px) { .online-team .team-faces { display: none; } .online-team { padding-left: 10px; } }
+
+/* ---------- Hand view: just your cards, big (for playing with the table on the TV) ---------- */
+.hand-view {
+  flex: 1; min-height: 0; display: flex; flex-direction: column; color: #fff;
+  padding: calc(8px + env(safe-area-inset-top)) 12px calc(10px + env(safe-area-inset-bottom));
+  background: var(--noise), radial-gradient(120% 90% at 50% 30%, var(--felt-c), var(--felt-b) 55%, var(--felt-a));
+}
+.hv-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.hv-back { display: inline-flex; align-items: center; gap: 6px; border: 0; border-radius: 999px; padding: 8px 14px; background: rgba(0, 0, 0, 0.35); color: #fff; font-weight: 800; font-size: 15px; }
+.hv-scores { display: flex; gap: 6px; }
+.hv-score { min-width: 48px; text-align: center; padding: 4px 10px; border-radius: 12px; background: rgba(0, 0, 0, 0.3); border-top: 3px solid var(--team); font-weight: 900; font-size: 18px; font-variant-numeric: tabular-nums; }
+.hv-call { gap: 4px; }
+.hv-status { display: flex; align-items: baseline; justify-content: center; flex-wrap: wrap; gap: 4px 12px; margin-top: 14px; font-size: 18px; text-align: center; }
+.hv-status b { font-size: 22px; }
+.hand-view.my-turn .hv-status b { color: var(--gold, #f5b82e); }
+.hv-mine, .hv-hand-no { font-size: 14px; font-weight: 700; opacity: 0.8; }
+.hv-mine { padding: 1px 10px; border-radius: 999px; background: rgba(0, 0, 0, 0.3); }
+.hv-hand { flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: center; }
+.hv-hand .fan { margin-top: 0; }
+.hv-hand .dock-hint { text-align: center; font-size: 18px; }
+.hv-hand .blind-choice { gap: 16px; }
+.hv-hand .facedown-fan { height: 170px; }
+.hv-hand .facedown-fan .pcard { --w: 100px; margin-left: -50px; }
+.hv-action { min-height: 56px; display: flex; align-items: center; justify-content: center; max-width: 560px; width: 100%; margin: 0 auto; }
+.hv-action .dock-hint { text-align: center; color: rgba(255, 255, 255, 0.8); }
+/* Sideways (or a computer): the bid buttons beside your cards */
+:root[data-layout='wide'] .hand-view { display: grid; grid-template-columns: minmax(0, 1fr) 300px; grid-template-rows: auto auto 1fr; column-gap: 16px; }
+:root[data-layout='wide'] .hv-top, :root[data-layout='wide'] .hv-status { grid-column: 1 / -1; }
+:root[data-layout='wide'] .hv-status { margin-top: 4px; }
+:root[data-layout='wide'] .hv-hand { grid-column: 1; }
+:root[data-layout='wide'] .hv-action { grid-column: 2; align-self: center; }
+:root[data-layout='wide'] .hv-hand .facedown-fan { height: 140px; }
+:root[data-layout='wide'] .hv-hand .facedown-fan .pcard { --w: 80px; margin-left: -40px; }
+.hv-rows { display: flex; flex-direction: column; }
+.hv-rows > .fan + .fan { margin-top: -18%; }
+.hv-rows > .fan { isolation: isolate; position: relative; }
+.hv-rows > .fan + .fan { z-index: 1; }
+/* Sideways hand view: the cards get the whole width unless there are buttons to show (bid, play) */
+:root[data-layout='wide'] .hand-view:not(:has(.hv-action :is(.bid-pad, button))) { grid-template-columns: minmax(0, 1fr); }
+:root[data-layout='wide'] .hand-view:not(:has(.hv-action :is(.bid-pad, button))) .hv-action { grid-column: 1; min-height: 0; }
+:root[data-layout='wide'] .hv-action .dock-hint { font-size: 13px; margin: 0; }

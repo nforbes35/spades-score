@@ -675,6 +675,9 @@ function OnlineTable({ code, table, mySeat, cards, me, isHost, call, room, icons
   const [decksOpen, setDecksOpen] = useState(false);
   const [tvOpen, setTvOpen] = useState(false);
   const [callOpen, setCallOpen] = useState(false);
+  const [joinOpen, setJoinOpen] = useState(false); // choosing video or audio only
+  // Hand view: just your cards, big, for playing with the table on a TV. Always starts in the table view.
+  const [handView, setHandView] = useState(false);
   const [bigVideo, setBigVideo] = useState(() => read(BIG_VIDEO_KEY) === true);
   const big = bigVideo && call.joined && !tv;
   const deck = useDeck();
@@ -720,8 +723,51 @@ function OnlineTable({ code, table, mySeat, cards, me, isHost, call, room, icons
   const peerOf = (id) => room.peers.find((p) => p.id === id);
   const trickCards = showingLast ? r.lastTrick.cards : r?.trick ?? [];
 
+  const { layout } = useTableLayout();
+  const fan = (list, row) => (
+    <FannedHand key={row} cards={list} selected={selected} dealKey={`${handNo}${row}`} big={handView}
+      onSelect={canAct ? (c) => setSelected(c && legal.includes(c) ? c : null) : undefined}
+      onPlay={canAct ? playCardNow : undefined} playable={legal}
+      onRefuse={() => toast.show(refuseReason(table, cards))}
+      dim={table.phase === 'playing' && myTurn ? list.filter((c) => !legal.includes(c)) : []} />
+  );
+  // Your cards (or the dealing / face-down step) and what you can do now: shared by the table view's hand
+  // strip and the hand view.
+  const handArea = (dealing ? (
+            <p className="dock-hint">Dealing…</p>
+          ) : coverCards ? (
+            // Your new hand, face down until you look (blind nil has to be bid before looking).
+            <div className="blind-choice">
+              <div className="facedown-fan" aria-hidden="true">
+                {Array.from({ length: 13 }, (_, k) => <CardBack key={k} size="sm" style={{ '--k': k - 6 }} />)}
+              </div>
+              <button type="button" className="primary big" onClick={() => setPeeked(handNo)}>Show my cards</button>
+              {myTurn && <button type="button" className="text-btn blind-link" onClick={() => setBlindAsk(true)}>Bid blind nil…</button>}
+            </div>
+          ) : cards ? (
+            // Hand view on an upright phone: two overlapping rows, so the cards can be big.
+            handView && layout === 'tall' && sorted.length > 7
+              ? <div className="hv-rows">{fan(sorted.slice(0, Math.ceil(sorted.length / 2)), 'a')}{fan(sorted.slice(Math.ceil(sorted.length / 2)), 'b')}</div>
+              : fan(sorted, '')
+          ) : (
+            <p className="dock-hint">Getting your cards…</p>
+          ));
+  const actionArea = (
+    <>
+            {myTurn && table.phase === 'bidding' && !coverCards && <BidPad onBid={(b) => send('o-bid', b)} />}
+            {myTurn && table.phase === 'playing' && (selected
+              ? <button type="button" className="primary big go" disabled={sending} onClick={play}>Play <CardText code={selected} /></button>
+              : <p className="dock-hint">Swipe a card up to play it, or tap it. Dimmed cards can’t be played.</p>)}
+    </>
+  );
+
   return (
     <>
+      {handView ? (
+        <HandView table={table} st={st} myTurn={myTurn} left={left} hurry={hurry} call={call}
+          handArea={handArea} actionArea={actionArea} onTable={() => setHandView(false)} onMore={() => setCallOpen(true)}
+          onJoinCall={() => setJoinOpen(true)} entry={seatEntry(hand, mySeat)} />
+      ) : <>
       <header className="online-top">
         <div className="online-scores">
           {[0, 1].map((t) => (
@@ -743,9 +789,9 @@ function OnlineTable({ code, table, mySeat, cards, me, isHost, call, room, icons
         <div className="online-meta">
           <span>Hand {handNo} · to {game.target}</span>
           <div className="row">
-            {!tv && !call.joined && <button type="button" className="icon-btn round small" aria-label="Video chat" onClick={() => call.join()}><Icon name="video" size={18} /></button>}
-            {!tv && !call.joined && <button type="button" className="icon-btn round small" aria-label="Audio chat" onClick={() => call.join({ audioOnly: true })}><Icon name="mic" size={18} /></button>}
+            {!tv && !call.joined && <button type="button" className="icon-btn round small" aria-label="Video chat" onClick={() => setJoinOpen(true)}><Icon name="video" size={18} /></button>}
             {!tv && <button type="button" className="icon-btn round small" aria-label="Add a TV" onClick={() => setTvOpen(true)}><Icon name="tv" size={18} /></button>}
+            {!tv && mySeat >= 0 && <button type="button" className="icon-btn round small" aria-label="Hand view: just my cards" onClick={() => setHandView(true)}><Icon name="hand" size={18} /></button>}
             {!tv && <button type="button" className="icon-btn round small" aria-label="Cards and table" onClick={() => setDecksOpen(true)}><Icon name="cards" size={18} /></button>}
             {!tv && <button type="button" className="icon-btn round small" aria-label="Leave" onClick={onLeave}><Icon name="close" size={18} /></button>}
           </div>
@@ -852,34 +898,11 @@ function OnlineTable({ code, table, mySeat, cards, me, isHost, call, room, icons
               {left != null && <b className={`dock-clock${hurry ? ' hurry' : ''}`}> · {left}s</b>}</span>
             <span>{cards ? `${cards.length} cards` : ''}</span>
           </div>
-          {dealing ? (
-            <p className="dock-hint">Dealing…</p>
-          ) : coverCards ? (
-            // Your new hand, face down until you look (blind nil has to be bid before looking).
-            <div className="blind-choice">
-              <div className="facedown-fan" aria-hidden="true">
-                {Array.from({ length: 13 }, (_, k) => <CardBack key={k} size="sm" style={{ '--k': k - 6 }} />)}
-              </div>
-              <button type="button" className="primary big" onClick={() => setPeeked(handNo)}>Show my cards</button>
-              {myTurn && <button type="button" className="text-btn blind-link" onClick={() => setBlindAsk(true)}>Bid blind nil…</button>}
-            </div>
-          ) : cards ? (
-            <FannedHand cards={sorted} selected={selected} dealKey={handNo}
-              onSelect={canAct ? (c) => setSelected(c && legal.includes(c) ? c : null) : undefined}
-              onPlay={canAct ? playCardNow : undefined} playable={legal}
-              onRefuse={() => toast.show(refuseReason(table, cards))}
-              dim={table.phase === 'playing' && myTurn ? sorted.filter((c) => !legal.includes(c)) : []} />
-          ) : (
-            <p className="dock-hint">Getting your cards…</p>
-          )}
-          <div className="dock-action">
-            {myTurn && table.phase === 'bidding' && !coverCards && <BidPad onBid={(b) => send('o-bid', b)} />}
-            {myTurn && table.phase === 'playing' && (selected
-              ? <button type="button" className="primary big go" disabled={sending} onClick={play}>Play <CardText code={selected} /></button>
-              : <p className="dock-hint">Swipe a card up to play it, or tap it. Dimmed cards can’t be played.</p>)}
-          </div>
+          {handArea}
+          <div className="dock-action">{actionArea}</div>
         </div>
       )}
+      </>}
 
       {decksOpen && <DeckPicker onClose={() => setDecksOpen(false)} />}
       {blindAsk && myTurn && table.phase === 'bidding' && (
@@ -890,11 +913,51 @@ function OnlineTable({ code, table, mySeat, cards, me, isHost, call, room, icons
           </div>
         </Sheet>
       )}
+      {joinOpen && !call.joined && (
+        <Sheet title="Video chat" short onClose={() => setJoinOpen(false)} closeLabel="Cancel">
+          <div className="blind-confirm">
+            <button type="button" className="primary big" onClick={() => { setJoinOpen(false); call.join(); }}><Icon name="video" /> Video and audio</button>
+            <button type="button" className="secondary big" onClick={() => { setJoinOpen(false); call.join({ audioOnly: true }); }}><Icon name="mic" /> Audio only</button>
+          </div>
+        </Sheet>
+      )}
       {tvOpen && <Sheet title="Companion TV" short onClose={() => setTvOpen(false)} closeLabel="Done"><TvInviteCard code={code} /></Sheet>}
       {(table.phase === 'scored' || table.phase === 'over') && !showingLast && (
         <HandResult table={table} isHost={isHost} hostActions={hostActions} />
       )}
     </>
+  );
+}
+
+/**
+ * Hand view: only your cards, big, as if holding them, for when the table's on the TV. Swipe a card up to
+ * throw it on the table. Bidding, the turn, the score and video chat are at hand; one tap goes back.
+ */
+function HandView({ table, st, myTurn, left, hurry, call, handArea, actionArea, onTable, onMore, onJoinCall, entry }) {
+  const game = table.game;
+  const status = myTurn ? (table.phase === 'bidding' ? 'Your bid' : 'Your turn') : turnText(table);
+  const mine = table.phase === 'bidding' ? null : `${entry.books}/${isNil(entry.call) ? nilLabel(entry.call) : entry.bid}`;
+  return (
+    <div className={`hand-view${myTurn ? ' my-turn' : ''}`}>
+      <header className="hv-top">
+        <button type="button" className="hv-back" onClick={onTable}><Icon name="tv" size={18} /> Table view</button>
+        <div className="hv-scores">
+          {[0, 1].map((t) => <span key={t} className={`hv-score t${t}`}>{st[t].score}</span>)}
+        </div>
+        <div className="row hv-call">
+          {call.joined ? <MyCallButtons call={call} onMore={onMore} /> : (
+            <button type="button" className="icon-btn round small" aria-label="Video chat" onClick={onJoinCall}><Icon name="video" size={18} /></button>
+          )}
+        </div>
+      </header>
+      <div className="hv-status">
+        <b>{status}</b>{left != null && <span className={`dock-clock${hurry ? ' hurry' : ''}`}> · {left}s</span>}
+        {mine && <span className="hv-mine">You {mine}</span>}
+        <span className="hv-hand-no">Hand {game.hands.length}</span>
+      </div>
+      <div className="hv-hand">{handArea}</div>
+      <div className="hv-action">{actionArea}</div>
+    </div>
   );
 }
 
