@@ -454,15 +454,17 @@ export function StatusDot({ on, label }) {
  * The online table's layout for this screen, kept on <html data-layout> for the CSS:
  *  'wide': a phone turned sideways, or a laptop / desktop / tablet held sideways. The table goes across the
  *  screen with your hand in a strip along the bottom; on a big screen it's all drawn bigger (`zoom`).
- *  'tall': a phone or tablet held upright.
+ *  'tall': a phone or tablet held upright (a tablet's drawn like a big phone, zoomed).
  */
 function measureLayout() {
   if (typeof window === 'undefined') return { layout: 'tall', zoom: 1 };
   const w = window.innerWidth, h = window.innerHeight;
   const phoneSideways = w > h && h <= 520;
   const bigSideways = w >= 900 && h > 520 && w > h * 1.15;
-  // Big screens: lay out as on a sideways phone about 900 wide, then scale up to fill the window.
-  const zoom = bigSideways ? Math.max(1, Math.min(h / 440, w / 900)) : 1;
+  const bigUpright = !phoneSideways && !bigSideways && w >= 600;
+  // Big screens: lay out as on a phone (sideways ~900 wide, upright ~430 wide), then scale up to fill the window.
+  const zoom = bigSideways ? Math.max(1, Math.min(h / 440, w / 900))
+    : bigUpright ? Math.max(1, Math.min(w / 430, h / 932)) : 1;
   return { layout: phoneSideways || bigSideways ? 'wide' : 'tall', zoom };
 }
 let current = measureLayout();

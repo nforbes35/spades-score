@@ -1426,7 +1426,7 @@ button.choice:active { transform: scale(0.98); }
 /* Big videos: a tile per player in the table's corners (••• → Large video chat). Tall tiles when the
    phone is upright, wide tiles when it's sideways or on a computer. Seats keep their name, bid and cards. */
 .big-videos { position: absolute; inset: 0; z-index: 3; pointer-events: none; --gap: 6px; }
-:root[data-layout='tall'] .big-videos { --bw: min(34vw, 260px); --ba: 3 / 4; --bottom: 74px; }
+:root[data-layout='tall'] .big-videos { --bw: min(34%, 260px); --ba: 3 / 4; --bottom: 74px; }
 :root[data-layout='wide'] .big-videos { --bw: 23%; --ba: 4 / 3; --bottom: 6px; }
 .big-tile {
   position: absolute; width: var(--bw); aspect-ratio: var(--ba); border-radius: 18px; overflow: hidden; pointer-events: auto;
@@ -1455,7 +1455,7 @@ button.choice:active { transform: scale(0.98); }
 /* Played cards and the seats' names stay on top of the tiles; upright phones get slightly smaller tiles */
 .felt.big-on .big-videos { z-index: 1; }
 .felt.big-on .trick { z-index: 4; }
-:root[data-layout='tall'] .big-videos { --bw: min(30vw, 240px); }
+:root[data-layout='tall'] .big-videos { --bw: min(30%, 240px); }
 /* Heads sit in the upper middle of a camera picture: crop from there so faces stay centred in the tile */
 .big-tile .vtile video { object-position: 50% 32%; }
 :root[data-layout='tall'] .felt.big-on .player-spot.left .spot-backs { position: absolute; left: calc(100% - 6px); top: -4px; }
@@ -1466,3 +1466,91 @@ button.choice:active { transform: scale(0.98); }
 :root[data-layout='wide'] .felt.big-on .big-tile { width: auto; height: calc(50cqh - 9px); }
 :root[data-layout='wide'] .app.online.at-table:not(.tv-mode) .felt.big-on .player-spot.left { left: calc((50cqh - 9px) * 4 / 3 + 12px); }
 :root[data-layout='wide'] .app.online.at-table:not(.tv-mode) .felt.big-on .player-spot.right { right: calc((50cqh - 9px) * 4 / 3 + 12px); }
+
+/* ---------- Short phones held upright (iPhone SE, mini): a compact table ---------- */
+@media (orientation: portrait) and (max-height: 740px) {
+  :root[data-layout='tall'] .app.online.at-table:not(.tv-mode) .table-verse { display: none; }
+  :root[data-layout='tall'] .app.online.at-table:not(.tv-mode) .player-spot .avatar { width: 46px; height: 46px; }
+  :root[data-layout='tall'] .app.online.at-table:not(.tv-mode) .player-spot .avatar .seat-icon { font-size: 16px; }
+  :root[data-layout='tall'] .app.online.at-table:not(.tv-mode) .player-spot.bottom .avatar { width: 38px; height: 38px; }
+  :root[data-layout='tall'] .app.online.at-table:not(.tv-mode) .player-spot { width: auto; }
+  /* Top: name beside the picture, cards to the right */
+  :root[data-layout='tall'] .app.online.at-table:not(.tv-mode) .player-spot.top { flex-direction: row; gap: 6px; top: 4px; }
+  :root[data-layout='tall'] .app.online.at-table:not(.tv-mode) .player-spot .spot-backs { position: absolute; top: 6px; order: 0; }
+  :root[data-layout='tall'] .app.online.at-table:not(.tv-mode) .player-spot.top .spot-backs { left: calc(100% + 2px); }
+  /* Sides: cards tucked in beside the name, toward the middle */
+  :root[data-layout='tall'] .app.online.at-table:not(.tv-mode) .player-spot.left .spot-backs { left: calc(100% - 8px); top: 4px; }
+  :root[data-layout='tall'] .app.online.at-table:not(.tv-mode) .player-spot.right .spot-backs { right: calc(100% - 8px); left: auto; top: 4px; }
+  :root[data-layout='tall'] .app.online.at-table:not(.tv-mode) .trick-card .pcard { --w: 50px; }
+  /* A shorter hand area: smaller bid buttons */
+  .online-dock { padding-top: 4px; }
+  .online-dock .bid-grid { gap: 4px; }
+  .online-dock .bid-grid button { height: 34px; font-size: 15px; }
+  .online-dock .bid-pad { gap: 6px; }
+  .online-dock .bid-pad .big { min-height: 46px; }
+  .online-dock .facedown-fan { height: 76px; }
+}
+
+/* ---------- Home on small screens: the buttons show without scrolling ---------- */
+@media (orientation: portrait) and (max-height: 740px) {
+  .home-hero { padding: 3vh 20px 10px; }
+  .home-fan { height: 112px; margin-bottom: 8px; }
+  .home-card { --w: 62px; }
+  .home-title { font-size: 32px; }
+  .home-title .brand-mark { width: 40px; height: 40px; font-size: 26px; }
+  .home-tagline { font-size: 16px; margin-top: 2px; }
+  .home-tagline .papi { font-size: 21px; padding: 1px 10px 2px; }
+  .home-king { font-size: 18px; margin-top: 2px; }
+  .home-season { margin-top: 6px; padding: 4px 12px; font-size: 13px; }
+  .choice { padding: 12px 12px 12px 14px; }
+  .choice-icon { width: 44px; height: 44px; }
+  .choice-text b { font-size: 17px; }
+  .choice-text span { font-size: 13.5px; }
+}
+/* A phone on its side: the title on the left, the buttons on the right */
+@media (orientation: landscape) and (max-height: 600px) {
+  .home { display: grid; grid-template-columns: 1fr minmax(320px, 1.1fr); align-items: start; height: 100dvh; min-height: 0; }
+  .home-hero { align-self: center; padding: 12px 8px 12px max(16px, env(safe-area-inset-left)); }
+  .home-fan { height: 104px; margin-bottom: 6px; }
+  .home-card { --w: 58px; }
+  .home-title { font-size: 30px; }
+  .home-title .brand-mark { width: 38px; height: 38px; font-size: 24px; }
+  .home-tagline { font-size: 15px; }
+  .home-tagline .papi { font-size: 19px; }
+  .home-king { font-size: 17px; }
+  .home-choices { height: 100dvh; overflow-y: auto; padding: 12px max(16px, env(safe-area-inset-right)) 16px 8px; gap: 10px; }
+  .choice { padding: 11px 12px; }
+  .choice-icon { width: 42px; height: 42px; }
+  .choice-text b { font-size: 16px; }
+  .choice-text span { font-size: 13px; }
+}
+/* Pages (lobby, setup, joining) on a phone on its side: a slim header and bottom bar */
+@media (orientation: landscape) and (max-height: 600px) {
+  .app:not(.at-table) > .hero { padding-top: max(6px, env(safe-area-inset-top)); padding-bottom: 6px; border-radius: 0 0 20px 20px; }
+  .app:not(.at-table) > .hero .brand h1 { font-size: 22px; }
+  .app:not(.at-table) > .hero .brand-mark { width: 32px; height: 32px; font-size: 20px; }
+  .app:not(.at-table) > .hero .lobby-me { margin-top: 4px; }
+  .app:not(.at-table) > .hero .profile-chip { padding-top: 2px; padding-bottom: 2px; font-size: 14px; }
+  .app:not(.at-table) > .hero .profile-chip .avatar-icon { width: 28px; height: 28px; }
+  .app:not(.at-table) > .hero .target { margin: 2px 0 0; font-size: 13px; }
+  .bottom-bar { padding-top: 6px; padding-bottom: max(6px, env(safe-area-inset-bottom)); }
+  .bottom-bar .big { min-height: 44px; font-size: 16px; }
+  .app { padding-bottom: 70px; }
+  .lobby-seat { min-height: 0; padding-top: 10px; padding-bottom: 10px; }
+  .lobby-avatar, .empty-seat { width: 44px; height: 44px; }
+}
+/* Page titles stay on one line, shrinking on narrow phones */
+.hero .brand { min-width: 0; }
+.hero .brand h1 { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: clamp(20px, 6.4vw, 28px); }
+@media (max-width: 400px) { .hero .icon-label { display: none; } }
+/* Watching (no seat, so no hand at the bottom): the table gets the whole screen */
+.app.online.at-table:not(.tv-mode):not(:has(.hand-dock)) .felt { margin-bottom: env(safe-area-inset-bottom); }
+:root[data-layout='tall'] .app.online.at-table:not(.tv-mode):not(:has(.hand-dock)) .table-oval { top: 50%; }
+:root[data-layout='tall'] .app.online.at-table:not(.tv-mode):not(:has(.hand-dock)) .player-spot.bottom { bottom: 10px; }
+:root[data-layout='tall'] .app.online.at-table:not(.tv-mode) .trick-msg.winner-msg { top: 50%; bottom: auto; z-index: 5; padding: 3px 12px; border-radius: 999px; background: rgba(0, 0, 0, 0.6); }
+/* Played cards always sit above the seats' card stacks */
+.app.online.at-table .trick { z-index: 3; }
+@media (orientation: portrait) and (max-height: 740px) {
+  :root[data-layout='tall'] .app.online.at-table:not(.tv-mode) .player-spot.bottom .spot-backs { left: calc(100% + 2px); top: 2px; }
+}
+@media (max-width: 350px) { .online-team .team-faces { display: none; } .online-team { padding-left: 10px; } }
