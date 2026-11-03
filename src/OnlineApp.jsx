@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import QRCode from 'qrcode';
 import { read, write, tabRead, tabWrite } from './lib/store.js';
-import { bigLayout } from './lib/bigLayout.js';
+import { bigLayout, gridLayout } from './lib/bigLayout.js';
 import { standings, winner, signed, scoreTeam, isNil, nilLabel, STANDARD_RULES } from './lib/scoring.js';
 import { SEATS, teamOf, seatEntry } from './lib/table.js';
 import { sortHand, cardLabel } from './lib/cards.js';
@@ -1001,6 +1001,8 @@ function OnlineTable({ reactions = [], react, teases = {}, tease, code, table, m
         {big && (
           <BigVideos onTap={tapSeat} table={table} posOf={posOf} mySeat={mySeat} me={me} call={call} icons={icons}
             videoOf={videoOf} peerOf={peerOf} left={left} hurry={hurry} scoreText={scoreText} tv={tv} teases={teases} fill={videoOnly}
+            played={videoOnly ? Object.fromEntries(trickCards.map((t) => [t.seat, t.card])) : null}
+            wonBy={videoOnly && showingLast ? r.lastTrick.winner : null}
             onMore={() => setCallOpen(true)} />
         )}
         {dealing && <DealAnimation dealer={r.dealer} posOf={posOf} />}
@@ -1399,7 +1401,7 @@ function SpadeTease({ level }) {
 const CORNER = { bottom: 'bl', left: 'tl', top: 'tr', right: 'br' };
 
 /** Big video tiles in the table's corners (or a player's icon, big, when their camera is off). */
-function BigVideos({ onTap, table, posOf, mySeat, me, call, icons, videoOf, peerOf, left, hurry, scoreText, tv, onMore, teases = {}, fill = false }) {
+function BigVideos({ onTap, table, posOf, mySeat, me, call, icons, videoOf, peerOf, left, hurry, scoreText, tv, onMore, teases = {}, fill = false, played = null, wonBy = null }) {
   const r = table.round;
   const box = useRef(null);
   const [layout, setLayout] = useState(null);
@@ -1420,9 +1422,7 @@ function BigVideos({ onTap, table, posOf, mySeat, me, call, icons, videoOf, peer
       el.parentElement.style.setProperty('--big-bottom', `${bottom}px`);
       // Video chat only: the four tiles fill the table area, two by two.
       if (fill) {
-        const g = 6, w = (W - 3 * g) / 2, h = (H - bottom - 3 * g) / 2;
-        const at = (left, top) => ({ left, top, width: w, height: h });
-        setLayout({ kind: 'grid', rects: { tl: at(g, g), tr: at(2 * g + w, g), bl: at(g, 2 * g + h), br: at(2 * g + w, 2 * g + h) } });
+        setLayout(gridLayout({ width: W, height: H, gap: 8, bottom }));
         return;
       }
       // Where each player's card lands (invisible stand-ins, placed exactly like real played cards).
@@ -1461,6 +1461,8 @@ function BigVideos({ onTap, table, posOf, mySeat, me, call, icons, videoOf, peer
             {teases[s] > 0 && <SpadeTease level={teases[s]} />}
             <div className="big-title">
               <span className="big-name">{micOff && <Icon name="micOff" size={13} />}{s === mySeat ? 'You' : who.name}{r?.dealer === s && <span className="big-dealer">D</span>}</span>
+              {/* Video chat only: the card this player put down this trick (no table to see it on) */}
+              {played?.[s] && <span className={`big-played${wonBy === s ? ' won' : ''}`}><CardText code={played[s]} /></span>}
               <span className="big-score">{scoreText(s)}</span>
             </div>
             {turn && left != null && <span className={`big-secs${hurry ? ' hurry' : ''}`}>{left}</span>}

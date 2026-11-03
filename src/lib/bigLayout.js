@@ -73,3 +73,28 @@ export function bigLayout({ width: W, height: H, cards, gap = 6, bottom = 0 }) {
   for (const [k, r] of Object.entries(best.rects)) rects[k] = { ...r, width: best.w, height: best.h };
   return { kind: best.kind, rects };
 }
+
+/**
+ * Video chat only: the four tiles fill the table area as big as they can while keeping a natural shape
+ * (2 × 2, four in a row on wide screens, or four stacked on tall narrow ones), centred.
+ */
+export function gridLayout({ width: W, height: H, gap = 6, bottom = 0 }) {
+  const B = H - bottom;
+  let best = null;
+  // left to right / top to bottom: the left player, you, your partner, the right player in a row;
+  // the table's corners for 2 × 2
+  for (const [cols, rows, order] of [[2, 2, ['tl', 'tr', 'bl', 'br']], [4, 1, ['tl', 'bl', 'tr', 'br']], [1, 4, ['tl', 'tr', 'bl', 'br']]]) {
+    const t = fit((W - (cols + 1) * gap) / cols, (B - (rows + 1) * gap) / rows);
+    if (t && (!best || t.w * t.h > best.w * best.h)) best = { ...t, cols, rows, order };
+  }
+  if (!best) return null;
+  const { w, h, cols, rows, order } = best;
+  const x0 = (W - (cols * w + (cols - 1) * gap)) / 2;
+  const y0 = (B - (rows * h + (rows - 1) * gap)) / 2;
+  const rects = {};
+  order.forEach((k, i) => {
+    const c = i % cols, r = Math.floor(i / cols);
+    rects[k] = { left: x0 + c * (w + gap), top: y0 + r * (h + gap), width: w, height: h };
+  });
+  return { kind: `grid-${cols}x${rows}`, rects };
+}

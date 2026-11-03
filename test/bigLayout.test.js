@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { bigLayout } from '../src/lib/bigLayout.js';
+import { bigLayout, gridLayout } from '../src/lib/bigLayout.js';
 
 // Played cards in a cross around (cx, cy): w × h cards, `spread` from the middle.
 const cross = (cx, cy, w = 70, h = 100, spread = 60) => [
@@ -28,4 +28,11 @@ for (const [name, W, H, bottom] of [['upright phone', 390, 470, 0], ['sideways p
 
 test('very wide tables put two tiles side by side on each side', () => {
   assert.equal(bigLayout({ width: 844, height: 200, cards: cross(422, 100) }).kind, 'pairs');
+});
+
+test('video chat only: four in a row on a wide, short Mac window, 2 × 2 on a phone', () => {
+  const mac = gridLayout({ width: 1300, height: 420 });
+  assert.equal(mac.kind, 'grid-4x1');
+  for (const r of Object.values(mac.rects)) assert.ok(r.width / r.height <= 1.5 + 1e-9);
+  assert.equal(gridLayout({ width: 390, height: 470 }).kind, 'grid-2x2');
 });

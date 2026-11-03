@@ -1890,3 +1890,10 @@ button.choice:active { transform: scale(0.98); }
 }
 @media (prefers-reduced-motion: reduce) { .speak-rings i { animation: none; opacity: 0.8; scale: 1.15; } }
 .player-spot .avatar { isolation: isolate; }
+
+/* Video chat only: the card each player put down, in their title bar */
+.big-played { flex: none; margin-left: auto; animation: played-in 0.25s ease-out; }
+.big-played .card-chip { font-size: 15px; padding: 1px 7px; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4); }
+.big-played.won .card-chip { box-shadow: 0 0 0 2px var(--gold), 0 0 10px rgba(245, 184, 46, 0.7); }
+.tv-mode .big-played .card-chip { font-size: 22px; }
+@keyframes played-in { from { opacity: 0; scale: 0.6; } }
