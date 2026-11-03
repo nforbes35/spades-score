@@ -1423,7 +1423,7 @@ button.choice:active { transform: scale(0.98); }
 :root[data-layout='tall'] .app.online.at-table:not(.tv-mode) .player-spot.top { top: max(6px, calc(50% - 40px - min(50% - 65px, 340px) - 44px)); }
 :root[data-layout='tall'] .app.online.at-table:not(.tv-mode) .player-spot.bottom { bottom: max(80px, calc(50% + 40px - min(50% - 65px, 340px) - 26px)); }
 
-/* Big videos: a tile per player in the table's corners (••• → Big videos in the corners). Tall tiles when the
+/* Big videos: a tile per player in the table's corners (••• → Large video chat). Tall tiles when the
    phone is upright, wide tiles when it's sideways or on a computer. Seats keep their name, bid and cards. */
 .big-videos { position: absolute; inset: 0; z-index: 3; pointer-events: none; --gap: 6px; }
 :root[data-layout='tall'] .big-videos { --bw: min(34vw, 260px); --ba: 3 / 4; --bottom: 74px; }

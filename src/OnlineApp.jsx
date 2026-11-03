@@ -836,7 +836,7 @@ function OnlineTable({ code, table, mySeat, cards, me, isHost, call, room, icons
           <div className="call-sheet">
             <CallButtons call={{ ...call, leave: () => { setCallOpen(false); call.leave(); } }} size={22} />
             <div className="card group call-options">
-              <Toggle label="Big videos in the corners" checked={bigVideo}
+              <Toggle label="Large video chat" checked={bigVideo}
                 onChange={(on) => { setBigVideo(on); write(BIG_VIDEO_KEY, on); }} />
             </div>
             <SoundNote call={call} />
