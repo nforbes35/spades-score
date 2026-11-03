@@ -242,6 +242,7 @@ const STICKY_PX = 5;
 export function FannedHand({ cards, selected, onSelect, disabled, dim = [], dealKey, onPlay, playable, onRefuse }) {
   const box = useRef(null);
   const [width, setWidth] = useState(340);
+  const short = useShortScreen();
   const [touch, setTouch] = useState(null); // { card, dx, dy, swiping }
   const [refused, setRefused] = useState(null);
   const [flying, setFlying] = useState(null);
@@ -255,7 +256,8 @@ export function FannedHand({ cards, selected, onSelect, disabled, dim = [], deal
   }, [dealKey]);
 
   const n = cards.length;
-  const cardW = Math.round(Math.min(88, Math.max(62, width / 4.8)));
+  // A phone on its side has little height: smaller cards, so the table still fits above them.
+  const cardW = short ? 58 : Math.round(Math.min(88, Math.max(62, width / 4.8)));
   const cardH = Math.round(cardW * 1.4);
   const suitOf = (c) => c.slice(-1);
   const gapsBefore = cards.map((c, i) => cards.slice(0, i + 1).filter((x, j) => j > 0 && suitOf(x) !== suitOf(cards[j - 1])).length);
@@ -441,4 +443,18 @@ export function CardText({ code }) {
 
 export function StatusDot({ on, label }) {
   return <span className={`status-dot${on ? ' on' : ''}`}><i />{label}</span>;
+}
+
+/** True on a short screen (a phone turned sideways). */
+export function useShortScreen() {
+  const query = '(orientation: landscape) and (max-height: 520px)';
+  const [short, setShort] = useState(() => window.matchMedia?.(query).matches ?? false);
+  useEffect(() => {
+    const mq = window.matchMedia?.(query);
+    if (!mq) return undefined;
+    const change = () => setShort(mq.matches);
+    mq.addEventListener('change', change);
+    return () => mq.removeEventListener('change', change);
+  }, []);
+  return short;
 }

@@ -1264,3 +1264,56 @@ button.choice:active { transform: scale(0.98); }
 .team-faces .avatar-icon + .avatar-icon { margin-left: -8px; }
 .online-team small { font-size: 10px; }
 .tv-mode .online-team small { font-size: 10.5px; }
+
+/* ---------- Online table on a phone turned sideways: the table fills the screen, your hand is a strip along
+   the bottom with the bid buttons beside it, players sit around the table's edge ---------- */
+@media (orientation: landscape) and (max-height: 520px) {
+  .app.online.at-table:not(.tv-mode) .online-top { padding: 4px 10px; }
+  .app.online.at-table:not(.tv-mode) .felt { margin-bottom: calc(126px + env(safe-area-inset-bottom)); }
+  .app.online.at-table:not(.tv-mode) .table-oval { top: 50%; width: min(60%, 560px); height: 88%; }
+  .app.online.at-table:not(.tv-mode) .table-verse { display: none; }
+  .app.online.at-table:not(.tv-mode) .table-logo { zoom: 0.6; }
+
+  .app.online.at-table:not(.tv-mode) .player-spot { width: auto; }
+  .app.online.at-table:not(.tv-mode) .player-spot .nameplate { max-width: 150px; }
+  .app.online.at-table:not(.tv-mode) .player-spot .avatar { width: 48px; height: 48px; }
+  .app.online.at-table:not(.tv-mode) .player-spot .avatar .seat-icon { font-size: 17px; }
+  .app.online.at-table:not(.tv-mode) .player-spot.top { top: 2px; left: 50%; transform: translateX(-50%); flex-direction: row; gap: 6px; }
+  .app.online.at-table:not(.tv-mode) .player-spot.top .spot-backs { top: 8px; }
+  .app.online.at-table:not(.tv-mode) .player-spot.left { left: 3%; top: 50%; transform: translateY(-50%); }
+  .app.online.at-table:not(.tv-mode) .player-spot.right { right: 3%; left: auto; top: 50%; transform: translateY(-50%); }
+  .app.online.at-table:not(.tv-mode) .player-spot .spot-backs { position: absolute; top: 4px; order: 0; }
+  .app.online.at-table:not(.tv-mode) .player-spot.top .spot-backs { left: calc(100% + 4px); }
+  .app.online.at-table:not(.tv-mode) .player-spot.left .spot-backs { left: calc(100% + 2px); }
+  .app.online.at-table:not(.tv-mode) .player-spot.right .spot-backs { right: calc(100% + 2px); }
+  /* You: a small badge on the table's bottom edge, across from your partner */
+  .app.online.at-table:not(.tv-mode) .player-spot.bottom { bottom: 2px; top: auto; left: 50%; transform: translateX(-50%); flex-direction: row; }
+  .app.online.at-table:not(.tv-mode) .player-spot.bottom .avatar { width: 34px; height: 34px; }
+  .app.online.at-table:not(.tv-mode) .player-spot.bottom .avatar .seat-icon { font-size: 13px; }
+
+  .app.online.at-table:not(.tv-mode) .trick { width: 150px; height: 150px; transform: translate(-50%, -50%); }
+  .app.online.at-table:not(.tv-mode) .trick-card .pcard { --w: 44px; }
+  .app.online.at-table:not(.tv-mode) .trick-card.top { transform: translate(-50%, -76%); }
+  .app.online.at-table:not(.tv-mode) .trick-card.bottom { transform: translate(-50%, -24%); }
+  .app.online.at-table:not(.tv-mode) .trick-card.left { transform: translate(-170%, -50%) rotate(-6deg); }
+  .app.online.at-table:not(.tv-mode) .trick-card.right { transform: translate(70%, -50%) rotate(6deg); }
+  .app.online.at-table:not(.tv-mode) .trick-msg.winner-msg { top: 50%; bottom: auto; z-index: 5; padding: 3px 10px; border-radius: 999px; background: rgba(0, 0, 0, 0.6); }
+
+  .hand-dock.online-dock {
+    display: grid; grid-template-columns: minmax(0, 1fr) 300px; grid-template-rows: auto 1fr; column-gap: 14px;
+    padding: 2px 12px calc(4px + env(safe-area-inset-bottom)); border-radius: 18px 18px 0 0;
+  }
+  .hand-dock.online-dock:has(.dock-action:empty) { grid-template-columns: minmax(0, 1fr); }
+  .hand-dock.online-dock > * { max-width: none; margin: 0; }
+  .online-dock .dock-head { display: none; }
+  .online-dock .fan, .online-dock .blind-choice, .online-dock > .dock-hint { grid-column: 1; grid-row: 2; }
+  .online-dock .dock-action { grid-column: 2; grid-row: 1 / span 2; min-height: 0; align-self: center; }
+  .online-dock .dock-action:empty { display: none; }
+  .online-dock .blind-choice { padding: 4px; gap: 6px; flex-direction: row; flex-wrap: wrap; justify-content: center; }
+  .online-dock .blind-choice p { margin: 0; font-size: 14px; }
+  .online-dock .bid-pad { gap: 6px; }
+  .online-dock .bid-grid { gap: 4px; }
+  .online-dock .bid-grid button { height: 32px; font-size: 15px; }
+  .online-dock .bid-pad .big { min-height: 42px; }
+  .online-dock .dock-action .dock-hint { font-size: 13px; text-align: center; }
+}
