@@ -1914,3 +1914,15 @@ button.choice:active { transform: scale(0.98); }
   .big-videos.grid-4x1 .big-score { margin-left: auto; }
   .big-videos.grid-4x1 .big-played { margin-left: 0; }
 }
+/* Video chat only, 2 × 2 (upright phones): title bars meet in the middle (the top two sit at the bottom
+   of their tiles), with three slots each: name at the outer edge, books/bid in the middle, the played
+   card at the inner edge, mirrored between the left and right tiles. */
+.big-videos.grid-2x2 .big-title { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; column-gap: 6px; }
+.big-videos.grid-2x2 .big-title > * { grid-row: 1; min-width: 0; max-width: 100%; }
+.big-videos.grid-2x2 .big-name { grid-column: 1; justify-self: start; }
+.big-videos.grid-2x2 .big-score { grid-column: 2; justify-self: center; }
+.big-videos.grid-2x2 .big-played { grid-column: 3; justify-self: end; margin: 0; }
+.big-videos.grid-2x2 .big-tile:is(.tr, .br) .big-name { grid-column: 3; justify-self: end; }
+.big-videos.grid-2x2 .big-tile:is(.tr, .br) .big-played { grid-column: 1; justify-self: start; }
+.big-videos.grid-2x2 .big-tile:is(.tl, .tr) .big-title { top: auto; bottom: 0; border-bottom: 0; border-top: 2px solid var(--team); }
+.big-videos.grid-2x2 .big-tile:is(.tl, .tr) .big-secs { bottom: auto; top: 6px; }
