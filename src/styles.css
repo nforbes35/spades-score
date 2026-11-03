@@ -1349,3 +1349,33 @@ button.choice:active { transform: scale(0.98); }
 }
 .tv-play-here { display: inline-flex; align-items: center; gap: 8px; margin-top: 4px; padding: 8px 16px; border-radius: 999px; border: 1px solid rgba(255, 255, 255, 0.35); background: rgba(0, 0, 0, 0.3); color: #fff; font-weight: 700; font-size: 15px; opacity: 0.85; }
 .tv-play-here:hover, .tv-play-here:focus-visible { opacity: 1; background: rgba(255, 255, 255, 0.15); }
+
+/* TV, bigger: the table and everyone around it fill the screen (still in useTvFit's 720-high units) */
+.app.online.at-table.tv-mode .table-oval { width: min(78%, 1200px); height: 84%; top: 51%; }
+.tv-mode .player-spot { width: 230px; }
+.tv-mode .player-spot .avatar, .tv-mode .player-spot.bottom .avatar { width: 140px; height: 140px; }
+.tv-mode .player-spot .avatar .seat-icon { font-size: 50px; }
+.tv-mode .nameplate { zoom: 1.85; max-width: 200px; }
+.tv-mode .bid-secs { zoom: 1.7; }
+.tv-mode .dealer-chip { zoom: 1.6; }
+.tv-mode .player-spot.left { left: 1.5%; }
+.tv-mode .player-spot.right { right: 1.5%; }
+.tv-mode .player-spot.top { top: 2px; }
+.tv-mode .player-spot.bottom { bottom: 4px; }
+.tv-mode .spot-backs { height: 66px; width: 150px; }
+.tv-mode .spot-backs .pcard { --w: 44px; }
+.tv-mode .held-count { zoom: 1.5; }
+.tv-mode .player-spot.top .spot-backs, .tv-mode .player-spot.bottom .spot-backs { left: calc(50% + 84px); top: 38px; }
+.tv-mode .trick { width: 380px; height: 380px; transform: translate(-50%, -52%); }
+.tv-mode .trick-card .pcard { --w: 112px; }
+.tv-mode .trick-msg { font-size: 26px; }
+.tv-mode .table-verse { font-size: 21px; width: 42%; bottom: 20%; }
+.tv-mode .table-logo { zoom: 1.9; }
+.tv-mode .deal-layer .pcard { --w: 74px; }
+.tv-mode .table-verse { bottom: 31%; }
+.tv-mode .trick { transform: translate(-50%, -50%); }
+.tv-mode .trick-card .pcard { --w: 104px; }
+.tv-mode .trick-card.top { transform: translate(-50%, -80%); }
+.tv-mode .trick-card.bottom { transform: translate(-50%, -20%); }
+.tv-mode .trick-card.left { transform: translate(-175%, -50%) rotate(-6deg); }
+.tv-mode .trick-card.right { transform: translate(75%, -50%) rotate(6deg); }
