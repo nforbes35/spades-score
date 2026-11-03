@@ -241,7 +241,10 @@ const STICKY_PX = 5;
  * suits. With `onPlay`, slide a finger along the hand to pick a card (it rises), swipe it up past the
  * line to play it, or tap it to select it. Cards not in `playable` shake and drop back.
  */
-export function FannedHand({ cards, selected, onSelect, disabled, dim = [], dealKey, onPlay, playable, onRefuse, big = false }) {
+const HOLD_MS = 480;
+const HOLD_SLOP = 8;
+
+export function FannedHand({ cards, selected, onSelect, disabled, dim = [], dealKey, onPlay, playable, onRefuse, onHold, big = false }) {
   const box = useRef(null);
   const [width, setWidth] = useState(340);
   const short = useShortScreen();
@@ -252,6 +255,8 @@ export function FannedHand({ cards, selected, onSelect, disabled, dim = [], deal
   const [refused, setRefused] = useState(null);
   const [flying, setFlying] = useState(null);
   const gesture = useRef(null);
+  const holdTimer = useRef(null);
+  const stopHold = () => { clearTimeout(holdTimer.current); holdTimer.current = null; };
   useLayoutEffect(() => {
     const el = box.current;
     if (!el) return undefined;
@@ -302,6 +307,18 @@ export function FannedHand({ cards, selected, onSelect, disabled, dim = [], deal
     e.currentTarget.setPointerCapture(e.pointerId);
     gesture.current = { x: e.clientX, y: e.clientY, card: cards[i], swiping: false };
     setTouch({ card: cards[i], dx: 0, dy: 0, swiping: false });
+    // Holding a card still: more ways to play it.
+    stopHold();
+    if (onHold) {
+      holdTimer.current = setTimeout(() => {
+        const g = gesture.current;
+        if (!g || g.swiping) return;
+        gesture.current = null;
+        setTouch(null);
+        buzzOnce(30);
+        onHold(g.card);
+      }, HOLD_MS);
+    }
   };
   const move = (e) => {
     const g = gesture.current;
@@ -309,6 +326,7 @@ export function FannedHand({ cards, selected, onSelect, disabled, dim = [], deal
     const z = zoomOf();
     const dx = (e.clientX - g.x) / z;
     const dy = (e.clientY - g.y) / z;
+    if (Math.abs(dx) > HOLD_SLOP || Math.abs(dy) > HOLD_SLOP) stopHold();
     if (!g.swiping && -dy > SWIPE_START && Math.abs(dy) > Math.abs(dx) * 0.8) g.swiping = true;
     if (g.swiping) {
       setTouch({ card: g.card, dx, dy: Math.min(dy, 0), swiping: true });
@@ -325,6 +343,7 @@ export function FannedHand({ cards, selected, onSelect, disabled, dim = [], deal
     }
   };
   const up = (e) => {
+    stopHold();
     const g = gesture.current;
     gesture.current = null;
     if (!g) return;
@@ -346,7 +365,7 @@ export function FannedHand({ cards, selected, onSelect, disabled, dim = [], deal
       onSelect?.(selected === g.card ? null : g.card);
     }
   };
-  const cancel = () => { gesture.current = null; setTouch(null); };
+  const cancel = () => { stopHold(); gesture.current = null; setTouch(null); };
 
   const pastLine = touch?.swiping && -touch.dy > cardH * PLAY_LINE;
   return (

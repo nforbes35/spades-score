@@ -104,3 +104,14 @@ test('a hand locked for one player can only be opened by that player', async () 
   assert.deepEqual(await unseal(sue, host.pub, box), ['AS', 'KH']);
   await assert.rejects(() => unseal(joe, host.pub, box), 'Joe can’t read Sue’s cards');
 });
+
+test('a play style rides along with the card (unknown styles are ignored)', () => {
+  let t = table4(seeded(5));
+  const first = t.round.turn;
+  for (let i = 0; i < 4; i++) t = placeBid(t, (first + i) % 4, { bid: 3 });
+  t = { ...t, round: { ...t.round, hands: { ...t.round.hands, [first]: ['2H', '3H'], [(first + 1) % 4]: ['4H', '5H'] } } };
+  t = playCard(t, first, '2H', 'papi');
+  t = playCard(t, (first + 1) % 4, '4H', 'fireworks');
+  assert.equal(t.round.trick[0].style, 'papi');
+  assert.equal(t.round.trick[1].style, undefined);
+});

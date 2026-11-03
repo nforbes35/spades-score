@@ -122,8 +122,14 @@ export function trickWinner(trick) {
   return trick.reduce((best, t) => (beats(t, best) ? t : best)).seat;
 }
 
-/** Seat `seat` plays `card`. Finishing the 13th book scores the hand (and maybe ends the game). */
-export function playCard(table, seat, card) {
+/** How a card can be played onto the table (only the look differs). 'papi': face down, flips after 3 s. */
+export const PLAY_STYLES = ['toss', 'slam', 'papi', 'spin'];
+
+/**
+ * Seat `seat` plays `card` (with a play `style`, just for show). Finishing the 13th book scores the hand (and
+ * maybe ends the game).
+ */
+export function playCard(table, seat, card, style = 'toss') {
   const r = table.round;
   if (table.phase !== 'playing') throw new Error('Not playing now.');
   if (r.turn !== seat) throw new Error('Not your turn.');
@@ -131,7 +137,7 @@ export function playCard(table, seat, card) {
     throw new Error(r.hands[seat].includes(card) ? 'You must follow suit (or spades aren’t broken yet).' : 'That card isn’t in your hand.');
   }
   const hands = { ...r.hands, [seat]: r.hands[seat].filter((c) => c !== card) };
-  const trick = [...r.trick, { seat, card }];
+  const trick = [...r.trick, { seat, card, ...(PLAY_STYLES.includes(style) && style !== 'toss' ? { style } : {}) }];
   const spadesBroken = r.spadesBroken || suitOf(card) === 'S';
   if (trick.length < 4) {
     return { ...table, round: { ...r, hands, trick, spadesBroken, turn: (seat + 1) % 4 } };

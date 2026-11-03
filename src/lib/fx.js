@@ -101,3 +101,24 @@ if (typeof window !== 'undefined') {
   addEventListener('pointerdown', prime, true);
   addEventListener('keydown', prime, true);
 }
+
+/** A soft thud: a slammed card hitting the table. Only while the app is on screen. */
+export function thud() {
+  if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return;
+  try {
+    const a = context();
+    if (a.state !== 'running') return;
+    const t = a.currentTime;
+    const osc = a.createOscillator();
+    const gain = a.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(110, t);
+    osc.frequency.exponentialRampToValueAtTime(42, t + 0.18);
+    gain.gain.setValueAtTime(0.0001, t);
+    gain.gain.exponentialRampToValueAtTime(0.5, t + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.24);
+    osc.connect(gain).connect(a.destination);
+    osc.start(t);
+    osc.stop(t + 0.26);
+  } catch { /* no sound available */ }
+}

@@ -38,6 +38,10 @@ plain words, keep text large and buttons big, check every screen fits a 320px ph
 - Hand view (top bar's hand button, players only; never remembered, the table view comes first): `HandView` shows
   only your cards big (FannedHand `big`; two overlapping rows on an upright phone), the bid pad, status, scores and
   chat, for playing with the table on a TV. `handArea` / `actionArea` are shared with the table view's hand strip.
+- Ways to play a card: hold a card (FannedHand `onHold`, 480 ms) → Slam / The Papi Flip / Spin / Toss. The style
+  rides with the card (`playCard(..., style)` → trick entries); a book ending in a Papi Flip stays up longer
+  (`showMs`) and bots wait for a flip. Emojis/gifts: tap a picture → `ReactSheet`; `o-react` is broadcast to the
+  room and each screen animates it (`ReactionsLayer`, positions from `[data-seat]`); one per second per device.
 - Rejoining: useRoom reconnects by itself (error/offline retry, back online, back to the app after 8 s away).
   Leaving mid-game keeps the seat (standIn: the computer plays). A device that says o-hello mid-game with the
   name of an away seat gets that seat (another browser/phone, e.g. iPhone home-screen app vs Safari). Home shows

@@ -3,14 +3,14 @@ import QRCode from 'qrcode';
 import { read, write, tabRead, tabWrite } from './lib/store.js';
 import { standings, winner, signed, scoreTeam, isNil, nilLabel, STANDARD_RULES } from './lib/scoring.js';
 import { SEATS, teamOf, seatEntry } from './lib/table.js';
-import { sortHand } from './lib/cards.js';
+import { sortHand, cardLabel } from './lib/cards.js';
 import { newTable, startGame, deal, placeBid, playCard, legalCards, backToLobby, publicTable, currentHand, ONLINE_RULES } from './lib/online.js';
 import { botBid, botPlay, pickBotNames } from './lib/bots.js';
 import { useRoom, joinLink } from './lib/room.js';
 import { useDevice, rememberTvScreen } from './lib/device.js';
 import { useCall } from './lib/call.js';
 import { useKeys, seal, unseal } from './lib/secret.js';
-import { useWakeLock, chime, buzz, dealSound } from './lib/fx.js';
+import { useWakeLock, chime, buzz, dealSound, thud } from './lib/fx.js';
 import { recordGame, useStatsSync, nameKey } from './lib/stats.js';
 import Stats from './Stats.jsx';
 import DeckPicker from './DeckPicker.jsx';
@@ -40,7 +40,11 @@ const DEAL_MS = 2500;
 // (A little slack: the host's clock and this phone's may differ by a second or two.)
 const JUST_DEALT_MS = 6000;
 const TRICK_SHOW_MS = 1600;
+// A book ending in a Papi Flip stays up until the card has flipped and been seen.
+const PAPI_FLIP_MS = 3000;
+const showMs = (lastTrick) => (lastTrick?.cards.at(-1)?.style === 'papi' ? PAPI_FLIP_MS + 1200 : TRICK_SHOW_MS);
 const BANNER_DELAY_MS = 4000;
+const REACTION_MS = 3200;
 const NOT_FOUND_MS = 15000;
 const BID_TIMES = [15, 30, 45, 60, 90];
 const DEFAULT_BID_TIMER = 30;
@@ -93,6 +97,22 @@ function OnlineRoom({ code, isHost = false, tv = false, name, avatar, onLeave, o
   const [view, setView] = useState(null); // the public table as this device sees it
   const [myHand, setMyHand] = useState(null); // { hand: game hand number, cards }
   const [closed, setClosed] = useState(null); // { by }: the host ended the game
+  // Emojis and gifts on their way across the table: { id, from, to, item, gift }
+  const [reactions, setReactions] = useState([]);
+  const addReaction = (x) => {
+    const id = Math.random().toString(36).slice(2);
+    setReactions((list) => [...list.slice(-12), { ...x, id }]);
+    setTimeout(() => setReactions((list) => list.filter((y) => y.id !== id)), REACTION_MS);
+  };
+  const lastReaction = useRef(0);
+  /** Send an emoji (it pops up over you) or a gift (it flies to seat `to`). One every second at most. */
+  const react = (to, item, gift) => {
+    if (Date.now() - lastReaction.current < 1000 || mySeatRef.current < 0) return;
+    lastReaction.current = Date.now();
+    room.send({ type: 'o-react', to, item, gift });
+    addReaction({ from: mySeatRef.current, to, item, gift });
+  };
+  const mySeatRef = useRef(-1);
   const hostRef = useRef(null);
 
   // ----- Host: runs the game -----
@@ -128,6 +148,11 @@ function OnlineRoom({ code, isHost = false, tv = false, name, avatar, onLeave, o
     if (m.type === 'rtc') { call.handle(m); return; }
     if (statsSync(m, from)) return;
     if (iconMessage(m, from)) return;
+    if (m.type === 'o-react') {
+      const seatFrom = from && shown ? seatOf(shown, from.id) : -1;
+      if (seatFrom >= 0) addReaction({ from: seatFrom, to: m.to, item: String(m.item).slice(0, 8), gift: Boolean(m.gift) });
+      return;
+    }
     if (isHost) {
       if (!from) return;
       const t = tableRef.current;
@@ -149,7 +174,7 @@ function OnlineRoom({ code, isHost = false, tv = false, name, avatar, onLeave, o
         error = act((x) => placeBid(x, seat, m));
       } else if (m.type === 'o-play' && seat >= 0) {
         if (alreadyPlayed(t, seat, m.card)) return; // a resend of a card that arrived
-        error = act((x) => playCard(x, seat, m.card));
+        error = act((x) => playCard(x, seat, m.card, m.style));
       }
       if (error) room.send({ type: 'o-error', text: error }, from.id);
       return;
@@ -198,7 +223,11 @@ function OnlineRoom({ code, isHost = false, tv = false, name, avatar, onLeave, o
     if (!isHost || !table || !['bidding', 'playing'].includes(table.phase)) return undefined;
     const s = table.round.turn;
     if (!autoSeat(table, s)) return undefined;
-    let wait = table.round.trick.length === 0 && table.round.lastTrick && Date.now() - table.round.lastTrick.at < TRICK_SHOW_MS ? TRICK_SHOW_MS : BOT_DELAY_MS;
+    const lastShow = showMs(table.round.lastTrick);
+    let wait = table.round.trick.length === 0 && table.round.lastTrick && Date.now() - table.round.lastTrick.at < lastShow ? lastShow : BOT_DELAY_MS;
+    // A bot doesn't play on top of a Papi Flip that hasn't flipped yet.
+    const flipping = table.round.trick.at(-1)?.style === 'papi';
+    if (flipping) wait = Math.max(wait, PAPI_FLIP_MS + 300);
     // The first bid waits for the cards to finish being dealt.
     if (table.phase === 'bidding' && table.round.bidsIn === 0 && table.round.dealtAt) wait = Math.max(wait, table.round.dealtAt + DEAL_MS + 400 - Date.now());
     const timer = setTimeout(() => {
@@ -229,13 +258,14 @@ function OnlineRoom({ code, isHost = false, tv = false, name, avatar, onLeave, o
   // Host: once the last book has been seen, show the score for a few seconds, then deal the next hand.
   useEffect(() => {
     if (!isHost || table?.phase !== 'scored') return undefined;
-    const timer = setTimeout(() => act((x) => (x.phase === 'scored' ? deal(x) : x)), TRICK_SHOW_MS + NEXT_HAND_MS);
+    const timer = setTimeout(() => act((x) => (x.phase === 'scored' ? deal(x) : x)), showMs(tableRef.current.round?.lastTrick) + NEXT_HAND_MS);
     return () => clearTimeout(timer);
   }, [isHost, table?.phase, table?.game?.hands.length]);
 
   // ----- What this device shows -----
   const shown = isHost ? (table ? publicTable(table) : null) : view;
   const mySeat = shown && !tv ? seatOf(shown, me.id) : -1;
+  mySeatRef.current = mySeat;
   // Every device keeps the game for stats as hands are scored (computer players noted).
   const scoredHands = shown?.game ? shown.game.hands.filter((h) => !h.inPlay).length : 0;
   useEffect(() => {
@@ -262,7 +292,7 @@ function OnlineRoom({ code, isHost = false, tv = false, name, avatar, onLeave, o
   const [pending, setPending] = useState(null);
   const send = (type, body) => {
     if (isHost) {
-      const err = act((x) => (type === 'o-bid' ? placeBid(x, mySeat, body) : type === 'o-play' ? playCard(x, mySeat, body.card) : x));
+      const err = act((x) => (type === 'o-bid' ? placeBid(x, mySeat, body) : type === 'o-play' ? playCard(x, mySeat, body.card, body.style) : x));
       if (err) toast.show(err);
       return;
     }
@@ -333,7 +363,7 @@ function OnlineRoom({ code, isHost = false, tv = false, name, avatar, onLeave, o
         {shown.phase === 'lobby'
           ? <TvLobby code={code} table={shown} icons={icons} onPlayHere={() => { rememberTvScreen(false); call.leave(); onPlayHere(); }} />
           : <OnlineTable code={code} table={shown} mySeat={-1} cards={null} me={me} isHost={false} call={call} room={room} icons={icons}
-              present={present} send={() => {}} toast={toast} waiting={false} tv onLeave={onLeave} />}
+              present={present} send={() => {}} toast={toast} waiting={false} tv onLeave={onLeave} reactions={reactions} />}
         <TvControls call={call} onLeave={() => { call.leave(); onLeave(); }} />
       </div>
     );
@@ -359,7 +389,7 @@ function OnlineRoom({ code, isHost = false, tv = false, name, avatar, onLeave, o
               onUseAsTv();
             }} />
         : <OnlineTable code={code} table={shown} mySeat={mySeat} cards={cards} me={me} isHost={isHost} call={call} room={room} icons={icons}
-            present={present} send={send} toast={toast} waiting={Boolean(pending)}
+            present={present} send={send} toast={toast} waiting={Boolean(pending)} reactions={reactions} react={react}
             hostActions={isHost ? hostGameActions(act) : null} onLeave={leave} />}
       <ConnectionBanner room={room} isHost={isHost} hostPeer={hostPeer} onLeave={leave} />
       {toast.node}
@@ -661,7 +691,7 @@ function RulesSheetOnline({ rules, onSave, onClose }) {
 // ---------------------------------------------------------------------------------------------
 // The card table.
 
-function OnlineTable({ code, table, mySeat, cards, me, isHost, call, room, icons, present, send, toast, waiting, hostActions, onLeave, tv = false }) {
+function OnlineTable({ reactions = [], react, code, table, mySeat, cards, me, isHost, call, room, icons, present, send, toast, waiting, hostActions, onLeave, tv = false }) {
   const r = table.round;
   const game = table.game;
   const hand = currentHand(table);
@@ -685,10 +715,11 @@ function OnlineTable({ code, table, mySeat, cards, me, isHost, call, room, icons
   const st = standings(game);
 
   // Let the finished book sit on the table for a moment.
-  const showingLast = r?.lastTrick && r.trick.length === 0 && now - r.lastTrick.at < TRICK_SHOW_MS;
+  const lastShow = showMs(r?.lastTrick);
+  const showingLast = r?.lastTrick && r.trick.length === 0 && now - r.lastTrick.at < lastShow;
   useEffect(() => {
     if (!r?.lastTrick) return undefined;
-    const t = setTimeout(() => setNow(Date.now()), Math.max(0, TRICK_SHOW_MS - (Date.now() - r.lastTrick.at)) + 30);
+    const t = setTimeout(() => setNow(Date.now()), Math.max(0, lastShow - (Date.now() - r.lastTrick.at)) + 30);
     return () => clearTimeout(t);
   }, [r?.lastTrick?.at]);
 
@@ -698,6 +729,10 @@ function OnlineTable({ code, table, mySeat, cards, me, isHost, call, room, icons
   useEffect(() => { if (myTurn) { buzz(60); } }, [myTurn, r?.tricks.length, table.phase]);
 
   const handNo = game.hands.length;
+  // A slammed card lands with a thud (on every screen, as it lands).
+  const lastPlayed = r?.trick.at(-1) ?? (r?.lastTrick && Date.now() - r.lastTrick.at < 1000 ? r.lastTrick.cards.at(-1) : null);
+  const slamKey = lastPlayed?.style === 'slam' ? `${handNo}:${r.tricks.length}:${lastPlayed.seat}` : null;
+  useEffect(() => { if (slamKey) setTimeout(thud, 240); }, [slamKey]);
   const dealing = useDealing(`${game.id}:${handNo}`, table.phase === 'bidding' && r?.bidsIn === 0 && Date.now() - (r?.dealtAt ?? 0) < JUST_DEALT_MS);
   const bidTimer = table.settings.bidTimer ?? 0;
   const left = useCountdown(bidTimer && table.phase === 'bidding' ? `${handNo}:${r.turn}` : null, bidTimer, r?.bidsIn === 0 ? DEAL_MS : 0);
@@ -712,12 +747,18 @@ function OnlineTable({ code, table, mySeat, cards, me, isHost, call, room, icons
   const sorted = cards ? sortHand(cards) : [];
 
   const canAct = table.phase === 'playing' && myTurn && !sending;
-  const playCardNow = (card) => {
+  const playCardNow = (card, style) => {
     if (!legal.includes(card)) return;
     setSelected(null);
     setSending(true);
-    send('o-play', { card });
+    send('o-play', style ? { card, style } : { card });
   };
+  // Holding a card: pick a fancier way to play it.
+  const [holdCard, setHoldCard] = useState(null);
+  const [reactTo, setReactTo] = useState(null); // the seat a gift is for (yourself: just emojis)
+  const canReact = Boolean(react) && mySeat >= 0;
+  const tapSeat = (s) => { if (canReact && table.seats[s]) setReactTo(s); };
+  const onHold = (card) => (legal.includes(card) ? setHoldCard(card) : toast.show(refuseReason(table, cards)));
   const play = () => { if (selected) playCardNow(selected); };
   const videoOf = (id) => (id === me.id ? call.local : call.videos.find((v) => v.peer.id === id)?.stream);
   const peerOf = (id) => room.peers.find((p) => p.id === id);
@@ -727,7 +768,7 @@ function OnlineTable({ code, table, mySeat, cards, me, isHost, call, room, icons
   const fan = (list, row) => (
     <FannedHand key={row} cards={list} selected={selected} dealKey={`${handNo}${row}`} big={handView}
       onSelect={canAct ? (c) => setSelected(c && legal.includes(c) ? c : null) : undefined}
-      onPlay={canAct ? playCardNow : undefined} playable={legal}
+      onPlay={canAct ? playCardNow : undefined} playable={legal} onHold={canAct ? onHold : undefined}
       onRefuse={() => toast.show(refuseReason(table, cards))}
       dim={table.phase === 'playing' && myTurn ? list.filter((c) => !legal.includes(c)) : []} />
   );
@@ -764,7 +805,7 @@ function OnlineTable({ code, table, mySeat, cards, me, isHost, call, room, icons
   return (
     <>
       {handView ? (
-        <HandView table={table} st={st} myTurn={myTurn} left={left} hurry={hurry} call={call}
+        <HandView reactions={reactions} onReact={canReact ? () => setReactTo(mySeat) : null} mySeat={mySeat} table={table} st={st} myTurn={myTurn} left={left} hurry={hurry} call={call}
           handArea={handArea} actionArea={actionArea} onTable={() => setHandView(false)} onMore={() => setCallOpen(true)}
           onJoinCall={() => setJoinOpen(true)} entry={seatEntry(hand, mySeat)} />
       ) : <>
@@ -821,7 +862,7 @@ function OnlineTable({ code, table, mySeat, cards, me, isHost, call, room, icons
                   <span className="held-count">{held}</span>
                 </div>
               )}
-              <div className="avatar">
+              <div className={`avatar${canReact ? ' tappable' : ''}`} data-seat={s} onClick={() => tapSeat(s)}>
                 {turn && left != null && (
                   <svg className={`bid-clock${hurry ? ' hurry' : ''}`} viewBox="0 0 100 100" aria-label={`${left} seconds to bid`}>
                     <circle cx="50" cy="50" r="46" pathLength="100" style={{ strokeDashoffset: 100 - (100 * left) / bidTimer }} />
@@ -856,14 +897,18 @@ function OnlineTable({ code, table, mySeat, cards, me, isHost, call, room, icons
         })}
 
         {big && (
-          <BigVideos table={table} posOf={posOf} mySeat={mySeat} me={me} call={call} icons={icons}
+          <BigVideos onTap={tapSeat} table={table} posOf={posOf} mySeat={mySeat} me={me} call={call} icons={icons}
             videoOf={videoOf} peerOf={peerOf} left={left} hurry={hurry} />
         )}
         {dealing && <DealAnimation dealer={r.dealer} posOf={posOf} />}
+        <ReactionsLayer reactions={reactions} />
         <div className="trick">
-          {trickCards.map(({ seat, card }) => (
-            <div key={seat} className={`trick-card ${posOf(seat)}${showingLast && r.lastTrick.winner === seat ? ' won' : ''}`}>
-              <PlayingCard code={card} size="md" />
+          {trickCards.map(({ seat, card, style }) => (
+            <div key={seat} className={`trick-card ${posOf(seat)}${style ? ` play-${style}` : ''}${showingLast && r.lastTrick.winner === seat ? ' won' : ''}`}>
+              {style === 'papi' ? (
+                // The Papi Flip: lands face down, turns over after 3 seconds.
+                <div className="papi"><PlayingCard code={card} size="md" /><CardBack size="md" /></div>
+              ) : <PlayingCard code={card} size="md" />}
             </div>
           ))}
           {!trickCards.length && table.phase === 'playing' && (
@@ -913,6 +958,23 @@ function OnlineTable({ code, table, mySeat, cards, me, isHost, call, room, icons
           </div>
         </Sheet>
       )}
+      {reactTo != null && canReact && (
+        <ReactSheet table={table} mySeat={mySeat} icons={icons} to={reactTo} onTo={setReactTo}
+          onSend={(to, item, gift) => { react(to, item, gift); setReactTo(null); }} onClose={() => setReactTo(null)} />
+      )}
+      {holdCard && canAct && (
+        <Sheet title={`Play ${cardLabel(holdCard)} with…`} short onClose={() => setHoldCard(null)} closeLabel="Cancel">
+          <div className="play-styles">
+            {PLAY_STYLE_CHOICES.map((p) => (
+              <button key={p.id} type="button" className={`play-style style-${p.id}`} onClick={() => { const c = holdCard; setHoldCard(null); playCardNow(c, p.id === 'toss' ? null : p.id); }}>
+                <span className="play-style-icon">{p.icon}</span>
+                <b>{p.name}</b>
+                <span>{p.note}</span>
+              </button>
+            ))}
+          </div>
+        </Sheet>
+      )}
       {joinOpen && !call.joined && (
         <Sheet title="Video chat" short onClose={() => setJoinOpen(false)} closeLabel="Cancel">
           <div className="blind-confirm">
@@ -929,11 +991,87 @@ function OnlineTable({ code, table, mySeat, cards, me, isHost, call, room, icons
   );
 }
 
+const EMOJIS = ['😂', '😍', '👏', '🔥', '😮', '😢', '😎', '🙏', '👍', '🤔', '💪', '🎉'];
+const GIFTS = [
+  ['🌹', 'Rose'], ['☕', 'Coffee'], ['🍰', 'Cake'], ['🍕', 'Pizza'], ['🏆', 'Trophy'], ['💐', 'Flowers'],
+  ['👑', 'Crown'], ['🎈', 'Balloon'], ['🍪', 'Cookie'], ['🧁', 'Cupcake'], ['🍦', 'Ice cream'], ['💖', 'Love'],
+];
+
+/** Pick who and what: a gift for another player, or an emoji that pops up over you. */
+function ReactSheet({ table, mySeat, icons, to, onTo, onSend, onClose }) {
+  const others = SEATS.map((_, s) => s).filter((s) => s !== mySeat && table.seats[s]);
+  const forMe = to === mySeat;
+  return (
+    <Sheet title="Emojis & gifts" short onClose={onClose} closeLabel="Close">
+      <div className="react-sheet">
+        <div className="section-title">Say it</div>
+        <div className="react-grid emojis">
+          {EMOJIS.map((e) => <button key={e} type="button" onClick={() => onSend(null, e, false)} aria-label={`Send ${e}`}>{e}</button>)}
+        </div>
+        <div className="section-title">Send a gift to</div>
+        <div className="react-to">
+          {others.map((s) => (
+            <button key={s} type="button" className={`react-person t${teamOf(s)}${to === s ? ' on' : ''}`} onClick={() => onTo(s)}>
+              <Avatar value={icons[table.seats[s].id]} name={table.seats[s].name} bot={table.seats[s].bot} />
+              <span>{table.seats[s].name}</span>
+            </button>
+          ))}
+        </div>
+        <div className={`react-grid gifts${forMe ? ' waiting' : ''}`}>
+          {GIFTS.map(([e, name]) => (
+            <button key={e} type="button" disabled={forMe} onClick={() => onSend(to, e, true)} aria-label={`Send ${name}`}>
+              <span>{e}</span><small>{name}</small>
+            </button>
+          ))}
+        </div>
+        {forMe && <p className="footnote center">Pick who the gift is for.</p>}
+      </div>
+    </Sheet>
+  );
+}
+
+/** Emojis popping up over whoever sent them; gifts flying from sender to receiver. */
+function ReactionsLayer({ reactions }) {
+  return <div className="fx-layer" aria-hidden="true">{reactions.map((x) => <Reaction key={x.id} x={x} />)}</div>;
+}
+
+function Reaction({ x }) {
+  const ref = useRef(null);
+  const [at, setAt] = useState(null);
+  useLayoutEffect(() => {
+    const layer = ref.current?.parentElement;
+    if (!layer) return;
+    const box = layer.getBoundingClientRect();
+    const zoom = box.width / layer.offsetWidth || 1;
+    // A seat's big video tile if it's showing, otherwise its picture.
+    const spot = (s) => {
+      const el = [...layer.parentElement.querySelectorAll(`[data-seat="${s}"]`)].find((e) => e.offsetWidth > 0);
+      const r = el?.getBoundingClientRect();
+      return r ? [(r.left + r.width / 2 - box.left) / zoom, (r.top + r.height / 2 - box.top) / zoom] : null;
+    };
+    const from = spot(x.from);
+    const to = x.gift ? spot(x.to) : null;
+    if (from) setAt({ from, to });
+  }, []);
+  const style = at ? {
+    left: at.from[0], top: at.from[1],
+    '--dx': `${at.to ? at.to[0] - at.from[0] : 0}px`, '--dy': `${at.to ? at.to[1] - at.from[1] : 0}px`,
+  } : { visibility: 'hidden' };
+  return <span ref={ref} className={`fx ${x.gift && at?.to ? 'fx-gift' : 'fx-emoji'}`} style={style}>{x.item}</span>;
+}
+
+const PLAY_STYLE_CHOICES = [
+  { id: 'slam', icon: '💥', name: 'Slam', note: 'Bang it down on the table' },
+  { id: 'papi', icon: '🃏', name: 'The Papi Flip', note: 'Face down, flips over in 3 seconds' },
+  { id: 'spin', icon: '🌀', name: 'Spin', note: 'Twirl it in' },
+  { id: 'toss', icon: '✋', name: 'Toss', note: 'Just play it' },
+];
+
 /**
  * Hand view: only your cards, big, as if holding them, for when the table's on the TV. Swipe a card up to
  * throw it on the table. Bidding, the turn, the score and video chat are at hand; one tap goes back.
  */
-function HandView({ table, st, myTurn, left, hurry, call, handArea, actionArea, onTable, onMore, onJoinCall, entry }) {
+function HandView({ reactions, onReact, mySeat, table, st, myTurn, left, hurry, call, handArea, actionArea, onTable, onMore, onJoinCall, entry }) {
   const game = table.game;
   const status = myTurn ? (table.phase === 'bidding' ? 'Your bid' : 'Your turn') : turnText(table);
   const mine = table.phase === 'bidding' ? null : `${entry.books}/${isNil(entry.call) ? nilLabel(entry.call) : entry.bid}`;
@@ -945,6 +1083,7 @@ function HandView({ table, st, myTurn, left, hurry, call, handArea, actionArea, 
           {[0, 1].map((t) => <span key={t} className={`hv-score t${t}`}>{st[t].score}</span>)}
         </div>
         <div className="row hv-call">
+          {onReact && <button type="button" className="icon-btn round small hv-react" aria-label="Emojis and gifts" onClick={onReact}>😊</button>}
           {call.joined ? <MyCallButtons call={call} onMore={onMore} /> : (
             <button type="button" className="icon-btn round small" aria-label="Video chat" onClick={onJoinCall}><Icon name="video" size={18} /></button>
           )}
@@ -954,6 +1093,13 @@ function HandView({ table, st, myTurn, left, hurry, call, handArea, actionArea, 
         <b>{status}</b>{left != null && <span className={`dock-clock${hurry ? ' hurry' : ''}`}> · {left}s</span>}
         {mine && <span className="hv-mine">You {mine}</span>}
         <span className="hv-hand-no">Hand {game.hands.length}</span>
+      </div>
+      <div className="hv-feed" aria-live="polite">
+        {reactions.slice(-3).map((x) => (
+          <span key={x.id} className="hv-react-note">
+            {table.seats[x.from]?.name ?? '?'}{x.gift ? <> → {x.to === mySeat ? 'you' : table.seats[x.to]?.name}</> : null} <b>{x.item}</b>
+          </span>
+        ))}
       </div>
       <div className="hv-hand">{handArea}</div>
       <div className="hv-action">{actionArea}</div>
@@ -965,7 +1111,7 @@ function HandView({ table, st, myTurn, left, hurry, call, handArea, actionArea, 
 const CORNER = { bottom: 'bl', left: 'tl', top: 'tr', right: 'br' };
 
 /** Big video tiles in the table's corners (or a player's icon, big, when their camera is off). */
-function BigVideos({ table, posOf, mySeat, me, call, icons, videoOf, peerOf, left, hurry }) {
+function BigVideos({ onTap, table, posOf, mySeat, me, call, icons, videoOf, peerOf, left, hurry }) {
   const r = table.round;
   return (
     <div className="big-videos">
@@ -978,7 +1124,7 @@ function BigVideos({ table, posOf, mySeat, me, call, icons, videoOf, peerOf, lef
         const turn = r?.turn === s && ['bidding', 'playing'].includes(table.phase);
         const micOff = !mine && !who.bot && peerOf(who.id) && !peerOf(who.id).mic;
         return (
-          <div key={s} className={`big-tile ${CORNER[posOf(s)]} t${teamOf(s)}${turn ? ' turn' : ''}`}>
+          <div key={s} className={`big-tile ${CORNER[posOf(s)]} t${teamOf(s)}${turn ? ' turn' : ''}`} data-seat={s} onClick={() => onTap(s)}>
             {/* Audio plays from the video element even with the camera off, so it's always there. */}
             {stream && <VideoTile stream={stream} muted={mine || !call.speakerOn} mirrored={mine} className={showVideo ? '' : 'no-video'} />}
             {!showVideo && <Avatar value={icons[who.id]} name={who.name} bot={who.bot} className="big-icon" />}
