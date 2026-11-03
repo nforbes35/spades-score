@@ -928,7 +928,7 @@ function OnlineTable({ reactions = [], react, teases = {}, tease, code, table, m
               </span>
               <span className="team-score">
                 <b><CountUp value={st[t].score} /></b>
-                {game.rules.bagsEnabled && <small>{st[t].bags} bag{st[t].bags === 1 ? '' : 's'}</small>}
+                {game.rules.bagsEnabled && <BagMeter bags={st[t].bags} limit={game.rules.bagsLimit} />}
               </span>
             </div>
           ))}
@@ -1426,6 +1426,21 @@ function BookFly() {
     });
   }, []);
   return <span ref={ref} className="book-fly" style={at ?? { display: 'none' }} aria-hidden="true" />;
+}
+
+/**
+ * A team's bags as a row of dots that fill towards the penalty (amber when close, red one away), with the
+ * count beside them.
+ */
+function BagMeter({ bags, limit = 10 }) {
+  const n = Math.max(1, Math.min(limit || 10, 15));
+  const level = bags >= n - 1 ? ' bags-danger' : bags >= n - 3 ? ' bags-warn' : '';
+  return (
+    <span className={`bag-meter${level}`} aria-label={`${bags} of ${n} bags`}>
+      <span className="bag-dots" aria-hidden="true">{Array.from({ length: n }, (_, i) => <i key={i} className={i < bags ? 'on' : ''} />)}</span>
+      <span className="bag-count">{bags} bag{bags === 1 ? '' : 's'}</span>
+    </span>
+  );
 }
 
 /** The spade bluff over a player's video or picture, as strong as their slider says. */

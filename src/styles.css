@@ -2009,3 +2009,30 @@ button.choice:active { transform: scale(0.98); }
    Island and the rounded corners on both sides. */
 .app.online:not(.tv-mode) .online-top { padding-left: max(12px, calc(env(safe-area-inset-left) + 6px)); padding-right: max(12px, calc(env(safe-area-inset-right) + 6px)); }
 :root[data-layout='wide'] .hand-dock.online-dock { padding-left: max(12px, calc(env(safe-area-inset-left) + 6px)); padding-right: max(12px, calc(env(safe-area-inset-right) + 6px)); }
+
+/* ---------- Team scores (top bar): faces, a big score, and bags as dots filling towards the penalty ---------- */
+.app.online .online-team {
+  gap: 10px; padding: 6px 12px 6px 8px; border-radius: 14px; border: 1px solid rgba(255, 255, 255, 0.1);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--team) 26%, rgba(255, 255, 255, 0.06)), rgba(255, 255, 255, 0.04));
+  box-shadow: inset 0 3px 0 var(--team);
+}
+.app.online .online-team .team-score { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; line-height: 1; }
+.app.online .online-team .team-score b { font-size: 24px; font-weight: 900; letter-spacing: -0.02em; }
+.bag-meter { display: inline-flex; align-items: center; gap: 6px; opacity: 1 !important; max-width: none !important; }
+.bag-dots { display: inline-grid; grid-template-columns: repeat(5, 5px); gap: 2px; }
+.bag-dots i { width: 5px; height: 5px; border-radius: 50%; background: rgba(255, 255, 255, 0.22); }
+.bag-dots i.on { background: #fff; }
+.bag-count { font-size: 11px !important; font-weight: 800; opacity: 0.85 !important; white-space: nowrap; }
+.bag-meter.bags-warn .bag-dots i.on { background: #fbbf24; }
+.bag-meter.bags-warn .bag-count { color: #fbbf24; opacity: 1 !important; }
+.bag-meter.bags-danger .bag-dots i.on { background: #f87171; box-shadow: 0 0 4px rgba(248, 113, 113, 0.8); }
+.bag-meter.bags-danger .bag-count { color: #f87171; opacity: 1 !important; }
+.tv-mode .bag-dots { grid-template-columns: repeat(5, 7px); gap: 3px; }
+.tv-mode .bag-dots i { width: 7px; height: 7px; }
+.app.online .online-team .bag-meter span { max-width: none; overflow: visible; }
+.app.online .online-team { gap: 8px; padding: 6px 10px 6px 7px; }
+.app.online .online-team .team-faces .avatar-icon { width: 24px; height: 24px; }
+.app.online .online-meta > span:first-child { text-align: right; }
+.app.online .online-team .team-faces .avatar-icon + .avatar-icon { margin-left: -10px; }
+.bag-meter { gap: 5px; }
+.app.online .online-team .team-score { flex: none; overflow: visible; max-width: none; }
