@@ -115,3 +115,45 @@ test('a play style rides along with the card (unknown styles are ignored)', () =
   assert.equal(t.round.trick[0].style, 'papi');
   assert.equal(t.round.trick[1].style, undefined);
 });
+
+test('the Papi Flip mini game: Papi picks, two guess, +/-25, then the card flips', async () => {
+  const { playCardAsHost, papiPick, papiGuess, papiFinish, papiSeat } = await import('../src/lib/online.js');
+  let t = table4(seeded(11));
+  t = { ...t, seats: t.seats.map((s, i) => (i === 0 ? { id: 'p', name: 'Papi' } : s)) };
+  t = { ...t, papi: { at: 1, count: 0, done: false } };
+  assert.equal(papiSeat(t), 0);
+  const first = t.round.turn;
+  for (let i = 0; i < 4; i++) t = placeBid(t, (first + i) % 4, { bid: 3 });
+  // Play round to Papi (seat 0), making sure he isn't last in the book.
+  t = { ...t, round: { ...t.round, turn: 0, lead: 0, trick: [] } };
+  const card = legalCards(t, 0)[0];
+  t = playCardAsHost(t, 0, card, null, seeded(3));
+  const g = t.round.papiGame;
+  assert.equal(g.phase, 'pick');
+  assert.deepEqual(g.guessers, [2, g.guessers[1]]);
+  assert.ok([1, 3].includes(g.guessers[1]));
+  assert.equal(t.round.trick[0].style, 'papi-wait');
+  assert.throws(() => playCard(t, 1, legalCards({ ...t, round: { ...t.round, papiGame: null } }, 1)[0]), /Papi Flip/);
+  t = papiPick(t, 0, g.numbers[0]);
+  t = papiGuess(t, 2, g.numbers[0]);           // partner right: +25 for Papi's team
+  t = papiGuess(t, g.guessers[1], g.numbers[1]); // opponent wrong: -25 for theirs
+  assert.equal(t.round.papiGame.phase, 'reveal');
+  assert.deepEqual(t.game.hands.at(-1).bonus, [25, -25]);
+  t = papiFinish(t);
+  assert.equal(t.round.papiGame, undefined);
+  assert.equal(t.round.trick[0].style, 'papi-now');
+  assert.equal(t.papi.done, true);
+});
+
+test('no Papi Flip when a team is within 25 of winning', async () => {
+  const { playCardAsHost, papiAllowed } = await import('../src/lib/online.js');
+  let t = table4(seeded(12));
+  t = { ...t, seats: t.seats.map((s, i) => (i === 0 ? { id: 'p', name: 'papi' } : s)), papi: { at: 1, count: 0, done: false } };
+  t = { ...t, game: { ...t.game, target: 20 } }; // 0 points is already within 25 of 20
+  assert.equal(papiAllowed(t), false);
+  const first = t.round.turn;
+  for (let i = 0; i < 4; i++) t = placeBid(t, (first + i) % 4, { bid: 3 });
+  t = { ...t, round: { ...t.round, turn: 0, lead: 0, trick: [] } };
+  t = playCardAsHost(t, 0, legalCards(t, 0)[0], null, seeded(3));
+  assert.equal(t.round.papiGame, undefined);
+});

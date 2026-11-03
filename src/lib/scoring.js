@@ -100,7 +100,9 @@ export function history(game) {
   const bags = [0, 0];
   return game.hands.map((hand) =>
     [0, 1].map((t) => {
-      if (hand.inPlay) return { score: score[t], bags: bags[t], points: 0, penalty: 0 };
+      // Extra points won or lost during a hand (the Papi Flip mini game) count straight away.
+      const extra = hand.bonus?.[t] ?? 0;
+      if (hand.inPlay) { score[t] += extra; return { score: score[t], bags: bags[t], points: extra, penalty: 0 }; }
       const r = scoreTeam(hand.teams[t], game.rules);
       let penalty = 0;
       if (game.rules.bagsEnabled && game.rules.bagsLimit > 0) {
@@ -110,7 +112,7 @@ export function history(game) {
           penalty += game.rules.bagsPenalty;
         }
       }
-      const points = r.total - penalty;
+      const points = r.total - penalty + extra;
       score[t] += points;
       return { score: score[t], bags: bags[t], points, penalty };
     }),

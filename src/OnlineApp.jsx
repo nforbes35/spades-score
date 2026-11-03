@@ -4,7 +4,7 @@ import { read, write, tabRead, tabWrite } from './lib/store.js';
 import { standings, winner, signed, scoreTeam, isNil, nilLabel, STANDARD_RULES } from './lib/scoring.js';
 import { SEATS, teamOf, seatEntry } from './lib/table.js';
 import { sortHand, cardLabel } from './lib/cards.js';
-import { newTable, startGame, deal, placeBid, playCard, legalCards, backToLobby, publicTable, currentHand, ONLINE_RULES } from './lib/online.js';
+import { newTable, startGame, deal, placeBid, playCard, playCardAsHost, papiPick, papiGuess, papiFinish, legalCards, backToLobby, publicTable, currentHand, ONLINE_RULES } from './lib/online.js';
 import { botBid, botPlay, pickBotNames } from './lib/bots.js';
 import { useRoom, joinLink } from './lib/room.js';
 import { useDevice, rememberTvScreen } from './lib/device.js';
@@ -45,6 +45,9 @@ const PAPI_FLIP_MS = 3000;
 const showMs = (lastTrick) => (lastTrick?.cards.at(-1)?.style === 'papi' ? PAPI_FLIP_MS + 1200 : TRICK_SHOW_MS);
 const BANNER_DELAY_MS = 4000;
 const REACTION_MS = 3200;
+const PAPI_ANSWER_MS = 30000;
+const PAPI_REVEAL_MS = 5500;
+const BOT_GUESS_MS = 1800;
 const NOT_FOUND_MS = 15000;
 const BID_TIMES = [15, 30, 45, 60, 90];
 const DEFAULT_BID_TIMER = 30;
@@ -174,7 +177,11 @@ function OnlineRoom({ code, isHost = false, tv = false, name, avatar, onLeave, o
         error = act((x) => placeBid(x, seat, m));
       } else if (m.type === 'o-play' && seat >= 0) {
         if (alreadyPlayed(t, seat, m.card)) return; // a resend of a card that arrived
-        error = act((x) => playCard(x, seat, m.card, m.style));
+        error = act((x) => playCardAsHost(x, seat, m.card, m.style));
+      } else if (m.type === 'o-papi-pick' && seat >= 0) {
+        error = act((x) => (x.round?.papiGame?.phase === 'pick' ? papiPick(x, seat, m.n) : x));
+      } else if (m.type === 'o-papi-guess' && seat >= 0) {
+        error = act((x) => (x.round?.papiGame?.guesses?.[seat] == null ? papiGuess(x, seat, m.n) : x));
       }
       if (error) room.send({ type: 'o-error', text: error }, from.id);
       return;
@@ -220,7 +227,7 @@ function OnlineRoom({ code, isHost = false, tv = false, name, avatar, onLeave, o
   const present = new Set([me.id, ...room.peers.map((p) => p.id)]);
   const autoSeat = (t, s) => t.seats[s]?.bot || (t.seats[s] && !present.has(t.seats[s].id) && t.seats[s].standIn);
   useEffect(() => {
-    if (!isHost || !table || !['bidding', 'playing'].includes(table.phase)) return undefined;
+    if (!isHost || !table || !['bidding', 'playing'].includes(table.phase) || table.round.papiGame) return undefined;
     const s = table.round.turn;
     if (!autoSeat(table, s)) return undefined;
     const lastShow = showMs(table.round.lastTrick);
@@ -228,6 +235,8 @@ function OnlineRoom({ code, isHost = false, tv = false, name, avatar, onLeave, o
     // A bot doesn't play on top of a Papi Flip that hasn't flipped yet.
     const flipping = table.round.trick.at(-1)?.style === 'papi';
     if (flipping) wait = Math.max(wait, PAPI_FLIP_MS + 300);
+    // Just after the Papi Flip mini game, give everyone a look at the card that turned over.
+    if (table.round.trick.some((t) => t.style === 'papi-now') && table.round.trick.length < 4) wait = Math.max(wait, 2200);
     // The first bid waits for the cards to finish being dealt.
     if (table.phase === 'bidding' && table.round.bidsIn === 0 && table.round.dealtAt) wait = Math.max(wait, table.round.dealtAt + DEAL_MS + 400 - Date.now());
     const timer = setTimeout(() => {
@@ -254,6 +263,30 @@ function OnlineRoom({ code, isHost = false, tv = false, name, avatar, onLeave, o
     }, bidTimer * 1000 + BID_GRACE_MS + (tableRef.current.round.bidsIn === 0 ? DEAL_MS : 0));
     return () => clearTimeout(timer);
   }, [isHost, bidTimer, bidTurn]);
+
+  // Host: the Papi Flip mini game. Computer players (and anyone away) answer after a moment, anyone who doesn't
+  // answer gets a random pick after PAPI_ANSWER_MS, and the card flips PAPI_REVEAL_MS after the reveal.
+  const papiGame = table?.round?.papiGame;
+  const papiStep = papiGame ? `${papiGame.phase}:${Object.keys(papiGame.guesses).length}` : null;
+  useEffect(() => {
+    if (!isHost || !papiGame) return undefined;
+    const pickFor = (g) => g.numbers[Math.floor(Math.random() * 2)];
+    const timers = [];
+    const later = (ms, fn) => timers.push(setTimeout(() => act(fn), ms));
+    if (papiGame.phase === 'pick') {
+      const ms = autoSeat(table, papiGame.seat) ? BOT_GUESS_MS : PAPI_ANSWER_MS;
+      later(ms, (x) => (x.round?.papiGame?.phase === 'pick' ? papiPick(x, papiGame.seat, pickFor(x.round.papiGame)) : x));
+    } else if (papiGame.phase === 'guess') {
+      for (const s of papiGame.guessers) {
+        if (papiGame.guesses[s] != null) continue;
+        const ms = autoSeat(table, s) ? BOT_GUESS_MS + Math.random() * 1200 : PAPI_ANSWER_MS;
+        later(ms, (x) => (x.round?.papiGame?.phase === 'guess' && x.round.papiGame.guesses[s] == null ? papiGuess(x, s, pickFor(x.round.papiGame)) : x));
+      }
+    } else if (papiGame.phase === 'reveal') {
+      later(PAPI_REVEAL_MS, (x) => papiFinish(x));
+    }
+    return () => timers.forEach(clearTimeout);
+  }, [isHost, papiStep]);
 
   // Host: once the last book has been seen, show the score for a few seconds, then deal the next hand.
   useEffect(() => {
@@ -292,7 +325,8 @@ function OnlineRoom({ code, isHost = false, tv = false, name, avatar, onLeave, o
   const [pending, setPending] = useState(null);
   const send = (type, body) => {
     if (isHost) {
-      const err = act((x) => (type === 'o-bid' ? placeBid(x, mySeat, body) : type === 'o-play' ? playCard(x, mySeat, body.card, body.style) : x));
+      const err = act((x) => (type === 'o-bid' ? placeBid(x, mySeat, body) : type === 'o-play' ? playCardAsHost(x, mySeat, body.card, body.style)
+        : type === 'o-papi-pick' ? papiPick(x, mySeat, body.n) : type === 'o-papi-guess' ? papiGuess(x, mySeat, body.n) : x));
       if (err) toast.show(err);
       return;
     }
@@ -300,7 +334,8 @@ function OnlineRoom({ code, isHost = false, tv = false, name, avatar, onLeave, o
     setPending(move);
     if (hostRef.current) room.send(move, hostRef.current.id);
   };
-  const turnKey = shown ? `${shown.phase}:${shown.round?.turn}:${shown.round?.tricks.length}:${shown.round?.trick.length}:${shown.round?.bidsIn}` : '';
+  const pg = shown?.round?.papiGame;
+  const turnKey = shown ? `${shown.phase}:${shown.round?.turn}:${shown.round?.tricks.length}:${shown.round?.trick.length}:${shown.round?.bidsIn}:${pg?.phase}:${Object.keys(pg?.guesses ?? {}).length}` : '';
   useEffect(() => { setPending(null); }, [turnKey]);
   useEffect(() => {
     if (!pending) return undefined;
@@ -697,7 +732,7 @@ function OnlineTable({ reactions = [], react, code, table, mySeat, cards, me, is
   const hand = currentHand(table);
   const base = mySeat >= 0 ? mySeat : 0;
   const posOf = (s) => AREAS[(s - base + 4) % 4];
-  const myTurn = mySeat >= 0 && r?.turn === mySeat && ['bidding', 'playing'].includes(table.phase);
+  const myTurn = mySeat >= 0 && r?.turn === mySeat && ['bidding', 'playing'].includes(table.phase) && !r?.papiGame;
   const [selected, setSelected] = useState(null);
   const [sending, setSending] = useState(false);
   const [peeked, setPeeked] = useState(null); // hand number whose cards I've looked at
@@ -746,7 +781,7 @@ function OnlineTable({ reactions = [], react, code, table, mySeat, cards, me, is
     : [];
   const sorted = cards ? sortHand(cards) : [];
 
-  const canAct = table.phase === 'playing' && myTurn && !sending;
+  const canAct = table.phase === 'playing' && myTurn && !sending && !r?.papiGame;
   const playCardNow = (card, style) => {
     if (!legal.includes(card)) return;
     setSelected(null);
@@ -905,9 +940,10 @@ function OnlineTable({ reactions = [], react, code, table, mySeat, cards, me, is
         <div className="trick">
           {trickCards.map(({ seat, card, style }) => (
             <div key={seat} className={`trick-card ${posOf(seat)}${style ? ` play-${style}` : ''}${showingLast && r.lastTrick.winner === seat ? ' won' : ''}`}>
-              {style === 'papi' ? (
-                // The Papi Flip: lands face down, turns over after 3 seconds.
-                <div className="papi"><PlayingCard code={card} size="md" /><CardBack size="md" /></div>
+              {style?.startsWith('papi') ? (
+                // The Papi Flip: lands face down, turns over after 3 seconds ('papi'), or stays down for the mini
+                // game ('papi-wait') and turns over when it's done ('papi-now').
+                <div className={`papi ${style}`}><PlayingCard code={card} size="md" /><CardBack size="md" /></div>
               ) : <PlayingCard code={card} size="md" />}
             </div>
           ))}
@@ -958,6 +994,7 @@ function OnlineTable({ reactions = [], react, code, table, mySeat, cards, me, is
           </div>
         </Sheet>
       )}
+      {r?.papiGame && <PapiGame g={r.papiGame} table={table} mySeat={mySeat} icons={icons} send={send} />}
       {reactTo != null && canReact && (
         <ReactSheet table={table} mySeat={mySeat} icons={icons} to={reactTo} onTo={setReactTo}
           onSend={(to, item, gift) => { react(to, item, gift); setReactTo(null); }} onClose={() => setReactTo(null)} />
@@ -988,6 +1025,66 @@ function OnlineTable({ reactions = [], react, code, table, mySeat, cards, me, is
         <HandResult table={table} isHost={isHost} hostActions={hostActions} />
       )}
     </>
+  );
+}
+
+/**
+ * The Papi Flip mini game, on every screen: Papi picks one of two numbers in secret, his partner and one
+ * player from the other team guess it (+25 right, -25 wrong), then the card flips.
+ */
+function PapiGame({ g, table, mySeat, icons, send }) {
+  const name = (s) => (s === mySeat ? 'You' : table.seats[s]?.name ?? '?');
+  const papi = table.seats[g.seat]?.name ?? 'Papi';
+  const [mine, setMine] = useState(null); // the number this device picked or guessed
+  const iAmPapi = mySeat === g.seat;
+  const iGuess = g.guessers.includes(mySeat);
+  const choose = (type, n) => { setMine(n); send(type, { n }); };
+  const numbers = (onPick) => (
+    <div className="papi-numbers">
+      {g.numbers.map((n) => (
+        <button key={n} type="button" className={`papi-number${mine === n ? ' on' : ''}`} disabled={!onPick || mine != null} onClick={() => onPick?.(n)}>{n}</button>
+      ))}
+    </div>
+  );
+  let body;
+  if (g.phase === 'pick') {
+    body = iAmPapi
+      ? <><p>Pick your secret number. Your partner and one of the other team will try to guess it.</p>{numbers((n) => choose('o-papi-pick', n))}</>
+      : <><p><b>{papi}</b> is picking a secret number…</p>{numbers(null)}</>;
+  } else if (g.phase === 'guess') {
+    const waiting = g.guessers.filter((s) => g.guesses[s] == null);
+    body = iGuess && g.guesses[mySeat] == null && mine == null
+      ? <><p>Which number did <b>{papi}</b> pick? <span className="papi-stakes">+25 right · −25 wrong</span></p>{numbers((n) => choose('o-papi-guess', n))}</>
+      : <>
+          <p>{iAmPapi && mine != null ? <>You picked <b>{mine}</b>. </> : null}{waiting.length ? <>Waiting for {waiting.map(name).join(' and ')}…</> : 'Revealing…'}</p>
+          <div className="papi-guessers">
+            {g.guessers.map((s) => (
+              <span key={s} className={`papi-guesser t${teamOf(s)}`}>
+                <Avatar value={icons[table.seats[s]?.id]} name={table.seats[s]?.name ?? '?'} bot={table.seats[s]?.bot} />
+                {name(s)} {g.guesses[s] != null ? '✓' : '…'}
+              </span>
+            ))}
+          </div>
+        </>;
+  } else {
+    body = <>
+      <p className="papi-answer">{papi} picked <b>{g.pick}</b>!</p>
+      <div className="papi-results">
+        {g.guessers.map((s) => (
+          <div key={s} className={`papi-result t${teamOf(s)} ${g.results[s] > 0 ? 'won' : 'lost'}`}>
+            <Avatar value={icons[table.seats[s]?.id]} name={table.seats[s]?.name ?? '?'} bot={table.seats[s]?.bot} />
+            <span>{name(s)} guessed {g.guesses[s]}</span>
+            <b>{g.results[s] > 0 ? `✓ +${g.results[s]}` : `✗ ${g.results[s]}`}</b>
+          </div>
+        ))}
+      </div>
+    </>;
+  }
+  return (
+    <div className={`papi-game ${g.phase}`} role="dialog" aria-label="The Papi Flip">
+      <div className="papi-title">🃏 The Papi Flip!</div>
+      {body}
+    </div>
   );
 }
 
@@ -1206,6 +1303,7 @@ const hasBid = (table, s) => {
 };
 
 function turnText(table) {
+  if (table.round?.papiGame) return 'The Papi Flip!';
   const who = table.seats[table.round?.turn]?.name;
   if (table.phase === 'bidding') return `${who} is bidding`;
   if (table.phase === 'playing') return `${who}’s turn`;
@@ -1255,7 +1353,7 @@ function HandResult({ table, isHost, hostActions }) {
               <div key={t} className={`result-team t${t}`}>
                 <b>{game.teams[t].name}</b>
                 <span className={`points ${last[t].points < 0 ? 'neg' : 'pos'}`}>{signed(last[t].points)}</span>
-                <span className="muted small">{r.lines.join(' · ')}{last[t].penalty ? ` · bag penalty −${last[t].penalty}` : ''}</span>
+                <span className="muted small">{r.lines.join(' · ')}{last[t].penalty ? ` · bag penalty −${last[t].penalty}` : ''}{hand.bonus?.[t] ? ` · Papi Flip ${signed(hand.bonus[t])}` : ''}</span>
                 <span className="result-total">{last[t].score}</span>
               </div>
             );

@@ -42,6 +42,11 @@ plain words, keep text large and buttons big, check every screen fits a 320px ph
   rides with the card (`playCard(..., style)` → trick entries); a book ending in a Papi Flip stays up longer
   (`showMs`) and bots wait for a flip. Emojis/gifts: tap a picture → `ReactSheet`; `o-react` is broadcast to the
   room and each screen animates it (`ReactionsLayer`, positions from `[data-seat]`); one per second per device.
+- The Papi Flip mini game (online.js `playCardAsHost`, `papiPick`, `papiGuess`, `papiFinish`; `PapiGame` panel):
+  once a game, on a seated person named Papi's `table.papi.at`-th card (not the last card of a book, only while
+  both teams are > 25 from winning), his card lands face down ('papi-wait'); he picks 1 of 2 numbers, his partner
+  and a random opponent guess (+/-25 into `hand.bonus`, counted at once by scoring.js `history`), then it flips
+  ('papi-now'). publicTable hides the pick/guesses until the reveal; the host answers for bots/no-shows (30 s).
 - Rejoining: useRoom reconnects by itself (error/offline retry, back online, back to the app after 8 s away).
   Leaving mid-game keeps the seat (standIn: the computer plays). A device that says o-hello mid-game with the
   name of an away seat gets that seat (another browser/phone, e.g. iPhone home-screen app vs Safari). Home shows
