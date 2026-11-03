@@ -1932,3 +1932,21 @@ button.choice:active { transform: scale(0.98); }
 .big-videos.grid-2x2 .big-tile:is(.tr, .br) .big-played { grid-column: 1; justify-self: start; }
 .big-videos.grid-2x2 .big-tile:is(.tl, .tr) .big-title { top: auto; bottom: 0; border-bottom: 0; border-top: 2px solid var(--team); }
 .big-videos.grid-2x2 .big-tile:is(.tl, .tr) .big-secs { bottom: auto; top: 6px; }
+/* Large video chat on an upright phone (tiles round the table): each title bar runs down the tile's outside
+   edge (left tiles: the left edge, right tiles: the right edge), the text reading top to bottom. */
+:root[data-layout='tall'] .app.online:not(.tv-mode) .big-videos:is(.corners, .pairs) { --bar: 34px; }
+:root[data-layout='tall'] .app.online:not(.tv-mode) .big-videos:is(.corners, .pairs) .big-title {
+  top: 0; bottom: 0; left: 0; right: auto; width: var(--bar);
+  writing-mode: vertical-rl; flex-direction: row; align-items: center; justify-content: space-between; gap: 6px;
+  padding: 12px 0; border-bottom: 0; border-right: 2px solid var(--team);
+}
+:root[data-layout='tall'] .app.online:not(.tv-mode) .big-videos:is(.corners, .pairs) .big-tile:is(.tr, .br) .big-title { left: auto; right: 0; border-right: 0; border-left: 2px solid var(--team); }
+:root[data-layout='tall'] .app.online:not(.tv-mode) .big-videos:is(.corners, .pairs) .big-name { max-width: none; max-height: 100%; }
+:root[data-layout='tall'] .app.online:not(.tv-mode) .big-videos:is(.corners, .pairs) .big-score { padding: 8px 1px; }
+/* the things that sit in the tile's corners step clear of the bar */
+:root[data-layout='tall'] .app.online:not(.tv-mode) .big-videos:is(.corners, .pairs) .big-tile:is(.tl, .bl) :is(.big-mine) { left: calc(var(--bar) + 6px); }
+:root[data-layout='tall'] .app.online:not(.tv-mode) .big-videos:is(.corners, .pairs) .big-tile .spade-tease { top: 8px; }
+:root[data-layout='tall'] .app.online:not(.tv-mode) .big-videos:is(.corners, .pairs) .big-tile:is(.tr, .br) :is(.spade-tease, .big-secs) { right: calc(var(--bar) + 8px); }
+/* the face sits a little off the bar */
+:root[data-layout='tall'] .app.online:not(.tv-mode) .big-videos:is(.corners, .pairs) .big-tile:is(.tl, .bl) :is(.vtile, .big-icon) { left: var(--bar); }
+:root[data-layout='tall'] .app.online:not(.tv-mode) .big-videos:is(.corners, .pairs) .big-tile:is(.tr, .br) :is(.vtile, .big-icon) { right: var(--bar); }
