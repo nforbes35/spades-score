@@ -1987,3 +1987,20 @@ button.choice:active { transform: scale(0.98); }
 .felt.video-only .big-score .sc-books { display: inline-block; animation: book-pop 0.45s cubic-bezier(.2, 1.6, .4, 1); }
 @keyframes book-pop { 0% { scale: 1.9; color: #fff; text-shadow: 0 0 10px #fff; } 100% { scale: 1; } }
 @media (prefers-reduced-motion: reduce) { .book-fly { display: none; } .felt.video-only .big-score .sc-books { animation: none; } }
+
+/* ---------- Highlights: green for whose turn it is, gold for who won the trick ---------- */
+:root { --turn: #34d399; --turn-glow: rgba(52, 211, 153, 0.65); }
+.player-spot.turn .avatar { box-shadow: 0 0 0 3px var(--team), 0 0 0 5px rgba(0, 0, 0, 0.5), 0 0 30px var(--turn-glow); }
+.player-spot.turn .avatar::before { background: conic-gradient(from 0deg, var(--turn), transparent 30%, var(--turn) 50%, transparent 80%, var(--turn)); }
+.player-spot.turn .nameplate { border-color: var(--turn); }
+.bid-clock circle { stroke: var(--turn); filter: drop-shadow(0 0 4px var(--turn-glow)); }
+.big-tile.turn { box-shadow: 0 0 0 4px var(--turn), 0 0 26px var(--turn-glow); }
+/* the trick's winner (while the finished trick shows; they also lead next, so gold wins over green) */
+.player-spot.won .avatar { transform: scale(1.06); box-shadow: 0 0 0 3px var(--team), 0 0 0 5px rgba(0, 0, 0, 0.5), 0 0 0 9px var(--gold), 0 0 32px rgba(245, 184, 46, 0.85); }
+.player-spot.won .avatar::before {
+  content: ''; display: block; position: absolute; inset: -10px; border-radius: 50%; z-index: -1;
+  background: conic-gradient(from 0deg, var(--gold), #fff3c4 25%, var(--gold) 50%, #fff3c4 75%, var(--gold));
+  animation: turn-spin 1.6s linear infinite;
+}
+.player-spot.won .nameplate { border-color: var(--gold); }
+.big-tile.won, .big-tile.won.turn { box-shadow: 0 0 0 4px var(--gold), 0 0 30px rgba(245, 184, 46, 0.8); }

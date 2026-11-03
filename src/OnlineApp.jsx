@@ -963,7 +963,7 @@ function OnlineTable({ reactions = [], react, teases = {}, tease, code, table, m
           const stream = who && !who.bot && !big ? videoOf(who.id) : null;
           const held = s !== mySeat && !dealing && table.phase !== 'scored' && table.phase !== 'over' ? r?.counts?.[s] ?? 0 : 0;
           return (
-            <div key={s} className={`player-spot ${posOf(s)} t${teamOf(s)}${turn ? ' turn' : ''}${s === mySeat ? ' me' : ''}`}>
+            <div key={s} className={`player-spot ${posOf(s)} t${teamOf(s)}${turn ? ' turn' : ''}${showingLast && r.lastTrick.winner === s ? ' won' : ''}${s === mySeat ? ' me' : ''}`}>
               {held > 0 && !big && (
                 <div className="spot-backs" aria-label={`${held} cards`}>
                   {Array.from({ length: Math.min(held, 7) }, (_, k) => <CardBack key={k} size="xs" style={{ '--k': k - (Math.min(held, 7) - 1) / 2 }} />)}
@@ -1013,7 +1013,7 @@ function OnlineTable({ reactions = [], react, teases = {}, tease, code, table, m
           <BigVideos onTap={tapSeat} table={table} posOf={posOf} mySeat={mySeat} me={me} call={call} icons={icons}
             videoOf={videoOf} peerOf={peerOf} left={left} hurry={hurry} scoreText={scoreText} tv={tv} teases={teases} fill={videoOnly}
             played={videoOnly ? Object.fromEntries(trickCards.map((t) => [t.seat, t.card])) : null}
-            wonBy={videoOnly && showingLast ? r.lastTrick.winner : null} flyKey={flyUntil && Date.now() < flyUntil ? r.lastTrick.at : null}
+            wonBy={showingLast ? r.lastTrick.winner : null} flyKey={flyUntil && Date.now() < flyUntil ? r.lastTrick.at : null}
             onMore={() => setCallOpen(true)} />
         )}
         {dealing && <DealAnimation dealer={r.dealer} posOf={posOf} />}
@@ -1488,7 +1488,7 @@ function BigVideos({ onTap, table, posOf, mySeat, me, call, icons, videoOf, peer
         const rect = layout?.rects[CORNER[posOf(s)]];
         if (!rect) return null;
         return (
-          <div key={s} className={`big-tile ${CORNER[posOf(s)]} t${teamOf(s)}${turn ? ' turn' : ''}`} data-seat={s} onClick={() => onTap(s)} style={rect}>
+          <div key={s} className={`big-tile ${CORNER[posOf(s)]} t${teamOf(s)}${turn ? ' turn' : ''}${wonBy === s ? ' won' : ''}`} data-seat={s} onClick={() => onTap(s)} style={rect}>
             {stream && !showVideo && <SpeakingRings stream={stream} tile />}
             {/* Audio plays from the video element even with the camera off, so it's always there. */}
             {stream && <VideoTile stream={stream} muted={mine || !call.speakerOn} mirrored={mine} className={showVideo ? '' : 'no-video'} />}
