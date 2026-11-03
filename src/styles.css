@@ -1317,3 +1317,16 @@ button.choice:active { transform: scale(0.98); }
   .online-dock .bid-pad .big { min-height: 42px; }
   .online-dock .dock-action .dock-hint { font-size: 13px; text-align: center; }
 }
+
+/* Lost connection: a strip across the top until the game is back */
+.conn-banner {
+  position: fixed; z-index: 80; left: 0; right: 0; margin: 0 auto; width: fit-content; top: calc(8px + env(safe-area-inset-top));
+  display: flex; align-items: center; gap: 10px; max-width: calc(100% - 24px); padding: 8px 8px 8px 14px; border-radius: 999px;
+  background: rgba(20, 20, 24, 0.92); color: #fff; font-size: 14px; font-weight: 700; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); animation: fade 0.2s;
+}
+.conn-banner button { border: 0; border-radius: 999px; padding: 6px 12px; background: var(--btn, var(--gold, #f5b82e)); color: var(--btn-ink, #2a1a00); font-weight: 800; white-space: nowrap; }
+.spinner.small { width: 16px; height: 16px; border-width: 2px; flex-shrink: 0; }
+.rejoin-choice { padding: 0; gap: 0; border-color: var(--btn, var(--gold, #f5b82e)); box-shadow: 0 0 0 2px color-mix(in srgb, var(--btn, #f5b82e) 60%, transparent), 0 12px 30px rgba(0, 0, 0, 0.22); }
+.rejoin-go { flex: 1; display: flex; align-items: center; gap: 14px; min-width: 0; padding: 16px 6px 16px 16px; border: 0; background: none; color: inherit; text-align: left; }
+.rejoin-forget { align-self: stretch; padding: 0 16px; border: 0; background: none; color: inherit; opacity: 0.6; }

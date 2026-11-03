@@ -6,7 +6,7 @@ import { useDeck } from './lib/decks.js';
 const SHOWCASE = ['10S', 'JD', 'QC', 'KH', 'AS'];
 
 /** The first screen: pick how you're playing tonight. */
-export default function Home({ onPlayOnline, onTable, onJoin, onStats }) {
+export default function Home({ onPlayOnline, onTable, onJoin, onStats, rejoin, onRejoin, onForget }) {
   const [joining, setJoining] = useState(false);
   const [decksOpen, setDecksOpen] = useState(false);
   const [code, setCode] = useState('');
@@ -28,6 +28,18 @@ export default function Home({ onPlayOnline, onTable, onJoin, onStats }) {
       </div>
 
       <div className="home-choices">
+        {rejoin && (
+          <div className="choice rejoin-choice">
+            <button type="button" className="rejoin-go" onClick={onRejoin}>
+              <span className="choice-icon"><Icon name="users" size={26} /></span>
+              <span className="choice-text">
+                <b>Rejoin game {rejoin.code}</b>
+                <span>{rejoin.host ? 'You’re the host: pick up where you left off.' : 'Go back to your seat.'}</span>
+              </span>
+            </button>
+            <button type="button" className="rejoin-forget" aria-label="Forget this game" onClick={onForget}><Icon name="close" size={18} /></button>
+          </div>
+        )}
         <button type="button" className="choice primary-choice" onClick={onPlayOnline}>
           <span className="choice-icon"><Icon name="users" size={26} /></span>
           <span className="choice-text">

@@ -11,7 +11,7 @@ import { useDevice } from './lib/device.js';
 import { useCall } from './lib/call.js';
 import { useKeys, seal, unseal } from './lib/secret.js';
 import { useWakeLock, chime, buzz, dealSound, unlockSound } from './lib/fx.js';
-import { recordGame, useStatsSync } from './lib/stats.js';
+import { recordGame, useStatsSync, nameKey } from './lib/stats.js';
 import Stats from './Stats.jsx';
 import DeckPicker from './DeckPicker.jsx';
 import { useDeck } from './lib/decks.js';
@@ -24,6 +24,8 @@ import { history } from './lib/scoring.js';
 
 const ID_KEY = 'spades-device-id';
 const TV_ID_KEY = 'spades-tv-id';
+// The last online game on this device, for the home screen's Rejoin button.
+export const LAST_ONLINE_KEY = 'spades-last-online';
 const BOT_DELAY_MS = 900;
 const RESEND_MS = 2500;
 const RESYNC_MS = 5000;
@@ -34,6 +36,7 @@ const RIFFLE_MS = 450;
 const DEAL_GAP_MS = 28;
 const DEAL_MS = 2500;
 const TRICK_SHOW_MS = 1600;
+const BANNER_DELAY_MS = 4000;
 const BID_TIMES = [15, 30, 45, 60, 90];
 const DEFAULT_BID_TIMER = 30;
 // Extra time the host allows past the countdown, for a bid that's on its way.
@@ -124,11 +127,17 @@ function OnlineRoom({ code, isHost = false, tv = false, name, avatar, onLeave, o
       const t = tableRef.current;
       const seat = seatOf(t, from.id);
       let error = null;
-      if (m.type === 'o-hello') sendAll(t, from);
-      else if (m.type === 'o-sit') {
+      if (m.type === 'o-hello') {
+        // Back from another browser or phone (so a new device id): the seat of an away player with the same
+        // name is theirs again.
+        const back = seat < 0 && t.phase !== 'lobby' && from.role === 'oplayer' ? awaySeatNamed(t, from.name, room.peers, me.id) : -1;
+        if (back >= 0) act((x) => ({ ...x, seats: x.seats.map((y, i) => (i === back ? { ...y, id: from.id, standIn: false } : y)) }));
+        else sendAll(t, from);
+      } else if (m.type === 'o-sit') {
         error = act((x) => sit(x, m.seat, { id: from.id, name: String(m.name || from.name || '').trim().slice(0, 14) || 'Player' }));
       } else if (m.type === 'o-stand') {
-        error = act((x) => ({ ...x, seats: x.seats.map((s) => (s?.id === from.id ? null : s)) }));
+        // Mid-game the seat stays theirs: the computer plays it until they rejoin.
+        error = act((x) => ({ ...x, seats: x.seats.map((s) => (s?.id !== from.id ? s : x.phase === 'lobby' ? null : { ...s, standIn: true })) }));
       } else if (m.type === 'o-bid' && seat >= 0) {
         if (alreadyBid(t, seat, m.hand)) return; // a resend of a bid that arrived
         error = act((x) => placeBid(x, seat, m));
@@ -227,6 +236,7 @@ function OnlineRoom({ code, isHost = false, tv = false, name, avatar, onLeave, o
     : (myHand && myHand.hand === handNo ? myHand.cards : null);
   useWakeLock(true);
   const tvFit = useTvFit(tv);
+  useEffect(() => { if (!tv) write(LAST_ONLINE_KEY, { code, host: isHost, at: Date.now() }); }, [code, isHost, tv, handNo]);
 
   // Moves from this device. A player's move is resent until the table shows it (a phone that locks for a
   // moment or a weak signal can drop a message); the host ignores repeats.
@@ -274,11 +284,13 @@ function OnlineRoom({ code, isHost = false, tv = false, name, avatar, onLeave, o
     );
   }
 
+  const midGame = shown.phase !== 'lobby' && mySeat >= 0;
   const leave = () => {
-    if (!confirm(isHost ? 'Close this game for everyone?' : 'Leave this game?')) return;
+    if (!confirm(isHost ? 'Close this game for everyone?'
+      : midGame ? 'Leave this game? The computer plays your seat until you rejoin from the home screen.' : 'Leave this game?')) return;
     if (!isHost) room.send({ type: 'o-stand' }, hostPeer?.id);
     call.leave();
-    if (isHost) write(tableKey, null);
+    if (isHost) { write(tableKey, null); write(LAST_ONLINE_KEY, null); }
     onLeave();
   };
 
@@ -306,12 +318,45 @@ function OnlineRoom({ code, isHost = false, tv = false, name, avatar, onLeave, o
         : <OnlineTable code={code} table={shown} mySeat={mySeat} cards={cards} me={me} isHost={isHost} call={call} room={room} icons={icons}
             present={present} send={send} toast={toast} waiting={Boolean(pending)}
             hostActions={isHost ? hostGameActions(act) : null} onLeave={leave} />}
+      <ConnectionBanner room={room} isHost={isHost} hostPeer={hostPeer} />
       {toast.node}
     </div>
   );
 }
 
 const toastErr = (toast, err) => { if (err) toast.show(err); };
+
+/** The seat of a player who isn't here and goes by `name` (-1 if none): someone coming back on a new device. */
+function awaySeatNamed(t, name, peers, hostId) {
+  if (!name) return -1;
+  const here = new Set([hostId, ...peers.map((p) => p.id)]);
+  return t.seats.findIndex((x) => x && !x.bot && !here.has(x.id) && nameKey(x.name) === nameKey(name));
+}
+
+/**
+ * A strip across the top when this device has lost the game: the connection dropped, or (for players) the
+ * host's phone has gone quiet. It reconnects by itself; the button tries again right away.
+ */
+function ConnectionBanner({ room, isHost, hostPeer }) {
+  const offline = room.status === 'error' || room.status === 'offline' || room.status === 'connecting';
+  const lostHost = !isHost && !hostPeer;
+  const problem = offline ? 'offline' : lostHost ? 'host' : null;
+  // Only after a few seconds, so a quick blip doesn't flash a warning.
+  const [shown, setShown] = useState(null);
+  useEffect(() => {
+    if (!problem) { setShown(null); return undefined; }
+    const t = setTimeout(() => setShown(problem), BANNER_DELAY_MS);
+    return () => clearTimeout(t);
+  }, [problem]);
+  if (!shown) return null;
+  return (
+    <div className="conn-banner" role="status">
+      <span className="spinner small" />
+      <span>{shown === 'offline' ? 'Connection lost. Reconnecting…' : 'Waiting for the host’s phone to come back…'}</span>
+      <button type="button" onClick={room.reconnect}>Rejoin now</button>
+    </div>
+  );
+}
 
 /** Sit `who` in `seat` (moving them from any other seat). */
 function sit(t, seat, who) {

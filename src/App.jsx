@@ -22,7 +22,7 @@ import GuestApp from './GuestApp.jsx';
 import TvApp from './TvApp.jsx';
 import CardDisplayApp from './CardDisplayApp.jsx';
 import JoinAs from './JoinAs.jsx';
-import OnlineApp from './OnlineApp.jsx';
+import OnlineApp, { LAST_ONLINE_KEY } from './OnlineApp.jsx';
 import { makeCode } from './lib/room.js';
 import { ScoreCard, HandRow } from './Scoreboard.jsx';
 
@@ -62,10 +62,19 @@ export default function App() {
   if (join?.as === 'otv') return <OnlineApp code={join.code} tv onLeave={leave} />;
   if (join?.as === 'online') return <OnlineApp code={join.code} isHost={Boolean(join.host)} onLeave={leave} />;
   if (join?.code) return <JoinAs code={join.code} onChoose={(as, seat) => update({ code: join.code, as, seat })} onLeave={leave} />;
-  return <HostApp onJoin={(code) => update({ code })} onPlayOnline={() => update({ code: makeCode(), as: 'online', host: true })} />;
+  return <HostApp onJoin={(code) => update({ code })} onPlayOnline={() => update({ code: makeCode(), as: 'online', host: true })}
+    onRejoin={(last) => update({ code: last.code, as: 'online', host: last.host })} />;
 }
 
-function HostApp({ onJoin, onPlayOnline }) {
+// An online game played on this device in the last day can be rejoined from the home screen.
+const REJOIN_WINDOW_MS = 24 * 60 * 60 * 1000;
+function lastOnlineGame() {
+  const last = read(LAST_ONLINE_KEY);
+  return last?.code && Date.now() - last.at < REJOIN_WINDOW_MS ? last : null;
+}
+
+function HostApp({ onJoin, onPlayOnline, onRejoin }) {
+  const [lastOnline, setLastOnline] = useState(lastOnlineGame);
   const store = useGame();
   const [newGameOpen, setNewGameOpen] = useState(false);
   const [setup, setSetup] = useState(false);
@@ -77,7 +86,8 @@ function HostApp({ onJoin, onPlayOnline }) {
       <>
         {setup
           ? <NewGame lastSetup={store.lastSetup} onStart={store.start} onBack={() => setSetup(false)} />
-          : <Home onPlayOnline={onPlayOnline} onTable={() => setSetup(true)} onJoin={onJoin} onStats={() => setStatsOpen(true)} />}
+          : <Home onPlayOnline={onPlayOnline} onTable={() => setSetup(true)} onJoin={onJoin} onStats={() => setStatsOpen(true)}
+              rejoin={lastOnline} onRejoin={() => onRejoin(lastOnline)} onForget={() => { write(LAST_ONLINE_KEY, null); setLastOnline(null); }} />}
         {statsOpen && <Stats onClose={() => setStatsOpen(false)} />}
         {toast.node}
       </>

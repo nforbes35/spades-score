@@ -15,6 +15,9 @@ export const onlineReady = Boolean(URL && KEY);
 
 const BEAT_MS = 4000;
 const GONE_MS = 12000;
+const RETRY_MS = 3000;
+// Away from the app this long (a locked phone), the connection may have gone stale: reconnect on return.
+const SLEEP_MS = 8000;
 let client;
 
 /** Four letters, no look-alikes (I/L/O). */
@@ -112,6 +115,9 @@ export function useRoom(code, me, onMessage) {
   const meRef = useRef(me);
   meRef.current = me;
   const room = useRef(null);
+  // Bumped to drop the connection and open a fresh one (after a lost signal, or a phone that slept).
+  const [attempt, setAttempt] = useState(0);
+  const reconnect = useCallback(() => setAttempt((n) => n + 1), []);
 
   useEffect(() => {
     if (!code) return undefined;
@@ -123,12 +129,31 @@ export function useRoom(code, me, onMessage) {
     });
     room.current = r;
     return () => { r.close(); room.current = null; setPeers([]); };
-  }, [code, me.id]);
+  }, [code, me.id, attempt]);
+
+  // Lost the connection: try again every few seconds. Coming back online, or back to the app after the
+  // phone slept, reconnects straight away.
+  useEffect(() => {
+    if (!code || (status !== 'error' && status !== 'offline')) return undefined;
+    const t = setTimeout(reconnect, RETRY_MS);
+    return () => clearTimeout(t);
+  }, [code, status, reconnect]);
+  useEffect(() => {
+    if (!code) return undefined;
+    let hiddenAt = 0;
+    const onVisible = () => {
+      if (document.visibilityState === 'hidden') hiddenAt = Date.now();
+      else if (hiddenAt && Date.now() - hiddenAt > SLEEP_MS) reconnect();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    addEventListener('online', reconnect);
+    return () => { document.removeEventListener('visibilitychange', onVisible); removeEventListener('online', reconnect); };
+  }, [code, reconnect]);
 
   // Tell the others straight away when something about this device changes (joined video, muted…).
   const meKey = JSON.stringify(me);
   useEffect(() => { room.current?.announce(); }, [meKey]);
 
   const send = useCallback((m, to) => room.current?.send(m, to), []);
-  return { peers, status, send };
+  return { peers, status, send, reconnect };
 }

@@ -32,6 +32,10 @@ plain words, keep text large and buttons big, check every screen fits a 320px ph
   `OnlineRoom` with `tv`: own id key (`spades-tv-id`, so it's never mistaken for a player), never seated, call
   `receiveOnly`, the phone layout zoomed to fit (`useTvFit`, laid out for 720px high). In call.js a phone with an
   'otv' in the same place keeps mic/camera on and its speaker off; the TV plays everyone's sound.
+- Rejoining: useRoom reconnects by itself (error/offline retry, back online, back to the app after 8 s away).
+  Leaving mid-game keeps the seat (standIn: the computer plays). A device that says o-hello mid-game with the
+  name of an away seat gets that seat (another browser/phone, e.g. iPhone home-screen app vs Safari). Home shows
+  "Rejoin game" from `spades-last-online` for a day. ConnectionBanner shows when the room or host is lost.
 - Between hands: the last book shows TRICK_SHOW_MS, the score NEXT_HAND_MS (5 s), then the host deals. Each deal
   plays `DealAnimation` + `dealSound` (fx.js, synthesized); `round.dealtAt` makes the first bid and bid timer wait DEAL_MS.
 - Seasons & holidays (`src/lib/seasons.js`): photo themes like the Sunday Table project (same Unsplash photos, saved as
