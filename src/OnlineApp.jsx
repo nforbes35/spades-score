@@ -1000,7 +1000,7 @@ function useDealing(key, fresh) {
     seen.current = key;
     if (!fresh) return;
     setDealing(true);
-    dealSound({ cards: 52, gap: DEAL_GAP_MS / 1000, riffle: RIFFLE_MS / 1000 });
+    dealSound();
     setTimeout(() => setDealing(false), DEAL_MS); // not cleared: a re-render mustn't leave it dealing
   }, [key]);
   return dealing;

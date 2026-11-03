@@ -39,43 +39,59 @@ export function chime(high = false) {
 
 export const buzz = (pattern = 60) => { try { navigator.vibrate?.(pattern); } catch { /* not supported */ } };
 
-// Card sounds, made on the fly from short bursts of filtered noise (no sound files to download).
-let noise;
+// The shuffle at each deal: a real recording (public/sounds, CC0 from Kenney's Casino Audio), loaded once and
+// played through Web Audio so it starts on time.
+const SHUFFLE_URL = '/sounds/shuffle.m4a';
+let shuffleBuffer;
 const context = () => {
   audio ??= new (window.AudioContext || window.webkitAudioContext)();
   if (audio.state === 'suspended') audio.resume().catch(() => {});
   return audio;
 };
-function flick(a, at, volume, pitch) {
-  noise ??= (() => {
-    const buf = a.createBuffer(1, Math.round(a.sampleRate * 0.07), a.sampleRate);
-    const d = buf.getChannelData(0);
-    for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / d.length) ** 4;
-    return buf;
-  })();
-  const src = a.createBufferSource();
-  src.buffer = noise;
-  const filter = a.createBiquadFilter();
-  filter.type = 'bandpass';
-  filter.frequency.value = pitch * (0.85 + Math.random() * 0.3);
-  filter.Q.value = 1.1;
-  const gain = a.createGain();
-  gain.gain.value = volume;
-  src.connect(filter).connect(gain).connect(a.destination);
-  src.start(at);
+function loadShuffle(a) {
+  shuffleBuffer ??= fetch(SHUFFLE_URL)
+    .then((r) => r.arrayBuffer())
+    .then((data) => new Promise((resolve, reject) => a.decodeAudioData(data, resolve, reject)))
+    .catch(() => { shuffleBuffer = undefined; return null; });
+  return shuffleBuffer;
 }
 
-/** A quick riffle shuffle, then one flick for every card dealt (`gap` seconds apart, after `riffle` seconds). */
-export function dealSound({ cards = 52, gap = 0.028, riffle = 0.45 } = {}) {
+/** Shuffle sound for a new deal. */
+export function dealSound({ volume = 0.8 } = {}) {
   try {
     const a = context();
-    const t0 = a.currentTime + 0.02;
-    for (let i = 0; i < 22; i++) flick(a, t0 + i * 0.017, 0.1 + Math.random() * 0.05, 4200);
-    for (let i = 0; i < cards; i++) flick(a, t0 + riffle + i * gap, 0.28, 2100);
+    loadShuffle(a).then((buffer) => {
+      if (!buffer) return;
+      const src = a.createBufferSource();
+      src.buffer = buffer;
+      const gain = a.createGain();
+      gain.gain.value = volume;
+      src.connect(gain).connect(a.destination);
+      src.start();
+    });
   } catch { /* no sound available */ }
 }
 
-/** Browsers only allow sound after a tap: call this from one so later sounds can play. */
+/** Browsers only allow sound after a tap: call this from one so later sounds can play. Also loads the shuffle. */
 export function unlockSound() {
-  try { context(); } catch { /* no sound available */ }
+  try {
+    const a = context();
+    // iPhones also want something played during the tap: a moment of silence.
+    const src = a.createBufferSource();
+    src.buffer = a.createBuffer(1, 1, 22050);
+    src.connect(a.destination);
+    src.start();
+    loadShuffle(a);
+  } catch { /* no sound available */ }
+}
+
+// The first tap or key press anywhere unlocks sound for the rest of the visit.
+if (typeof window !== 'undefined') {
+  const prime = () => {
+    unlockSound();
+    removeEventListener('pointerdown', prime, true);
+    removeEventListener('keydown', prime, true);
+  };
+  addEventListener('pointerdown', prime, true);
+  addEventListener('keydown', prime, true);
 }
