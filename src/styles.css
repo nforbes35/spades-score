@@ -1777,11 +1777,11 @@ button.choice:active { transform: scale(0.98); }
 @media (prefers-reduced-motion: reduce) { .trick-card:is(.thrown, .play-spin, .play-papi, .play-papi-wait, .play-slam), .papi { animation-duration: 0.01s !important; } }
 
 /* ---------- The spade bluff: a slider under your cards fades a ♠ in over your video for everyone ---------- */
-.spade-bluff { display: flex; align-items: center; gap: 10px; width: 100%; max-width: 340px; margin: 4px auto 0; color: #fff; }
+.spade-bluff { display: flex; align-items: center; gap: 8px; width: 46%; max-width: 200px; margin: 4px 4px 0 auto; color: #fff; }
 .spade-bluff .sb-min { font-size: 13px; opacity: 0.45; }
 .spade-bluff .sb-max { font-size: 22px; line-height: 1; }
 .spade-bluff input { flex: 1; min-width: 0; height: 26px; margin: 0; accent-color: var(--btn, #2f9e62); }
-.hand-view .spade-bluff { margin-top: 12px; max-width: 420px; }
+.hand-view .spade-bluff { margin: 12px 4px 0 auto; max-width: 220px; }
 /* A black spade with a white glow, so it shows on any video or picture */
 .spade-tease {
   position: absolute; left: 50%; top: 50%; z-index: 1; width: 74%; height: 74%; translate: -50% -50%; pointer-events: none;
