@@ -88,6 +88,7 @@ export function unlockSound() {
     src.connect(a.destination);
     src.start();
     loadDeal(a);
+    loadGlass(a);
   } catch { /* no sound available */ }
 }
 
@@ -123,17 +124,43 @@ export function thud() {
   } catch { /* no sound available */ }
 }
 
-/**
- * Glass breaking (spades broken), made on the spot: a sharp crack, a burst of shattering noise, then dozens of
- * small shards tinkling down for about a second, each a short high ring at its own pitch and moment.
- * Only while the app is on screen.
- */
-export function glassBreak({ delay = 0, volume = 0.6 } = {}) {
+// Glass breaking (spades broken): a real recording of a small pane shattering (public/sounds/glass.m4a).
+const GLASS_URL = '/sounds/glass.m4a';
+let glassBuffer;
+function loadGlass(a) {
+  glassBuffer ??= fetch(GLASS_URL)
+    .then((r) => r.arrayBuffer())
+    .then((data) => new Promise((resolve, reject) => a.decodeAudioData(data, resolve, reject)))
+    .catch(() => { glassBuffer = undefined; return null; });
+  return glassBuffer;
+}
+
+/** Glass shattering, `delay` seconds from now. Only while the app is on screen. */
+export function glassBreak({ delay = 0, volume = 0.8 } = {}) {
   if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return;
   try {
     const a = context();
     if (a.state !== 'running') return;
-    const t0 = a.currentTime + delay;
+    const at = a.currentTime + delay;
+    loadGlass(a).then((buffer) => {
+      if (a.state !== 'running' || a.currentTime > at + 0.3 || document.visibilityState !== 'visible') return;
+      if (!buffer) { glassSynth(a, Math.max(at, a.currentTime)); return; } // (couldn't load the recording)
+      const src = a.createBufferSource();
+      src.buffer = buffer;
+      const gain = a.createGain();
+      gain.gain.value = volume;
+      src.connect(gain).connect(a.destination);
+      src.start(Math.max(at, a.currentTime));
+    });
+  } catch { /* no sound available */ }
+}
+
+/**
+ * A stand-in shatter made on the spot, for when the recording can't load: a sharp crack, a burst of
+ * shattering noise, then dozens of small shards tinkling down.
+ */
+function glassSynth(a, t0, volume = 0.6) {
+  try {
     const out = a.createGain();
     out.gain.value = volume;
     // A little room, so it doesn't sound like it's inside the phone

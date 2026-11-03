@@ -1,3 +1,5 @@
 deal.m4a: made from the "card-slide" recordings in Casino Audio by Kenney (www.kenney.nl), Creative Commons Zero
 (CC0): the crisp part of each slide, laid out as 14 cards landing about 10 a second with small changes in timing,
 pitch and volume, softened (highs rolled off above ~3 kHz, gentle onsets), levelled and converted to AAC.
+
+glass.m4a: "Small Glass Pane Shatter", supplied by Nick for the family game; trimmed to 1.25 s with a short fade-out and converted to AAC.
