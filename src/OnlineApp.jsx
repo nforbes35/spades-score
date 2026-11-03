@@ -27,7 +27,7 @@ const ID_KEY = 'spades-device-id';
 const TV_ID_KEY = 'spades-tv-id';
 // The last online game on this device, for the home screen's Rejoin button.
 const TABLE_MODE_KEY = 'spades-table-mode'; // 'full', 'backdrop' (no table, just the theme) or 'video' (just the video chat)
-const TV_BIG_VIDEO_KEY = 'spades-tv-big-video'; // the TV remembers its own choice
+const TV_VIEW_KEY = 'spades-tv-view'; // the TV remembers its own view: 'table', 'chat' (table + chat) or 'video' (video chat only)
 export const LAST_ONLINE_KEY = 'spades-last-online';
 const BOT_DELAY_MS = 900;
 const RESEND_MS = 2500;
@@ -333,7 +333,8 @@ function OnlineRoom({ code, isHost = false, tv = false, name, avatar, onLeave, o
     : (myHand && myHand.hand === handNo ? myHand.cards : null);
   useWakeLock(true);
   const tvFit = useTvFit(tv);
-  const [tvBig, setTvBig] = useState(() => read(TV_BIG_VIDEO_KEY) === true);
+  const [tvView, setTvViewState] = useState(() => read(TV_VIEW_KEY) ?? (read('spades-tv-big-video') === true ? 'chat' : 'table'));
+  const setTvView = (v) => { setTvViewState(v); write(TV_VIEW_KEY, v); };
   const tableLayout = useTableLayout();
   // No host after a while: the game may be over (an old link or code).
   const [slow, setSlow] = useState(false);
@@ -422,9 +423,9 @@ function OnlineRoom({ code, isHost = false, tv = false, name, avatar, onLeave, o
         {shown.phase === 'lobby'
           ? <TvLobby code={code} table={shown} icons={icons} onPlayHere={() => { rememberTvScreen(false); call.leave(); onPlayHere(); }} />
           : <OnlineTable code={code} table={shown} mySeat={-1} cards={null} me={me} isHost={false} call={call} room={room} icons={icons}
-              present={present} send={() => {}} toast={toast} waiting={false} tv tvBig={tvBig} onLeave={onLeave} reactions={reactions} teases={teases} />}
+              present={present} send={() => {}} toast={toast} waiting={false} tv tvView={tvView} onLeave={onLeave} reactions={reactions} teases={teases} />}
         <TvControls call={call} onLeave={() => { call.leave(); onLeave(); }}
-          big={shown.phase === 'lobby' ? null : tvBig} onBig={(on) => { setTvBig(on); write(TV_BIG_VIDEO_KEY, on); }} />
+          view={shown.phase === 'lobby' ? null : tvView} onView={setTvView} />
       </div>
     );
   }
@@ -751,7 +752,7 @@ function RulesSheetOnline({ rules, onSave, onClose }) {
 // ---------------------------------------------------------------------------------------------
 // The card table.
 
-function OnlineTable({ reactions = [], react, teases = {}, tease, code, table, mySeat, cards, me, isHost, call, room, icons, present, send, toast, waiting, hostActions, onLeave, tv = false, tvBig = false }) {
+function OnlineTable({ reactions = [], react, teases = {}, tease, code, table, mySeat, cards, me, isHost, call, room, icons, present, send, toast, waiting, hostActions, onLeave, tv = false, tvView = 'table' }) {
   const r = table.round;
   const game = table.game;
   const hand = currentHand(table);
@@ -771,8 +772,8 @@ function OnlineTable({ reactions = [], react, teases = {}, tease, code, table, m
   // How much of the table to show on this device (••• menu), remembered for next time.
   const [tableMode, setTableModeState] = useState(() => (tv ? 'full' : read(TABLE_MODE_KEY) ?? 'full'));
   const setTableMode = (m) => { setTableModeState(m); write(TABLE_MODE_KEY, m); };
-  const videoOnly = !tv && tableMode === 'video';
-  const big = videoOnly || (tv && tvBig); // video tiles: video chat only here, or the TV's large video chat
+  const videoOnly = tv ? tvView === 'video' : tableMode === 'video';
+  const big = videoOnly || (tv && tvView === 'chat'); // video tiles: video chat only, or the TV's table + chat
   // A seat's books/bid ('bidding…' or '–' until they've bid), for its nameplate or its big video tile.
   const scoreText = (s) => {
     const entry = seatEntry(hand, s);
@@ -951,7 +952,7 @@ function OnlineTable({ reactions = [], react, teases = {}, tease, code, table, m
         </div>
       </header>
 
-      <div className={`felt${big ? ' big-on' : ''}${tableMode !== 'full' ? ' no-table' : ''}${videoOnly ? ' video-only' : ''}`}>
+      <div className={`felt${big ? ' big-on' : ''}${tableMode !== 'full' || videoOnly ? ' no-table' : ''}${videoOnly ? ' video-only' : ''}`}>
         <div className="table-oval" aria-hidden="true">
           <span className="table-logo">♠</span>
           {deck.verse && <p className="table-verse">“{deck.verse}”<small>{deck.verseRef}</small></p>}
@@ -1788,16 +1789,18 @@ function TvLobby({ code, table, icons, onPlayHere }) {
 }
 
 /** Small controls in the corner, and a note until a key press lets the TV play sound. */
-function TvControls({ call, onLeave, big, onBig }) {
+function TvControls({ call, onLeave, view, onView }) {
   const needsPress = useTvStart(call);
+  // The TV's views: the table, the table with big videos round it, or just the videos (tap again: the table)
+  const viewButton = (v, icon, label) => (
+    <button type="button" className={`tv-big${view === v ? ' on' : ''}`} onClick={() => onView(view === v ? 'table' : v)} aria-pressed={view === v}>
+      <Icon name={icon} size={18} /> {label}
+    </button>
+  );
   return (
     <>
       <div className="tv-corner">
-        {big != null && (
-          <button type="button" className={`tv-big${big ? ' on' : ''}`} onClick={() => onBig(!big)} aria-pressed={big}>
-            <Icon name="video" size={18} /> Large video chat
-          </button>
-        )}
+        {view != null && <>{viewButton('chat', 'video', 'Table + Chat')}{viewButton('video', 'users', 'Video chat only')}</>}
         <button type="button" onClick={call.toggleSpeaker} aria-label={call.speakerOn ? 'Turn sound off' : 'Turn sound on'}>
           <Icon name={call.speakerOn ? 'speaker' : 'speakerOff'} size={18} />
         </button>
