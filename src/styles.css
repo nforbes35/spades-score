@@ -2036,3 +2036,16 @@ button.choice:active { transform: scale(0.98); }
 .app.online .online-team .team-faces .avatar-icon + .avatar-icon { margin-left: -10px; }
 .bag-meter { gap: 5px; }
 .app.online .online-team .team-score { flex: none; overflow: visible; max-width: none; }
+/* (score and bag dots side by side on one row: a shorter, wider score box) */
+.app.online .online-team { padding: 4px 14px 4px 6px; gap: 9px; }
+.app.online .online-team .team-score { flex-direction: row; align-items: center; gap: 10px; }
+.app.online .online-team .team-score b { font-size: 24px; }
+.app.online .bag-dots { grid-template-columns: repeat(5, 6px); gap: 3px; }
+.app.online .bag-dots i { width: 6px; height: 6px; }
+.app.online .online-team .team-faces { flex: none; }
+.app.online .online-team { padding: 4px 12px 4px 5px; gap: 7px; }
+.app.online .online-team .team-score { gap: 8px; }
+.app.online .bag-dots { grid-template-columns: repeat(5, 5px); gap: 2.5px; }
+.app.online .bag-dots i { width: 5px; height: 5px; }
+.app.online .online-team .team-faces .avatar-icon + .avatar-icon { margin-left: -11px; }
+:root[data-layout='tall'] .app.online:not(.tv-mode) .online-meta { max-width: 66px; font-size: 11.5px; }

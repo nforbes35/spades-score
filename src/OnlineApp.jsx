@@ -1438,7 +1438,6 @@ function BagMeter({ bags, limit = 10 }) {
   return (
     <span className={`bag-meter${level}`} aria-label={`${bags} of ${n} bags`}>
       <span className="bag-dots" aria-hidden="true">{Array.from({ length: n }, (_, i) => <i key={i} className={i < bags ? 'on' : ''} />)}</span>
-      <span className="bag-count">{bags} bag{bags === 1 ? '' : 's'}</span>
     </span>
   );
 }
