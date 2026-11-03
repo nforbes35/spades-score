@@ -42,6 +42,8 @@ const DEAL_MS = 2500;
 // (A little slack: the host's clock and this phone's may differ by a second or two.)
 const JUST_DEALT_MS = 6000;
 const TRICK_SHOW_MS = 1600;
+const BOOK_FLY_DELAY_MS = 450;
+const BOOK_FLY_MS = 800;
 // A book ending in a Papi Flip stays up until the card has flipped and been seen.
 const PAPI_FLIP_MS = 3000;
 const showMs = (lastTrick) => (lastTrick?.cards.at(-1)?.style === 'papi' ? PAPI_FLIP_MS + 1200 : TRICK_SHOW_MS);
@@ -775,7 +777,11 @@ function OnlineTable({ reactions = [], react, teases = {}, tease, code, table, m
   const scoreText = (s) => {
     const entry = seatEntry(hand, s);
     const call = isNil(entry.call) ? nilLabel(entry.call) : entry.bid;
-    if (table.phase !== 'bidding') return <>{entry.books}<small>/{call}</small></>;
+    if (table.phase !== 'bidding') {
+      // Video chat only: the winner's new book only shows once the gold has flown into it (see BookFly)
+      const books = entry.books - (flyUntil && Date.now() < flyUntil && s === r.lastTrick.winner ? 1 : 0);
+      return <><span key={books} className="sc-books">{books}</span><small>/{call}</small></>;
+    }
     if (hasBid(table, s)) return isNil(entry.call) ? call : `bid ${call}`;
     return table.round?.turn === s ? 'bidding…' : '–';
   };
@@ -786,6 +792,15 @@ function OnlineTable({ reactions = [], react, teases = {}, tease, code, table, m
   // Let the finished book sit on the table for a moment.
   const lastShow = showMs(r?.lastTrick);
   const showingLast = r?.lastTrick && r.trick.length === 0 && now - r.lastTrick.at < lastShow;
+  // Video chat only: when a book is won, the winning card's gold outline flies into the winner's books count
+  // (BOOK_FLY_DELAY_MS after the trick ends, for BOOK_FLY_MS), and the count goes up as it lands.
+  const flyUntil = videoOnly && showingLast ? r.lastTrick.at + BOOK_FLY_DELAY_MS + BOOK_FLY_MS : 0;
+  const [, setFlyTick] = useState(0);
+  useEffect(() => {
+    if (!flyUntil) return undefined;
+    const t = setTimeout(() => setFlyTick((x) => x + 1), Math.max(0, flyUntil - Date.now()) + 20);
+    return () => clearTimeout(t);
+  }, [flyUntil]);
   useEffect(() => {
     if (!r?.lastTrick) return undefined;
     const t = setTimeout(() => setNow(Date.now()), Math.max(0, lastShow - (Date.now() - r.lastTrick.at)) + 30);
@@ -998,7 +1013,7 @@ function OnlineTable({ reactions = [], react, teases = {}, tease, code, table, m
           <BigVideos onTap={tapSeat} table={table} posOf={posOf} mySeat={mySeat} me={me} call={call} icons={icons}
             videoOf={videoOf} peerOf={peerOf} left={left} hurry={hurry} scoreText={scoreText} tv={tv} teases={teases} fill={videoOnly}
             played={videoOnly ? Object.fromEntries(trickCards.map((t) => [t.seat, t.card])) : null}
-            wonBy={videoOnly && showingLast ? r.lastTrick.winner : null}
+            wonBy={videoOnly && showingLast ? r.lastTrick.winner : null} flyKey={flyUntil && Date.now() < flyUntil ? r.lastTrick.at : null}
             onMore={() => setCallOpen(true)} />
         )}
         {dealing && <DealAnimation dealer={r.dealer} posOf={posOf} />}
@@ -1384,6 +1399,30 @@ function SpeakingRings({ stream, tile = false }) {
     );
 }
 
+/**
+ * The gold outline of the winning card, flying into its player's books count: it starts as the card's box,
+ * shrinks to a dot and turns white on the way, and is gone as the number goes up.
+ */
+function BookFly() {
+  const ref = useRef(null);
+  const [at, setAt] = useState(null);
+  useLayoutEffect(() => {
+    const tile = ref.current?.parentElement;
+    const from = tile?.querySelector('.big-played');
+    const to = tile?.querySelector('.sc-books');
+    if (!from || !to) return;
+    const t = tile.getBoundingClientRect(), a = from.getBoundingClientRect(), b = to.getBoundingClientRect();
+    const k = tile.offsetWidth / (t.width || 1); // (zoomed tables)
+    setAt({
+      '--fx': `${(a.left + a.width / 2 - t.left) * k}px`, '--fy': `${(a.top + a.height / 2 - t.top) * k}px`,
+      '--fw': `${a.width * k}px`, '--fh': `${a.height * k}px`,
+      '--tx': `${(b.left + b.width / 2 - t.left) * k}px`, '--ty': `${(b.top + b.height / 2 - t.top) * k}px`,
+      '--delay': `${BOOK_FLY_DELAY_MS}ms`, '--dur': `${BOOK_FLY_MS}ms`,
+    });
+  }, []);
+  return <span ref={ref} className="book-fly" style={at ?? { display: 'none' }} aria-hidden="true" />;
+}
+
 /** The spade bluff over a player's video or picture, as strong as their slider says. */
 function SpadeTease({ level }) {
   return (
@@ -1397,7 +1436,7 @@ function SpadeTease({ level }) {
 const CORNER = { bottom: 'bl', left: 'tl', top: 'tr', right: 'br' };
 
 /** Big video tiles in the table's corners (or a player's icon, big, when their camera is off). */
-function BigVideos({ onTap, table, posOf, mySeat, me, call, icons, videoOf, peerOf, left, hurry, scoreText, tv, onMore, teases = {}, fill = false, played = null, wonBy = null }) {
+function BigVideos({ onTap, table, posOf, mySeat, me, call, icons, videoOf, peerOf, left, hurry, scoreText, tv, onMore, teases = {}, fill = false, played = null, wonBy = null, flyKey = null }) {
   const r = table.round;
   const box = useRef(null);
   const [layout, setLayout] = useState(null);
@@ -1462,6 +1501,7 @@ function BigVideos({ onTap, table, posOf, mySeat, me, call, icons, videoOf, peer
               <span className="big-score">{scoreText(s)}</span>
             </div>
             {turn && left != null && <span className={`big-secs${hurry ? ' hurry' : ''}`}>{left}</span>}
+            {flyKey && wonBy === s && <BookFly key={flyKey} />}
             {/* your own mic, camera and ••• ride on your tile */}
             {mine && call.joined && <div className="big-mine" onClick={(e) => e.stopPropagation()}><MyCallButtons call={call} onMore={onMore} /></div>}
           </div>

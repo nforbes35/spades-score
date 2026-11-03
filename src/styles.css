@@ -1970,3 +1970,20 @@ button.choice:active { transform: scale(0.98); }
 .felt.video-only .big-videos.grid-2x2 .big-tile:is(.tr, .br) .big-name { grid-column: 2; justify-self: end; }
 /* (measured from the whole bar, not a grid cell) */
 .felt.video-only .big-videos .big-tile .big-title .big-played { grid-column: auto; grid-row: auto; }
+
+/* Video chat only: a won book's gold outline flies into the winner's books count, becoming the new number */
+.book-fly {
+  position: absolute; z-index: 6; left: var(--fx); top: var(--fy); width: var(--fw); height: var(--fh); translate: -50% -50%;
+  border: 3px solid var(--gold); border-radius: 12px; box-shadow: 0 0 16px rgba(245, 184, 46, 0.9), inset 0 0 10px rgba(245, 184, 46, 0.5);
+  pointer-events: none; opacity: 0; animation: book-fly var(--dur) cubic-bezier(.55, 0, .35, 1) var(--delay) both;
+}
+@keyframes book-fly {
+  0% { opacity: 1; }
+  70% { border-color: #fff3c4; box-shadow: 0 0 14px rgba(255, 240, 190, 0.9); }
+  88% { opacity: 1; }
+  100% { left: var(--tx); top: var(--ty); width: 12px; height: 12px; border-radius: 50%; border-color: #fff; background: #fff; box-shadow: 0 0 12px #fff; opacity: 0; }
+}
+/* the count pops as the new number arrives */
+.felt.video-only .big-score .sc-books { display: inline-block; animation: book-pop 0.45s cubic-bezier(.2, 1.6, .4, 1); }
+@keyframes book-pop { 0% { scale: 1.9; color: #fff; text-shadow: 0 0 10px #fff; } 100% { scale: 1; } }
+@media (prefers-reduced-motion: reduce) { .book-fly { display: none; } .felt.video-only .big-score .sc-books { animation: none; } }
