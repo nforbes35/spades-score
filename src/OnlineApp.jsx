@@ -858,8 +858,7 @@ function OnlineTable({ code, table, mySeat, cards, me, isHost, call, room, icons
       {blindAsk && myTurn && table.phase === 'bidding' && (
         <Sheet title="Bid blind nil?" short onClose={() => setBlindAsk(false)} closeLabel="Cancel">
           <div className="blind-confirm">
-            <p>You’d bid <b>without looking at your cards</b>.</p>
-            <p>Take no books and your team gets <b className="pos">+{table.settings.rules.blindNilValue}</b>. Take even one and your team loses <b className="neg">−{table.settings.rules.blindNilValue}</b>.</p>
+            <p className="center">Are you sure?</p>
             <button type="button" className="danger big" onClick={() => { setBlindAsk(false); send('o-bid', { call: 'blind' }); }}>Yes, bid blind nil</button>
             <button type="button" className="secondary big" onClick={() => { setBlindAsk(false); setPeeked(handNo); }}>No, show my cards</button>
           </div>
