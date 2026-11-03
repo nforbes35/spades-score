@@ -230,8 +230,10 @@ export function CardBack({ size = 'md', className = '', style }) { // style can 
 const FAN_SPREAD_DEG = 12;
 const FAN_DROP = 9;
 const SUIT_GAP = 5;
-// Swipe a card this far up (in card heights) to play it; less and it drops back into the hand.
-const PLAY_LINE = 0.75;
+// Swipe a card this far up (in card heights, at most PLAY_DIST_MAX px) to play it; less and it drops back
+// into the hand. A quick flick upward plays it too.
+const PLAY_LINE = 0.4;
+const FLICK_SPEED = 0.6; // px per ms, upward
 // How far a finger must move up before a slide along the hand becomes a swipe.
 const SWIPE_START = 18;
 const STICKY_PX = 5;
@@ -244,10 +246,10 @@ const STICKY_PX = 5;
 const HOLD_MS = 480;
 // A mouse rests still before a drag more often than a finger does: wait longer before opening the menu.
 const HOLD_MOUSE_MS = 750;
-const PLAY_DIST_MAX = 72;
+const PLAY_DIST_MAX = 40;
 const HOLD_SLOP = 8;
 
-export function FannedHand({ cards, selected, onSelect, disabled, dim = [], dealKey, onPlay, playable, onRefuse, onHold, big = false }) {
+export function FannedHand({ cards, selected, onSelect, disabled, dim = [], dealKey, onPlay, playable, onRefuse, onHold, big = false, aside = null }) {
   const box = useRef(null);
   const [width, setWidth] = useState(340);
   const short = useShortScreen();
@@ -260,6 +262,14 @@ export function FannedHand({ cards, selected, onSelect, disabled, dim = [], deal
   const gesture = useRef(null);
   const holdTimer = useRef(null);
   const stopHold = () => { clearTimeout(holdTimer.current); holdTimer.current = null; };
+  // The cards fly in when a hand is dealt, and only then (left on, a card leaving the hand could replay it).
+  const [dealAnim, setDealAnim] = useState(dealKey != null);
+  useEffect(() => {
+    if (dealKey == null) return undefined;
+    setDealAnim(true);
+    const t = setTimeout(() => setDealAnim(false), 500 + 13 * 45 + 150);
+    return () => clearTimeout(t);
+  }, [dealKey]);
   useLayoutEffect(() => {
     const el = box.current;
     if (!el) return undefined;
@@ -269,12 +279,14 @@ export function FannedHand({ cards, selected, onSelect, disabled, dim = [], deal
   }, [dealKey]);
 
   const n = cards.length;
+  // Room kept at the right for `aside` (the cards centre in what's left, with it just past them).
+  const fanW = aside ? Math.max(120, width - 48) : width;
   // A phone on its side has little height: smaller cards, so the table still fits above them.
   // Hand view: big cards, overlapping more, as if held in the hand.
   // The biggest card that still shows every card's corner (each needs ~30% of a card's width uncovered),
   // leaving room at the edges for the fan's tilt.
-  const cardW = big ? Math.round(Math.min(170, bigMaxW, Math.max(64, (width - 64 - (n - 1) * 4) / (1 + (n - 1) * 0.3))))
-    : short ? 58 : Math.round(Math.min(88, Math.max(62, width / 4.8)));
+  const cardW = big ? Math.round(Math.min(170, bigMaxW, Math.max(64, (fanW - 64 - (n - 1) * 4) / (1 + (n - 1) * 0.3))))
+    : short ? 58 : Math.round(Math.min(88, Math.max(62, fanW / 4.8)));
   const cardH = Math.round(cardW * 1.4);
   // How far up to drag a card to play it: most of a small card's height, but never a long drag (big cards in
   // the hand view, a zoomed computer screen).
@@ -282,9 +294,9 @@ export function FannedHand({ cards, selected, onSelect, disabled, dim = [], deal
   const suitOf = (c) => c.slice(-1);
   const gapsBefore = cards.map((c, i) => cards.slice(0, i + 1).filter((x, j) => j > 0 && suitOf(x) !== suitOf(cards[j - 1])).length);
   const gaps = gapsBefore[n - 1] ?? 0;
-  const step = n > 1 ? Math.min(cardW * 0.6, (width - cardW - gaps * SUIT_GAP - 8) / (n - 1)) : 0;
+  const step = n > 1 ? Math.min(cardW * 0.6, (fanW - cardW - gaps * SUIT_GAP - 8) / (n - 1)) : 0;
   const total = cardW + step * Math.max(0, n - 1) + gaps * SUIT_GAP;
-  const left0 = (width - total) / 2;
+  const left0 = (fanW - total) / 2 + (width - fanW) / 2 - (aside ? 24 : 0);
   const mid = (n - 1) / 2;
   const lefts = cards.map((_, i) => left0 + i * step + gapsBefore[i] * SUIT_GAP);
   const swipeable = Boolean(onPlay) && !disabled;
@@ -333,6 +345,11 @@ export function FannedHand({ cards, selected, onSelect, disabled, dim = [], deal
     const dx = (e.clientX - g.x) / z;
     const dy = (e.clientY - g.y) / z;
     if (Math.abs(dx) > HOLD_SLOP || Math.abs(dy) > HOLD_SLOP) stopHold();
+    // How fast the finger is going up or down right now (for flicks)
+    const now = performance.now();
+    if (g.lastT) g.vy = (e.clientY - g.lastY) / z / Math.max(1, now - g.lastT);
+    g.lastY = e.clientY;
+    g.lastT = now;
     if (!g.swiping && -dy > SWIPE_START && Math.abs(dy) > Math.abs(dx) * 0.8) g.swiping = true;
     if (g.swiping) {
       setTouch({ card: g.card, dx, dy: Math.min(dy, 0), swiping: true });
@@ -355,7 +372,8 @@ export function FannedHand({ cards, selected, onSelect, disabled, dim = [], deal
     if (!g) return;
     const dy = (e.clientY - g.y) / zoomOf();
     setTouch(null);
-    if (g.swiping && -dy > playDist) {
+    const flick = (g.vy ?? 0) < -FLICK_SPEED && -dy > SWIPE_START;
+    if (g.swiping && (-dy > playDist || flick)) {
       if (canPlay(g.card)) {
         setFlying(g.card);
         buzzOnce(25);
@@ -375,7 +393,7 @@ export function FannedHand({ cards, selected, onSelect, disabled, dim = [], deal
 
   const pastLine = touch?.swiping && -touch.dy > playDist;
   return (
-    <div ref={box} key={dealKey} className={`fan${dealKey != null ? ' dealing' : ''}${swipeable ? ' swipeable' : ''}`}
+    <div ref={box} key={dealKey} className={`fan${dealAnim ? ' dealing' : ''}${swipeable ? ' swipeable' : ''}`}
       style={{ height: cardH + FAN_DROP + 26 }}
       onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={cancel} onLostPointerCapture={cancel}
       onContextMenu={(e) => {
@@ -413,6 +431,11 @@ export function FannedHand({ cards, selected, onSelect, disabled, dim = [], deal
             }} />
         );
       })}
+      {/* Something kept just past the last card (the spade bluff slider, sideways), clear of the swipes */}
+      {aside && (
+        <div className="fan-aside" style={{ left: Math.min(width - 34, left0 + total + 18) }}
+          onPointerDown={(e) => e.stopPropagation()} onContextMenu={(e) => e.stopPropagation()}>{aside}</div>
+      )}
     </div>
   );
 }

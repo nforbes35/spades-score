@@ -1789,3 +1789,17 @@ button.choice:active { transform: scale(0.98); }
   filter: drop-shadow(0 0 1.5px #fff) drop-shadow(0 0 6px #fff) drop-shadow(0 0 14px rgba(255, 255, 255, 0.7));
 }
 .big-tile .spade-tease { width: auto; height: 62%; max-width: 80%; top: calc(50% + 14px); }
+/* Sideways and on computers: a short upright slider just past your last card (full strength at the top) */
+.fan-aside { position: absolute; top: 46%; translate: 0 -50%; z-index: 120; touch-action: none; }
+/* Playing (no bid pad): the cards stay centred across the whole width, and the Play button that appears
+   after tapping a card floats in the space to their left instead of pushing them over */
+:root[data-layout='wide'] .hand-dock.online-dock:not(:has(.dock-action .bid-pad)) { grid-template-columns: minmax(0, 1fr); }
+:root[data-layout='wide'] .online-dock:not(:has(.dock-action .bid-pad)) .dock-action:not(:empty) {
+  position: absolute; grid-column: 1 / -1; grid-row: 1 / -1; /* (measured from the whole dock, not a grid cell) */
+  left: calc(10px + env(safe-area-inset-left)); top: 50%; translate: 0 -50%; width: 132px; z-index: 130;
+}
+:root[data-layout='wide'] .online-dock:not(:has(.dock-action .bid-pad)) .dock-action .primary.big { min-height: 48px; padding: 0 12px; }
+:root[data-layout='wide'] .spade-bluff { flex-direction: column-reverse; width: 30px; gap: 4px; align-self: center; margin: 0; }
+:root[data-layout='wide'] .spade-bluff input { flex: none; width: 26px; height: 78px; writing-mode: vertical-lr; direction: rtl; }
+:root[data-layout='wide'] .spade-bluff .sb-max { font-size: 18px; }
+:root[data-layout='wide'] .hand-view .spade-bluff input { height: 120px; }

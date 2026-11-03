@@ -835,8 +835,17 @@ function OnlineTable({ reactions = [], react, teases = {}, tease, code, table, m
   const trickCards = showingLast ? r.lastTrick.cards : r?.trick ?? [];
 
   const { layout } = useTableLayout();
+  // The spade bluff slider: under your cards when upright, just to their right when sideways.
+  const bluff = tease && cards && !dealing && !coverCards && ['bidding', 'playing'].includes(table.phase) && (
+    <label className="spade-bluff">
+      <span className="sb-min" aria-hidden="true">♠</span>
+      <input type="range" min="0" max="1" step="0.01" value={teases[mySeat] ?? 0} onChange={(e) => tease(Number(e.target.value))}
+        aria-label="Spade bluff: fade a spade in over your video" />
+      <span className="sb-max" aria-hidden="true">♠</span>
+    </label>
+  );
   const fan = (list, row) => (
-    <FannedHand key={row} cards={list} selected={selected} dealKey={`${handNo}${row}`} big={handView}
+    <FannedHand key={row} cards={list} selected={selected} dealKey={`${handNo}${row}`} big={handView} aside={layout === 'wide' ? bluff : null}
       onSelect={canAct ? (c) => setSelected(c && legal.includes(c) ? c : null) : undefined}
       onPlay={canAct ? playCardNow : undefined} playable={legal} onHold={canAct ? onHold : undefined}
       onRefuse={() => toast.show(refuseReason(table, cards))}
@@ -868,24 +877,16 @@ function OnlineTable({ reactions = [], react, teases = {}, tease, code, table, m
             {myTurn && table.phase === 'bidding' && !coverCards && <BidPad onBid={(b) => send('o-bid', b)} />}
             {myTurn && table.phase === 'playing' && (selected
               ? <button type="button" className="primary big go" disabled={sending} onClick={play}>Play <CardText code={selected} /></button>
-              : <p className="dock-hint">Swipe a card up to play it, or tap it. Dimmed cards can’t be played.</p>)}
+              // (sideways and on computers the cards speak for themselves: no hint, so they can sit centred)
+              : layout !== 'wide' && <p className="dock-hint">Swipe a card up to play it, or tap it. Dimmed cards can’t be played.</p>)}
     </>
-  );
-  // The spade bluff slider, under your cards, any time in the hand.
-  const bluff = tease && cards && !dealing && !coverCards && ['bidding', 'playing'].includes(table.phase) && (
-    <label className="spade-bluff">
-      <span className="sb-min" aria-hidden="true">♠</span>
-      <input type="range" min="0" max="1" step="0.01" value={teases[mySeat] ?? 0} onChange={(e) => tease(Number(e.target.value))}
-        aria-label="Spade bluff: fade a spade in over your video" />
-      <span className="sb-max" aria-hidden="true">♠</span>
-    </label>
   );
 
   return (
     <>
       {handView ? (
         <HandView reactions={reactions} onReact={canReact ? () => setReactTo(mySeat) : null} mySeat={mySeat} table={table} st={st} myTurn={myTurn} left={left} hurry={hurry} call={call}
-          handArea={<>{handArea}{bluff}</>} actionArea={actionArea} onTable={() => setHandView(false)} onMore={() => setCallOpen(true)}
+          handArea={<>{handArea}{layout !== 'wide' && bluff}</>} actionArea={actionArea} onTable={() => setHandView(false)} onMore={() => setCallOpen(true)}
           onJoinCall={() => setJoinOpen(true)} entry={seatEntry(hand, mySeat)} />
       ) : <>
       <header className="online-top">
@@ -1029,7 +1030,7 @@ function OnlineTable({ reactions = [], react, teases = {}, tease, code, table, m
             <span>{cards ? `${cards.length} cards` : ''}</span>
           </div>
           {handArea}
-          {bluff}
+          {layout !== 'wide' && bluff}
           <div className="dock-action">{actionArea}</div>
         </div>
       )}
