@@ -1897,3 +1897,20 @@ button.choice:active { transform: scale(0.98); }
 .big-played.won .card-chip { box-shadow: 0 0 0 2px var(--gold), 0 0 10px rgba(245, 184, 46, 0.7); }
 .tv-mode .big-played .card-chip { font-size: 22px; }
 @keyframes played-in { from { opacity: 0; scale: 0.6; } }
+/* Four across (video chat only, sideways and on computers): a much bigger title bar, sized to the tile.
+   Short tiles (sideways phones) keep it on one line so faces stay clear; tall ones (computers) give the
+   name its own line with the played card and books/bid under it. */
+.big-videos.grid-4x1 .big-tile { container-type: size; }
+.big-videos.grid-4x1 .big-title { padding: clamp(5px, 2.5cqw, 12px) clamp(8px, 3.5cqw, 16px); gap: clamp(4px, 2cqw, 10px); border-bottom-width: 3px; }
+.big-videos.grid-4x1 :is(.big-name, .big-score, .big-played .card-chip) { font-size: clamp(15px, min(8.5cqw, 10cqh), 30px); }
+.big-videos.grid-4x1 .big-score { padding: 2px 0.5em; }
+.big-videos.grid-4x1 .big-played .card-chip { padding: 1px 0.35em; border-radius: 8px; }
+.big-videos.grid-4x1 .big-dealer { width: 1.2em; height: 1.2em; font-size: 0.7em; }
+.big-videos.grid-4x1 .big-name svg { width: 0.9em; height: 0.9em; }
+@container (min-height: 280px) {
+  .big-videos.grid-4x1 .big-title { flex-wrap: wrap; row-gap: clamp(4px, 2cqw, 8px); padding: clamp(7px, 4cqw, 18px) clamp(8px, 3.5cqw, 18px); }
+  .big-videos.grid-4x1 :is(.big-name, .big-score, .big-played .card-chip) { font-size: clamp(17px, 10.5cqw, 36px); }
+  .big-videos.grid-4x1 .big-name { flex: 1 0 100%; }
+  .big-videos.grid-4x1 .big-score { margin-left: auto; }
+  .big-videos.grid-4x1 .big-played { margin-left: 0; }
+}
