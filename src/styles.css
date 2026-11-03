@@ -2079,3 +2079,8 @@ button.choice:active { transform: scale(0.98); }
 .app.online.tv-mode .online-team .bag-dots i { width: 9px; height: 9px; }
 .app.online.tv-mode .online-scores { gap: 14px; }
 .app.online.tv-mode .online-meta > span:first-child { font-size: 17px; }
+
+/* TV, video chat only: 1×4 or 2×2 */
+.tv-mode .tv-grid-pick { display: inline-flex; padding: 2px; gap: 2px; border-radius: 999px; background: rgba(255, 255, 255, 0.14); }
+.tv-mode .tv-grid-pick button { width: auto; height: 32px; padding: 0 12px; border-radius: 999px; background: none; font-weight: 800; font-size: 15px; }
+.tv-mode .tv-grid-pick button.on { background: var(--btn, #2f9e62); color: var(--btn-ink, #fff); }

@@ -27,6 +27,7 @@ const ID_KEY = 'spades-device-id';
 const TV_ID_KEY = 'spades-tv-id';
 // The last online game on this device, for the home screen's Rejoin button.
 const TABLE_MODE_KEY = 'spades-table-mode'; // 'full', 'backdrop' (no table, just the theme) or 'video' (just the video chat)
+const TV_GRID_KEY = 'spades-tv-grid'; // video chat only on the TV: '4x1' (four across) or '2x2'
 const TV_VIEW_KEY = 'spades-tv-view'; // the TV remembers its own view: 'table', 'chat' (table + chat) or 'video' (video chat only)
 export const LAST_ONLINE_KEY = 'spades-last-online';
 const BOT_DELAY_MS = 900;
@@ -335,6 +336,8 @@ function OnlineRoom({ code, isHost = false, tv = false, name, avatar, onLeave, o
   const tvFit = useTvFit(tv);
   const [tvView, setTvViewState] = useState(() => read(TV_VIEW_KEY) ?? (read('spades-tv-big-video') === true ? 'chat' : 'table'));
   const setTvView = (v) => { setTvViewState(v); write(TV_VIEW_KEY, v); };
+  const [tvGrid, setTvGridState] = useState(() => read(TV_GRID_KEY) ?? '4x1');
+  const setTvGrid = (g) => { setTvGridState(g); write(TV_GRID_KEY, g); };
   const tableLayout = useTableLayout();
   // No host after a while: the game may be over (an old link or code).
   const [slow, setSlow] = useState(false);
@@ -423,9 +426,9 @@ function OnlineRoom({ code, isHost = false, tv = false, name, avatar, onLeave, o
         {shown.phase === 'lobby'
           ? <TvLobby code={code} table={shown} icons={icons} onPlayHere={() => { rememberTvScreen(false); call.leave(); onPlayHere(); }} />
           : <OnlineTable code={code} table={shown} mySeat={-1} cards={null} me={me} isHost={false} call={call} room={room} icons={icons}
-              present={present} send={() => {}} toast={toast} waiting={false} tv tvView={tvView} onLeave={onLeave} reactions={reactions} teases={teases} />}
+              present={present} send={() => {}} toast={toast} waiting={false} tv tvView={tvView} tvGrid={tvGrid} onLeave={onLeave} reactions={reactions} teases={teases} />}
         <TvControls call={call} onLeave={() => { call.leave(); onLeave(); }}
-          view={shown.phase === 'lobby' ? null : tvView} onView={setTvView} />
+          view={shown.phase === 'lobby' ? null : tvView} onView={setTvView} grid={tvGrid} onGrid={setTvGrid} />
       </div>
     );
   }
@@ -752,7 +755,7 @@ function RulesSheetOnline({ rules, onSave, onClose }) {
 // ---------------------------------------------------------------------------------------------
 // The card table.
 
-function OnlineTable({ reactions = [], react, teases = {}, tease, code, table, mySeat, cards, me, isHost, call, room, icons, present, send, toast, waiting, hostActions, onLeave, tv = false, tvView = 'table' }) {
+function OnlineTable({ reactions = [], react, teases = {}, tease, code, table, mySeat, cards, me, isHost, call, room, icons, present, send, toast, waiting, hostActions, onLeave, tv = false, tvView = 'table', tvGrid = null }) {
   const r = table.round;
   const game = table.game;
   const hand = currentHand(table);
@@ -1013,7 +1016,7 @@ function OnlineTable({ reactions = [], react, teases = {}, tease, code, table, m
 
         {big && (
           <BigVideos onTap={tapSeat} table={table} posOf={posOf} mySeat={mySeat} me={me} call={call} icons={icons}
-            videoOf={videoOf} peerOf={peerOf} left={left} hurry={hurry} scoreText={scoreText} tv={tv} teases={teases} fill={videoOnly}
+            videoOf={videoOf} peerOf={peerOf} left={left} hurry={hurry} scoreText={scoreText} tv={tv} teases={teases} fill={videoOnly} shape={tv ? tvGrid : null}
             played={videoOnly ? Object.fromEntries(trickCards.map((t) => [t.seat, t.card])) : null}
             wonBy={showingLast ? r.lastTrick.winner : null}
             onMore={() => setCallOpen(true)} />
@@ -1442,7 +1445,7 @@ function SpadeTease({ level }) {
 const CORNER = { bottom: 'bl', left: 'tl', top: 'tr', right: 'br' };
 
 /** Big video tiles in the table's corners (or a player's icon, big, when their camera is off). */
-function BigVideos({ onTap, table, posOf, mySeat, me, call, icons, videoOf, peerOf, left, hurry, scoreText, tv, onMore, teases = {}, fill = false, played = null, wonBy = null }) {
+function BigVideos({ onTap, table, posOf, mySeat, me, call, icons, videoOf, peerOf, left, hurry, scoreText, tv, onMore, teases = {}, fill = false, shape = null, played = null, wonBy = null }) {
   const r = table.round;
   const box = useRef(null);
   const [layout, setLayout] = useState(null);
@@ -1463,7 +1466,7 @@ function BigVideos({ onTap, table, posOf, mySeat, me, call, icons, videoOf, peer
       el.parentElement.style.setProperty('--big-bottom', `${bottom}px`);
       // Video chat only: the four tiles fill the table area, two by two.
       if (fill) {
-        setLayout(gridLayout({ width: W, height: H, gap: 8, bottom }));
+        setLayout(gridLayout({ width: W, height: H, gap: 8, bottom, shape }));
         return;
       }
       // Where each player's card lands (invisible stand-ins, placed exactly like real played cards).
@@ -1480,7 +1483,7 @@ function BigVideos({ onTap, table, posOf, mySeat, me, call, icons, videoOf, peer
     if (ghosts) ro.observe(ghosts);
     if (dockEl) ro.observe(dockEl); // it grows and shrinks between bidding and playing
     return () => ro.disconnect();
-  }, [tv, fill]);
+  }, [tv, fill, shape]);
   return (
     <div className={`big-videos${layout ? ` ${layout.kind}` : ''}`} ref={box}>
       {SEATS.map((_, s) => {
@@ -1789,7 +1792,7 @@ function TvLobby({ code, table, icons, onPlayHere }) {
 }
 
 /** Small controls in the corner, and a note until a key press lets the TV play sound. */
-function TvControls({ call, onLeave, view, onView }) {
+function TvControls({ call, onLeave, view, onView, grid, onGrid }) {
   const needsPress = useTvStart(call);
   // The TV's views: the table, the table with big videos round it, or just the videos (tap again: the table)
   const viewButton = (v, icon, label) => (
@@ -1801,6 +1804,13 @@ function TvControls({ call, onLeave, view, onView }) {
     <>
       <div className="tv-corner">
         {view != null && <>{viewButton('chat', 'video', 'Table + Chat')}{viewButton('video', 'users', 'Video chat only')}</>}
+        {view === 'video' && (
+          <span className="tv-grid-pick" role="group" aria-label="Video layout">
+            {[['4x1', '1×4'], ['2x2', '2×2']].map(([g, label]) => (
+              <button key={g} type="button" className={grid === g ? 'on' : ''} aria-pressed={grid === g} onClick={() => onGrid(g)}>{label}</button>
+            ))}
+          </span>
+        )}
         <button type="button" onClick={call.toggleSpeaker} aria-label={call.speakerOn ? 'Turn sound off' : 'Turn sound on'}>
           <Icon name={call.speakerOn ? 'speaker' : 'speakerOff'} size={18} />
         </button>

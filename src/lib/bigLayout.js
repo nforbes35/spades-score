@@ -79,12 +79,14 @@ export function bigLayout({ width: W, height: H, cards, gap = 6, bottom = 0 }) {
  * Video chat only: the four tiles fill the table area as big as they can while keeping a natural shape
  * (2 × 2, four in a row on wide screens, or four stacked on tall narrow ones), centred.
  */
-export function gridLayout({ width: W, height: H, gap = 6, bottom = 0 }) {
+export function gridLayout({ width: W, height: H, gap = 6, bottom = 0, shape = null }) {
+  // shape: '2x2' or '4x1' to choose the arrangement (the TV's layout button); otherwise the biggest tiles win
   const B = H - bottom;
   let best = null;
   // left to right / top to bottom: the left player, you, your partner, the right player in a row;
   // the table's corners for 2 × 2
   for (const [cols, rows, order] of [[2, 2, ['tl', 'tr', 'bl', 'br']], [4, 1, ['tl', 'bl', 'tr', 'br']], [1, 4, ['tl', 'tr', 'bl', 'br']]]) {
+    if (shape && shape !== `${cols}x${rows}`) continue;
     const t = fit((W - (cols + 1) * gap) / cols, (B - (rows + 1) * gap) / rows);
     if (t && (!best || t.w * t.h > best.w * best.h)) best = { ...t, cols, rows, order };
   }
