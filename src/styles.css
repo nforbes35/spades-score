@@ -2005,3 +2005,7 @@ button.choice:active { transform: scale(0.98); }
 }
 .player-spot.won .nameplate { border-color: var(--gold); }
 .big-tile.won, .big-tile.won.turn { box-shadow: 0 0 0 4px var(--gold), 0 0 30px rgba(245, 184, 46, 0.8); }
+/* Sideways iPhones: the top bar (scores, hand count, ••• menu) and your hand stay clear of the Dynamic
+   Island and the rounded corners on both sides. */
+.app.online:not(.tv-mode) .online-top { padding-left: max(12px, calc(env(safe-area-inset-left) + 6px)); padding-right: max(12px, calc(env(safe-area-inset-right) + 6px)); }
+:root[data-layout='wide'] .hand-dock.online-dock { padding-left: max(12px, calc(env(safe-area-inset-left) + 6px)); padding-right: max(12px, calc(env(safe-area-inset-right) + 6px)); }
