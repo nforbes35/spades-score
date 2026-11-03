@@ -27,6 +27,7 @@ const ID_KEY = 'spades-device-id';
 const TV_ID_KEY = 'spades-tv-id';
 // The last online game on this device, for the home screen's Rejoin button.
 const BIG_VIDEO_KEY = 'spades-big-video';
+const TABLE_MODE_KEY = 'spades-table-mode'; // 'full', 'backdrop' (no table, just the theme) or 'video' (just the video chat)
 const TV_BIG_VIDEO_KEY = 'spades-tv-big-video'; // the TV remembers its own choice
 export const LAST_ONLINE_KEY = 'spades-last-online';
 const BOT_DELAY_MS = 900;
@@ -767,7 +768,11 @@ function OnlineTable({ reactions = [], react, teases = {}, tease, code, table, m
   // Hand view: just your cards, big, for playing with the table on a TV. Always starts in the table view.
   const [handView, setHandView] = useState(false);
   const [bigVideo, setBigVideo] = useState(() => read(BIG_VIDEO_KEY) === true);
-  const big = tv ? tvBig : bigVideo && call.joined;
+  // How much of the table to show on this device (••• menu), remembered for next time.
+  const [tableMode, setTableModeState] = useState(() => (tv ? 'full' : read(TABLE_MODE_KEY) ?? 'full'));
+  const setTableMode = (m) => { setTableModeState(m); write(TABLE_MODE_KEY, m); };
+  const videoOnly = !tv && tableMode === 'video';
+  const big = videoOnly || (tv ? tvBig : bigVideo && call.joined);
   // A seat's books/bid ('bidding…' or '–' until they've bid), for its nameplate or its big video tile.
   const scoreText = (s) => {
     const entry = seatEntry(hand, s);
@@ -922,7 +927,9 @@ function OnlineTable({ reactions = [], react, teases = {}, tease, code, table, m
               call.joined
                 ? { icon: 'video', label: 'Video chat settings', onClick: () => setCallOpen(true) }
                 : { icon: 'video', label: 'Join video chat', onClick: () => setJoinOpen(true) },
-              call.joined && { icon: 'grow', label: 'Large video chat', on: bigVideo, onClick: () => { setBigVideo(!bigVideo); write(BIG_VIDEO_KEY, !bigVideo); } },
+              call.joined && !videoOnly && { icon: 'grow', label: 'Large video chat', on: bigVideo, onClick: () => { setBigVideo(!bigVideo); write(BIG_VIDEO_KEY, !bigVideo); } },
+              { icon: 'users', label: 'Video chat only', note: 'Hide the table, fill it with video', on: tableMode === 'video', onClick: () => setTableMode(tableMode === 'video' ? 'full' : 'video') },
+              { icon: 'expand', label: 'Hide the table', note: 'Just the backdrop', on: tableMode === 'backdrop', onClick: () => setTableMode(tableMode === 'backdrop' ? 'full' : 'backdrop') },
               mySeat >= 0 && { icon: 'hand', label: 'Hand view', note: 'Just your cards, big', onClick: () => setHandView(true) },
               { icon: 'tv', label: 'Add a TV', onClick: () => setTvOpen(true) },
               { icon: 'cards', label: 'Cards & table', onClick: () => setDecksOpen(true) },
@@ -932,7 +939,7 @@ function OnlineTable({ reactions = [], react, teases = {}, tease, code, table, m
         </div>
       </header>
 
-      <div className={`felt${big ? ' big-on' : ''}`}>
+      <div className={`felt${big ? ' big-on' : ''}${tableMode !== 'full' ? ' no-table' : ''}${videoOnly ? ' video-only' : ''}`}>
         <div className="table-oval" aria-hidden="true">
           <span className="table-logo">♠</span>
           {deck.verse && <p className="table-verse">“{deck.verse}”<small>{deck.verseRef}</small></p>}
@@ -990,7 +997,7 @@ function OnlineTable({ reactions = [], react, teases = {}, tease, code, table, m
 
         {big && (
           <BigVideos onTap={tapSeat} table={table} posOf={posOf} mySeat={mySeat} me={me} call={call} icons={icons}
-            videoOf={videoOf} peerOf={peerOf} left={left} hurry={hurry} scoreText={scoreText} tv={tv} teases={teases}
+            videoOf={videoOf} peerOf={peerOf} left={left} hurry={hurry} scoreText={scoreText} tv={tv} teases={teases} fill={videoOnly}
             onMore={() => setCallOpen(true)} />
         )}
         {dealing && <DealAnimation dealer={r.dealer} posOf={posOf} />}
@@ -1340,7 +1347,7 @@ function SpadeTease({ level }) {
 const CORNER = { bottom: 'bl', left: 'tl', top: 'tr', right: 'br' };
 
 /** Big video tiles in the table's corners (or a player's icon, big, when their camera is off). */
-function BigVideos({ onTap, table, posOf, mySeat, me, call, icons, videoOf, peerOf, left, hurry, scoreText, tv, onMore, teases = {} }) {
+function BigVideos({ onTap, table, posOf, mySeat, me, call, icons, videoOf, peerOf, left, hurry, scoreText, tv, onMore, teases = {}, fill = false }) {
   const r = table.round;
   const box = useRef(null);
   const [layout, setLayout] = useState(null);
@@ -1348,7 +1355,7 @@ function BigVideos({ onTap, table, posOf, mySeat, me, call, icons, videoOf, peer
   useLayoutEffect(() => {
     const el = box.current;
     const ghosts = el?.parentElement?.querySelector('.trick-ghost');
-    if (!el || !ghosts) return undefined;
+    if (!el || (!ghosts && !fill)) return undefined;
     const measure = () => {
       const a = el.getBoundingClientRect();
       const k = el.offsetWidth / (a.width || 1); // screen pixels to the page's own (zoomed tables)
@@ -1359,6 +1366,13 @@ function BigVideos({ onTap, table, posOf, mySeat, me, call, icons, videoOf, peer
       const dock = el.closest('.app')?.querySelector('.hand-dock')?.getBoundingClientRect();
       const bottom = Math.max(dock && dock.height ? Math.max(0, a.bottom - dock.top) * k : 0, tv ? 50 : 0);
       el.parentElement.style.setProperty('--big-bottom', `${bottom}px`);
+      // Video chat only: the four tiles fill the table area, two by two.
+      if (fill) {
+        const g = 6, w = (W - 3 * g) / 2, h = (H - bottom - 3 * g) / 2;
+        const at = (left, top) => ({ left, top, width: w, height: h });
+        setLayout({ kind: 'grid', rects: { tl: at(g, g), tr: at(2 * g + w, g), bl: at(g, 2 * g + h), br: at(2 * g + w, 2 * g + h) } });
+        return;
+      }
       // Where each player's card lands (invisible stand-ins, placed exactly like real played cards).
       const cards = [...ghosts.children].map((g) => {
         const r = g.firstElementChild.getBoundingClientRect();
@@ -1370,10 +1384,10 @@ function BigVideos({ onTap, table, posOf, mySeat, me, call, icons, videoOf, peer
     const ro = new ResizeObserver(measure);
     ro.observe(el);
     const dockEl = el.closest('.app')?.querySelector('.hand-dock');
-    ro.observe(ghosts);
+    if (ghosts) ro.observe(ghosts);
     if (dockEl) ro.observe(dockEl); // it grows and shrinks between bidding and playing
     return () => ro.disconnect();
-  }, [tv]);
+  }, [tv, fill]);
   return (
     <div className={`big-videos${layout ? ` ${layout.kind}` : ''}`} ref={box}>
       {SEATS.map((_, s) => {

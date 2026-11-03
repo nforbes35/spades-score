@@ -1867,3 +1867,7 @@ button.choice:active { transform: scale(0.98); }
 .menu-switch::after { content: ''; position: absolute; left: 3px; top: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: translate 0.15s; }
 .menu-switch.on { background: var(--btn, #2f9e62); }
 .menu-switch.on::after { translate: 16px 0; }
+
+/* ---------- Hiding the table (••• menu): just the backdrop, or just the video chat ---------- */
+.felt.no-table .table-oval { display: none; }
+.felt.video-only :is(.player-spot, .trick, .trick-ghost, .deal-layer) { display: none; }
