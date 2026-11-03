@@ -332,7 +332,7 @@ function GameScreen({ store, toast, onNewGame, onJoin, onPlayOnline }) {
         <Sheet title="Menu" onClose={() => setSheet(null)} closeLabel="Close" short>
           <div className="menu-list card group">
             <button type="button" onClick={() => setSheet('invite')}><Icon name="users" /> Remote players, video &amp; TV</button>
-            <button type="button" onClick={() => { setSheet(null); onPlayOnline(); }}><Icon name="cards" /> Play online instead</button>
+            <button type="button" onClick={() => { setSheet(null); onPlayOnline(); }}><Icon name="cards" /> Play Online</button>
             <button type="button" onClick={() => setSheet('stats')}><Icon name="trophy" /> Stats &amp; records</button>
             <button type="button" onClick={() => setSheet('rules')}><Icon name="edit" /> Scoring rules</button>
             <button type="button" onClick={() => { setSheet(null); if (confirm('Start a new game? You can undo this.')) onNewGame(); }}>
@@ -344,6 +344,14 @@ function GameScreen({ store, toast, onNewGame, onJoin, onPlayOnline }) {
               if (clean?.length === 4) onJoin(clean);
             }}>
               <Icon name="phone" /> Join someone else's game
+            </button>
+            <button type="button" onClick={() => {
+              if (!confirm('Close this game and go back to the home screen? Finished hands stay in your stats.')) return;
+              setSheet(null);
+              store.end();
+              toast.show('Game closed', { onUndo: store.undo });
+            }}>
+              <Icon name="home" /> Close game &amp; go home
             </button>
             <a href="https://github.com/nforbes35/spades-score" target="_blank" rel="noreferrer">
               <Icon name="share" /> Source code &amp; licenses

@@ -82,6 +82,8 @@ export function useGame() {
       write(SETUP_KEY, { teams: next.teams, target: next.target, rules: next.rules });
       commit('New game', () => next);
     },
+    /** Close the game (back to the home screen). Its hands are already in the stats. */
+    end: () => commit('Close game', () => null),
     addHand: (hand) => commit('New hand', (g) => ({ ...g, hands: [...g.hands, hand] })),
     /** Replace a hand with an edited copy. */
     saveHand: (hand) => commit('Edit hand', (g) => ({ ...g, hands: g.hands.map((h) => (h.id === hand.id ? hand : h)) })),
