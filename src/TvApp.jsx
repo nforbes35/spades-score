@@ -6,7 +6,7 @@ import { useDevice } from './lib/device.js';
 import { useCall } from './lib/call.js';
 import { useWakeLock } from './lib/fx.js';
 import { Icon, PlayingCard } from './components.jsx';
-import { VideoTile } from './Video.jsx';
+import { VideoTile, useTvStart, SoundPrompt } from './Video.jsx';
 
 /**
  * TV view: open on a smart TV's browser, a laptop on HDMI, or an iPad mirrored to an Apple TV.
@@ -15,7 +15,6 @@ import { VideoTile } from './Video.jsx';
  */
 export default function TvApp({ code, onLeave }) {
   const [game, setGame] = useState(null);
-  const [started, setStarted] = useState(false);
   const [device, setDevice] = useDevice(code, { role: 'tv', name: 'TV' });
   const room = useRoom(code, device, (m) => {
     if (m.type === 'state') setGame(m.game);
@@ -24,15 +23,9 @@ export default function TvApp({ code, onLeave }) {
   const call = useCall({ room, me: device, setMe: setDevice, receiveOnly: true });
   const host = room.peers.find((p) => p.role === 'host');
   useEffect(() => { if (host) room.send({ type: 'hello' }, host.id); }, [host?.id, room.send]);
-  useWakeLock(started);
+  useWakeLock(true);
   const idle = useIdleCursor();
-
-  // A TV needs one click or tap before it may play sound; that's also when it goes full screen.
-  const start = () => {
-    setStarted(true);
-    call.join();
-    document.documentElement.requestFullscreen?.().catch(() => {});
-  };
+  const needsPress = useTvStart(call);
 
   const table = call.videos.find((v) => v.peer.role === 'host');
   const faces = call.videos.filter((v) => v.peer.role !== 'host' && v.peer.role !== 'tv');
@@ -68,14 +61,7 @@ export default function TvApp({ code, onLeave }) {
           <Icon name="close" size={18} />
         </button>
       </div>
-      {!started && (
-        <button type="button" className="tv-start" onClick={start} autoFocus>
-          <span className="brand-mark">♠</span>
-          <b>Spades TV view</b>
-          <span>Game {code}</span>
-          <span className="tv-start-go">Click or tap to start</span>
-        </button>
-      )}
+      {needsPress && <SoundPrompt />}
     </div>
   );
 }

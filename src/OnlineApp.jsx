@@ -10,7 +10,7 @@ import { useRoom, joinLink } from './lib/room.js';
 import { useDevice } from './lib/device.js';
 import { useCall } from './lib/call.js';
 import { useKeys, seal, unseal } from './lib/secret.js';
-import { useWakeLock, chime, buzz, dealSound, unlockSound } from './lib/fx.js';
+import { useWakeLock, chime, buzz, dealSound } from './lib/fx.js';
 import { recordGame, useStatsSync, nameKey } from './lib/stats.js';
 import Stats from './Stats.jsx';
 import DeckPicker from './DeckPicker.jsx';
@@ -18,7 +18,7 @@ import { useDeck } from './lib/decks.js';
 import { Avatar, ProfileEditor } from './Avatar.jsx';
 import { loadName, saveName, loadAvatar, saveAvatar, useAvatars } from './lib/profile.js';
 import { Icon, FannedHand, PlayingCard, CardBack, Sheet, RulesFields, Toggle, Segmented, useToast, Confetti, StatusDot, CardText, useCountUp } from './components.jsx';
-import { VideoTile, CallButtons, SoundNote } from './Video.jsx';
+import { VideoTile, CallButtons, SoundNote, useTvStart, SoundPrompt } from './Video.jsx';
 import { HandRow } from './Scoreboard.jsx';
 import { history } from './lib/scoring.js';
 
@@ -329,7 +329,7 @@ function OnlineRoom({ code, isHost = false, tv = false, name, avatar, onLeave, o
           ? <TvLobby code={code} table={shown} icons={icons} />
           : <OnlineTable code={code} table={shown} mySeat={-1} cards={null} me={me} isHost={false} call={call} room={room} icons={icons}
               present={present} send={() => {}} toast={toast} waiting={false} tv onLeave={onLeave} />}
-        <TvControls code={code} call={call} onLeave={() => { call.leave(); onLeave(); }} />
+        <TvControls call={call} onLeave={() => { call.leave(); onLeave(); }} />
       </div>
     );
   }
@@ -1102,15 +1102,9 @@ function TvLobby({ code, table, icons }) {
   );
 }
 
-/** A tap to start (so the TV may play sound), then small controls in the corner. */
-function TvControls({ code, call, onLeave }) {
-  const [started, setStarted] = useState(false);
-  const start = () => {
-    setStarted(true);
-    unlockSound();
-    call.join();
-    document.documentElement.requestFullscreen?.().catch(() => {});
-  };
+/** Small controls in the corner, and a note until a key press lets the TV play sound. */
+function TvControls({ call, onLeave }) {
+  const needsPress = useTvStart(call);
   return (
     <>
       <div className="tv-corner">
@@ -1124,14 +1118,7 @@ function TvControls({ code, call, onLeave }) {
           <Icon name="close" size={18} />
         </button>
       </div>
-      {!started && (
-        <button type="button" className="tv-start" onClick={start} autoFocus>
-          <span className="brand-mark">♠</span>
-          <b>Family Spades on the TV</b>
-          <span>Game {code}</span>
-          <span className="tv-start-go">Click or tap to start</span>
-        </button>
-      )}
+      {needsPress && <SoundPrompt />}
     </>
   );
 }

@@ -1342,3 +1342,8 @@ button.choice:active { transform: scale(0.98); }
 .ended-team b { font-size: 30px; font-variant-numeric: tabular-nums; }
 .ended-card .primary { width: 100%; }
 .conn-banner .leave { background: rgba(255, 255, 255, 0.16); color: #fff; }
+.tv-sound-prompt {
+  position: fixed; z-index: 60; left: 16px; bottom: 14px; display: flex; align-items: center; gap: 8px;
+  padding: 8px 14px; border-radius: 999px; background: rgba(0, 0, 0, 0.6); color: #fff; font-weight: 700; font-size: 16px;
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); animation: fade 0.3s;
+}

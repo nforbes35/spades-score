@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Icon } from './components.jsx';
+import { unlockSound } from './lib/fx.js';
 
 export const ROLE_LABEL = { host: 'Table', player: 'Player', guest: 'Video', tv: 'TV' };
 
@@ -130,3 +131,27 @@ export function CallBox({ call, videos, emptyText = 'Waiting for others to turn 
     </div>
   );
 }
+
+/**
+ * A TV joins the call straight away. Browsers only play sound once something on the page has been pressed
+ * (typing the game code counts); until then a small note asks for a press, and the first one anywhere turns
+ * the sound on. Returns whether that note should show.
+ */
+export function useTvStart(call) {
+  const [needsPress, setNeedsPress] = useState(() => !(navigator.userActivation?.hasBeenActive ?? false));
+  useEffect(() => { call.join(); }, []);
+  useEffect(() => {
+    if (!needsPress) { unlockSound(); return undefined; }
+    const go = () => {
+      setNeedsPress(false);
+      unlockSound();
+      document.querySelectorAll('video').forEach((v) => v.play().catch(() => {}));
+    };
+    addEventListener('pointerdown', go);
+    addEventListener('keydown', go);
+    return () => { removeEventListener('pointerdown', go); removeEventListener('keydown', go); };
+  }, [needsPress]);
+  return needsPress;
+}
+
+export const SoundPrompt = () => <div className="tv-sound-prompt"><Icon name="speaker" size={18} /> Press OK or click for sound</div>;
