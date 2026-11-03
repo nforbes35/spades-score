@@ -1,5 +1,5 @@
 // Season and holiday themes, picked by the date like Sunday Table does: a real photo on the table, the
-// card backs and the home screen, a matching felt colour, an ornament and a verse (KJV, public domain).
+// card backs and the home screen, a matching felt colour, an ornament and a well-known verse that changes daily (KJV, public domain).
 // Photos are from Unsplash (Unsplash License), saved in public/decks so they work offline.
 
 const pad = (n) => String(n).padStart(2, '0');
@@ -50,26 +50,33 @@ const emblem = (kind) => svgUrl(`<svg xmlns='http://www.w3.org/2000/svg' viewBox
 // felt: the dark-to-light colours behind the table, the top bar and your hand. button: [colour, text colour].
 const THEMES = [
   { id: 'fall', name: 'Fall', ornament: 'leaf', ring: '#e9a23b', button: ['#c8641f', '#fff'], felt: ['#2a1206', '#5a2a0e', '#8a4316'],
-    verse: 'To every thing there is a season, and a time to every purpose under the heaven.', verseRef: 'Ecclesiastes 3:1' },
+    verses: [['To every thing there is a season, and a time to every purpose under the heaven.', 'Ecclesiastes 3:1'], ['The LORD is my shepherd; I shall not want.', 'Psalm 23:1']] },
   { id: 'thanksgiving', name: 'Thanksgiving', ornament: 'wheat', ring: '#e2b04a', button: ['#b5652a', '#fff'], felt: ['#2b1408', '#5c2e12', '#8b4a1e'],
-    verse: 'O give thanks unto the LORD; for he is good: for his mercy endureth for ever.', verseRef: 'Psalm 107:1' },
+    verses: [['In every thing give thanks: for this is the will of God in Christ Jesus concerning you.', '1 Thessalonians 5:18'], ['Enter into his gates with thanksgiving, and into his courts with praise.', 'Psalm 100:4']] },
   { id: 'christmas', name: 'Christmas', ornament: 'star', ring: '#e3c06a', button: ['#c62a36', '#fff'], felt: ['#06200f', '#0f3d22', '#1b5a35'],
-    verse: 'For unto you is born this day in the city of David a Saviour, which is Christ the Lord.', verseRef: 'Luke 2:11' },
+    verses: [['For unto you is born this day in the city of David a Saviour, which is Christ the Lord.', 'Luke 2:11'], ['For unto us a child is born, unto us a son is given.', 'Isaiah 9:6'], ['Glory to God in the highest, and on earth peace, good will toward men.', 'Luke 2:14']] },
   { id: 'newyear', name: 'New Year', ornament: 'sparkle', ring: '#e8c76f', button: ['#e0b44c', '#241800'], felt: ['#070b1a', '#14213d', '#24365e'],
-    verse: 'His compassions fail not. They are new every morning: great is thy faithfulness.', verseRef: 'Lamentations 3:22–23' },
+    verses: [['For I know the thoughts that I think toward you, saith the LORD, thoughts of peace, and not of evil, to give you an expected end.', 'Jeremiah 29:11'], ['If any man be in Christ, he is a new creature: old things are passed away; behold, all things are become new.', '2 Corinthians 5:17']] },
   { id: 'winter', name: 'Winter', ornament: 'snow', ring: '#b9d6ea', button: ['#3f7aa6', '#fff'], felt: ['#0e2233', '#1d3b53', '#33618a'],
-    verse: 'Though your sins be as scarlet, they shall be as white as snow.', verseRef: 'Isaiah 1:18' },
+    verses: [['Be still, and know that I am God.', 'Psalm 46:10'], ['Though your sins be as scarlet, they shall be as white as snow.', 'Isaiah 1:18']] },
   { id: 'valentines', name: 'Valentine’s', ornament: 'heart', ring: '#f2a7b8', button: ['#c94466', '#fff'], felt: ['#2a0712', '#5a1428', '#86223e'],
-    verse: 'We love him, because he first loved us.', verseRef: '1 John 4:19' },
+    verses: [['This is my commandment, That ye love one another, as I have loved you.', 'John 15:12'], ['We love him, because he first loved us.', '1 John 4:19']] },
   { id: 'spring', name: 'Spring', ornament: 'flower', ring: '#f3b9c4', button: ['#d9708a', '#fff'], felt: ['#173018', '#2c5530', '#4c7c48'],
-    verse: 'The flowers appear on the earth; the time of the singing of birds is come.', verseRef: 'Song of Solomon 2:12' },
+    verses: [['This is the day which the LORD hath made; we will rejoice and be glad in it.', 'Psalm 118:24'], ['The grass withereth, the flower fadeth: but the word of our God shall stand for ever.', 'Isaiah 40:8']] },
   { id: 'easter', name: 'Easter', ornament: 'cross', plainTable: true, ring: '#f0c46a', button: ['#e6a83a', '#2b1700'], felt: ['#1f1430', '#3c2a5c', '#5e4687'],
-    verse: 'He is not here: for he is risen, as he said.', verseRef: 'Matthew 28:6' },
+    verses: [['He is not here: for he is risen, as he said.', 'Matthew 28:6'], ['I am the resurrection, and the life: he that believeth in me, though he were dead, yet shall he live.', 'John 11:25'], ['I am the way, the truth, and the life: no man cometh unto the Father, but by me.', 'John 14:6']] },
   { id: 'summer', name: 'Summer', ornament: 'sun', ring: '#f6c544', button: ['#f4ae2c', '#2e1800'], felt: ['#062e31', '#0f5257', '#1d7a7f'],
-    verse: 'Rejoice in the Lord alway: and again I say, Rejoice.', verseRef: 'Philippians 4:4' },
+    verses: [['I can do all things through Christ which strengtheneth me.', 'Philippians 4:13'], ['Trust in the LORD with all thine heart; and lean not unto thine own understanding.', 'Proverbs 3:5']] },
   { id: 'patriotic', name: 'Red, White & Blue', ornament: 'star', ring: '#e8eef8', button: ['#c8323a', '#fff'], felt: ['#0b1630', '#15284f', '#25406f'],
-    verse: 'Where the Spirit of the Lord is, there is liberty.', verseRef: '2 Corinthians 3:17' },
+    verses: [['Blessed is the nation whose God is the LORD.', 'Psalm 33:12'], ['Greater love hath no man than this, that a man lay down his life for his friends.', 'John 15:13'], ['Where the Spirit of the Lord is, there is liberty.', '2 Corinthians 3:17']] },
 ];
+
+/** A different well-known verse each day. */
+function verseOfTheDay(verses, now = new Date()) {
+  const day = Math.floor((now - new Date(now.getFullYear(), 0, 0)) / 86400000);
+  const [verse, verseRef] = verses[day % verses.length];
+  return { verse, verseRef };
+}
 
 export const SEASON_DECKS = THEMES.map((t) => ({
   // plainTable: the photo already has the ornament in it (the Easter cross), so the table goes without.
@@ -78,7 +85,7 @@ export const SEASON_DECKS = THEMES.map((t) => ({
   table: `radial-gradient(75% 70% at 50% 45%, rgba(0, 0, 0, 0.12), rgba(0, 0, 0, 0.5)), url(/decks/season-${t.id}-table.webp) center / cover`,
   home: `url(/decks/season-${t.id}-table.webp)`,
   emblemImage: t.plainTable ? undefined : emblem(t.ornament),
-  felt: t.felt, button: t.button, verse: t.verse, verseRef: t.verseRef,
+  felt: t.felt, button: t.button, ...verseOfTheDay(t.verses),
 }));
 
 /** Which season or holiday it is. Holidays take over a week or two ahead, like Sunday Table. */
