@@ -37,6 +37,7 @@ const DEAL_GAP_MS = 28;
 const DEAL_MS = 2500;
 const TRICK_SHOW_MS = 1600;
 const BANNER_DELAY_MS = 4000;
+const NOT_FOUND_MS = 15000;
 const BID_TIMES = [15, 30, 45, 60, 90];
 const DEFAULT_BID_TIMER = 30;
 // Extra time the host allows past the countdown, for a bid that's on its way.
@@ -87,6 +88,7 @@ function OnlineRoom({ code, isHost = false, tv = false, name, avatar, onLeave, o
   const toast = useToast();
   const [view, setView] = useState(null); // the public table as this device sees it
   const [myHand, setMyHand] = useState(null); // { hand: game hand number, cards }
+  const [closed, setClosed] = useState(null); // { by }: the host ended the game
   const hostRef = useRef(null);
 
   // ----- Host: runs the game -----
@@ -153,6 +155,11 @@ function OnlineRoom({ code, isHost = false, tv = false, name, avatar, onLeave, o
       unseal(keys, hostRef.current.pub, m.box).then((cards) => setMyHand({ hand: m.hand, cards })).catch(() => {});
     } else if (m.type === 'o-error') toast.show(m.text);
     else if (m.type === 'o-ping') { chime(true); buzz([200, 100, 200]); }
+    else if (m.type === 'o-closed' && from?.role === 'ohost') {
+      setClosed({ by: m.by || from.name });
+      forgetGame(code);
+      call.leave();
+    }
   }
 
   /** Host: send the table to everyone, each seated player their own (locked) cards. */
@@ -236,6 +243,13 @@ function OnlineRoom({ code, isHost = false, tv = false, name, avatar, onLeave, o
     : (myHand && myHand.hand === handNo ? myHand.cards : null);
   useWakeLock(true);
   const tvFit = useTvFit(tv);
+  // No host after a while: the game may be over (an old link or code).
+  const [slow, setSlow] = useState(false);
+  useEffect(() => {
+    if (shown) return undefined;
+    const t = setTimeout(() => setSlow(true), NOT_FOUND_MS);
+    return () => clearTimeout(t);
+  }, [Boolean(shown)]);
   useEffect(() => { if (!tv) write(LAST_ONLINE_KEY, { code, host: isHost, at: Date.now() }); }, [code, isHost, tv, handNo]);
 
   // Moves from this device. A player's move is resent until the table shows it (a phone that locks for a
@@ -271,6 +285,8 @@ function OnlineRoom({ code, isHost = false, tv = false, name, avatar, onLeave, o
     ...room.peers.filter((p) => p.role === 'ohost' || p.role === 'oplayer').map((p) => ({ ...p, here: true })),
   ];
 
+  if (closed) return <GameEnded by={closed.by} game={shown?.game} onHome={onLeave} />;
+
   if (!shown) {
     return (
       <div className="app">
@@ -278,7 +294,14 @@ function OnlineRoom({ code, isHost = false, tv = false, name, avatar, onLeave, o
           <button type="button" className="icon-btn" onClick={onLeave}>Leave</button></div></header>
         <main className="wrap">
           <div className="card waiting-card"><span className="spinner" /><h2>Finding the host…</h2>
-            <p className="muted">Make sure whoever sent the link has the game open.</p></div>
+            <p className="muted">Make sure whoever sent the link has the game open.</p>
+            {slow && (
+              <>
+                <p><b>Still can’t find game {code}.</b> It may have ended, or the host’s phone has the app closed.</p>
+                <button type="button" className="secondary" onClick={() => { forgetGame(code); onLeave(); }}>Back to home</button>
+              </>
+            )}
+          </div>
         </main>
       </div>
     );
@@ -286,12 +309,17 @@ function OnlineRoom({ code, isHost = false, tv = false, name, avatar, onLeave, o
 
   const midGame = shown.phase !== 'lobby' && mySeat >= 0;
   const leave = () => {
-    if (!confirm(isHost ? 'Close this game for everyone?'
+    if (!confirm(isHost
+      ? (shown.phase === 'lobby' ? 'Close this game for everyone?' : 'End this game for everyone? Everyone sees the score so far and goes back to the home screen.')
       : midGame ? 'Leave this game? The computer plays your seat until you rejoin from the home screen.' : 'Leave this game?')) return;
-    if (!isHost) room.send({ type: 'o-stand' }, hostPeer?.id);
     call.leave();
-    if (isHost) { write(tableKey, null); write(LAST_ONLINE_KEY, null); }
-    onLeave();
+    if (!isHost) { room.send({ type: 'o-stand' }, hostPeer?.id); onLeave(); return; }
+    // Tell everyone it's over (twice, in case one goes missing), then go.
+    write(tableKey, null);
+    forgetGame(code);
+    room.send({ type: 'o-closed', by: name });
+    setTimeout(() => room.send({ type: 'o-closed', by: name }), 250);
+    setTimeout(onLeave, 600);
   };
 
   if (tv) {
@@ -318,13 +346,46 @@ function OnlineRoom({ code, isHost = false, tv = false, name, avatar, onLeave, o
         : <OnlineTable code={code} table={shown} mySeat={mySeat} cards={cards} me={me} isHost={isHost} call={call} room={room} icons={icons}
             present={present} send={send} toast={toast} waiting={Boolean(pending)}
             hostActions={isHost ? hostGameActions(act) : null} onLeave={leave} />}
-      <ConnectionBanner room={room} isHost={isHost} hostPeer={hostPeer} />
+      <ConnectionBanner room={room} isHost={isHost} hostPeer={hostPeer} onLeave={leave} />
       {toast.node}
     </div>
   );
 }
 
 const toastErr = (toast, err) => { if (err) toast.show(err); };
+
+/** Drop this game from the home screen's Rejoin button. */
+function forgetGame(code) {
+  if (read(LAST_ONLINE_KEY)?.code === code) write(LAST_ONLINE_KEY, null);
+}
+
+/** The host ended the game: the score so far, and back home. */
+function GameEnded({ by, game, onHome }) {
+  const st = game ? standings(game) : null;
+  const played = game ? game.hands.filter((h) => !h.inPlay).length : 0;
+  return (
+    <div className="app game-ended">
+      <main className="wrap">
+        <div className="card waiting-card ended-card">
+          <span className="brand-mark">♠</span>
+          <h2>{by ? `${by} closed the game` : 'The game has ended'}</h2>
+          {game && (
+            <div className="ended-scores">
+              {[0, 1].map((t) => (
+                <div key={t} className={`ended-team t${t}`}>
+                  <span>{game.teams[t].name}</span>
+                  <b>{st[t].score}</b>
+                </div>
+              ))}
+            </div>
+          )}
+          {game && <p className="muted">{played ? `After ${played} hand${played === 1 ? '' : 's'}. Stats from the hands you played are saved.` : 'No hands were finished.'}</p>}
+          <button type="button" className="primary big go" onClick={onHome}>Back to home</button>
+        </div>
+      </main>
+    </div>
+  );
+}
 
 /** The seat of a player who isn't here and goes by `name` (-1 if none): someone coming back on a new device. */
 function awaySeatNamed(t, name, peers, hostId) {
@@ -337,7 +398,7 @@ function awaySeatNamed(t, name, peers, hostId) {
  * A strip across the top when this device has lost the game: the connection dropped, or (for players) the
  * host's phone has gone quiet. It reconnects by itself; the button tries again right away.
  */
-function ConnectionBanner({ room, isHost, hostPeer }) {
+function ConnectionBanner({ room, isHost, hostPeer, onLeave }) {
   const offline = room.status === 'error' || room.status === 'offline' || room.status === 'connecting';
   const lostHost = !isHost && !hostPeer;
   const problem = offline ? 'offline' : lostHost ? 'host' : null;
@@ -354,6 +415,7 @@ function ConnectionBanner({ room, isHost, hostPeer }) {
       <span className="spinner small" />
       <span>{shown === 'offline' ? 'Connection lost. Reconnecting…' : 'Waiting for the host’s phone to come back…'}</span>
       <button type="button" onClick={room.reconnect}>Rejoin now</button>
+      {shown === 'host' && <button type="button" className="leave" onClick={onLeave}>Leave</button>}
     </div>
   );
 }

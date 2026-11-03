@@ -13,6 +13,13 @@ export default function JoinAs({ code, onChoose, onLeave }) {
   const onlineHost = room.peers.find((p) => p.role === 'ohost');
   useEffect(() => { if (host) room.send({ type: 'hello' }, host.id); }, [host?.id, room.send]);
   const seats = game ? remoteSeats(game) : [];
+  // Nobody answers after a while: probably an old code for a game that's over.
+  const [slow, setSlow] = useState(false);
+  useEffect(() => {
+    if (game || onlineHost) return undefined;
+    const t = setTimeout(() => setSlow(true), 15000);
+    return () => clearTimeout(t);
+  }, [Boolean(game || onlineHost)]);
 
   // An online game: play on this phone, or show the table on a TV.
   if (onlineHost) {
@@ -55,6 +62,12 @@ export default function JoinAs({ code, onChoose, onLeave }) {
             <span className="spinner" />
             <h2>Finding the table…</h2>
             <p className="muted">Make sure the scorekeeper has Spades open and invited you.</p>
+            {slow && (
+              <>
+                <p><b>Still can’t find game {code}.</b> Check the code. The game may have ended, or the host’s phone has the app closed.</p>
+                <button type="button" className="secondary" onClick={onLeave}>Back to home</button>
+              </>
+            )}
           </div>
         )}
         {game && (

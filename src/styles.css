@@ -1330,3 +1330,15 @@ button.choice:active { transform: scale(0.98); }
 .rejoin-choice { padding: 0; gap: 0; border-color: var(--btn, var(--gold, #f5b82e)); box-shadow: 0 0 0 2px color-mix(in srgb, var(--btn, #f5b82e) 60%, transparent), 0 12px 30px rgba(0, 0, 0, 0.22); }
 .rejoin-go { flex: 1; display: flex; align-items: center; gap: 14px; min-width: 0; padding: 16px 6px 16px 16px; border: 0; background: none; color: inherit; text-align: left; }
 .rejoin-forget { align-self: stretch; padding: 0 16px; border: 0; background: none; color: inherit; opacity: 0.6; }
+
+/* The host ended the game */
+.game-ended { display: grid; place-items: center; background: radial-gradient(120% 90% at 50% 30%, var(--felt-c), var(--felt-b) 55%, var(--felt-a)); }
+:root[data-home-photo] .game-ended { background: linear-gradient(rgba(0, 0, 0, 0.45), rgba(0, 0, 0, 0.7)), var(--deck-home) center / cover, var(--felt-a); }
+.ended-card { align-items: center; text-align: center; gap: 14px; max-width: 420px; margin: 0 auto; }
+.ended-card .brand-mark { width: 52px; height: 52px; font-size: 32px; }
+.ended-scores { display: flex; gap: 10px; width: 100%; }
+.ended-team { flex: 1; display: flex; flex-direction: column; gap: 2px; padding: 10px; border-radius: 14px; background: var(--surface-2); border-top: 4px solid var(--team); }
+.ended-team span { font-size: 13px; font-weight: 700; color: var(--muted); }
+.ended-team b { font-size: 30px; font-variant-numeric: tabular-nums; }
+.ended-card .primary { width: 100%; }
+.conn-banner .leave { background: rgba(255, 255, 255, 0.16); color: #fff; }
