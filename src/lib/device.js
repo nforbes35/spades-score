@@ -23,6 +23,10 @@ export function isTvScreen() {
   try { if (localStorage.getItem(TV_KEY) != null) return localStorage.getItem(TV_KEY) === 'true'; } catch { /* no storage */ }
   return TV_AGENT.test(navigator.userAgent);
 }
+/** This device last picked "play on this phone": it goes straight to playing next time. */
+export function rememberedAsPlayer() {
+  try { return localStorage.getItem(TV_KEY) === 'false'; } catch { return false; }
+}
 export function rememberTvScreen(tv) {
   try { localStorage.setItem(TV_KEY, String(tv)); } catch { /* no storage */ }
 }

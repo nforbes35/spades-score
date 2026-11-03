@@ -53,7 +53,7 @@ function stableId(key = ID_KEY) {
 }
 
 /** Online mode: everyone plays on their own device, the app deals, checks the rules and keeps score. */
-export default function OnlineApp({ code, isHost, tv, onLeave, onPlayHere }) {
+export default function OnlineApp({ code, isHost, tv, onLeave, onPlayHere, onUseAsTv }) {
   const [name, setName] = useState(loadName);
   const [avatar, setAvatar] = useState(loadAvatar);
   const [named, setNamed] = useState(() => Boolean(loadName()));
@@ -76,12 +76,12 @@ export default function OnlineApp({ code, isHost, tv, onLeave, onPlayHere }) {
     );
   }
   return (
-    <OnlineRoom code={code} isHost={isHost} name={name.trim()} avatar={avatar} onLeave={onLeave}
+    <OnlineRoom code={code} isHost={isHost} name={name.trim()} avatar={avatar} onLeave={onLeave} onUseAsTv={onUseAsTv}
       onProfile={(next) => { setName(next.name); saveName(next.name); changeAvatar(next.avatar); }} />
   );
 }
 
-function OnlineRoom({ code, isHost = false, tv = false, name, avatar, onLeave, onPlayHere, onProfile }) {
+function OnlineRoom({ code, isHost = false, tv = false, name, avatar, onLeave, onPlayHere, onUseAsTv, onProfile }) {
   const keys = useKeys();
   const [deviceId] = useState(() => stableId(tv ? TV_ID_KEY : ID_KEY));
   const [me, setMe] = useDevice(code, { role: isHost ? 'ohost' : tv ? 'otv' : 'oplayer', name, id: deviceId, pub: keys?.pub ?? null });
@@ -342,7 +342,14 @@ function OnlineRoom({ code, isHost = false, tv = false, name, avatar, onLeave, o
             onSit={(seat) => (isHost ? toastErr(toast, act((x) => sit(x, seat, { id: me.id, name }))) : room.send({ type: 'o-sit', seat, name }, hostPeer?.id))}
             onStand={() => (isHost ? act((x) => ({ ...x, seats: x.seats.map((s) => (s?.id === me.id ? null : s)) })) : room.send({ type: 'o-stand' }, hostPeer?.id))}
             hostActions={isHost ? hostLobbyActions(act, toast) : null}
-            onLeave={leave} />
+            onLeave={leave}
+            onUseAsTv={isHost ? null : () => {
+              // This screen becomes the TV (remembered for next time); give up any seat first.
+              rememberTvScreen(true);
+              if (mySeat >= 0) room.send({ type: 'o-stand' }, hostPeer?.id);
+              call.leave();
+              onUseAsTv();
+            }} />
         : <OnlineTable code={code} table={shown} mySeat={mySeat} cards={cards} me={me} isHost={isHost} call={call} room={room} icons={icons}
             present={present} send={send} toast={toast} waiting={Boolean(pending)}
             hostActions={isHost ? hostGameActions(act) : null} onLeave={leave} />}
@@ -462,7 +469,7 @@ function hostGameActions(act) {
 // ---------------------------------------------------------------------------------------------
 // Lobby: invite people, pick seats, set the rules, start.
 
-function Lobby({ code, table, isHost, me, people, call, icons, profile, onProfile, onSit, onStand, hostActions, onLeave }) {
+function Lobby({ code, table, isHost, me, people, call, icons, profile, onProfile, onSit, onStand, hostActions, onLeave, onUseAsTv }) {
   const [qr, setQr] = useState(null);
   const [editing, setEditing] = useState(null); // the profile being edited
   const [decksOpen, setDecksOpen] = useState(false);
@@ -522,6 +529,7 @@ function Lobby({ code, table, isHost, me, people, call, icons, profile, onProfil
             <Avatar value={profile.avatar} name={profile.name} /> {profile.name} <Icon name="edit" size={14} />
           </button>
           <button type="button" className="profile-chip" onClick={() => setDecksOpen(true)}><Icon name="cards" size={18} /> Cards &amp; table</button>
+          {onUseAsTv && <button type="button" className="profile-chip" onClick={onUseAsTv}><Icon name="tv" size={18} /> TV mode</button>}
         </div>
         <div className="wrap"><p className="target">Game {code} · {isHost ? 'You’re the host' : `Host: ${host?.name ?? '…'}`}</p></div>
       </header>
