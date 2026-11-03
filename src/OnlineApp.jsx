@@ -119,6 +119,19 @@ function OnlineRoom({ code, isHost = false, tv = false, name, avatar, onLeave, o
   };
   const mySeatRef = useRef(-1);
   const hostRef = useRef(null);
+  // The spade bluff: how strongly a ♠ shows over each seat's video (0 to 1), set with the slider under your
+  // cards so people think you're about to throw a spade. Sent to everyone as you slide (a few times a second).
+  const [teases, setTeases] = useState({});
+  const teaseOut = useRef({ at: 0, timer: null, level: 0 });
+  const tease = (level) => {
+    const seat = mySeatRef.current;
+    if (seat < 0) return;
+    setTeases((x) => ({ ...x, [seat]: level }));
+    const q = teaseOut.current;
+    q.level = level;
+    const go = () => { q.at = Date.now(); q.timer = null; room.send({ type: 'o-tease', level: q.level }); };
+    if (Date.now() - q.at > 80) go(); else if (!q.timer) q.timer = setTimeout(go, 80);
+  };
 
   // ----- Host: runs the game -----
   const tableKey = `spades-online-table-${code}`;
@@ -153,6 +166,11 @@ function OnlineRoom({ code, isHost = false, tv = false, name, avatar, onLeave, o
     if (m.type === 'rtc') { call.handle(m); return; }
     if (statsSync(m, from)) return;
     if (iconMessage(m, from)) return;
+    if (m.type === 'o-tease') {
+      const seatFrom = from && shown ? seatOf(shown, from.id) : -1;
+      if (seatFrom >= 0) setTeases((x) => ({ ...x, [seatFrom]: Math.min(1, Math.max(0, Number(m.level) || 0)) }));
+      return;
+    }
     if (m.type === 'o-react') {
       const seatFrom = from && shown ? seatOf(shown, from.id) : -1;
       if (seatFrom >= 0) addReaction({ from: seatFrom, to: m.to, item: String(m.item).slice(0, 8), gift: Boolean(m.gift) });
@@ -307,6 +325,7 @@ function OnlineRoom({ code, isHost = false, tv = false, name, avatar, onLeave, o
     if (shown?.game && !tv) recordGame(shown.game, { mode: 'online', bots: shown.seats.filter((s) => s?.bot).map((s) => s.name) });
   }, [scoredHands, shown?.game?.id, shown?.phase]);
   const handNo = shown?.game?.hands.length ?? 0;
+  useEffect(() => setTeases({}), [handNo]); // every hand starts with no spade showing
   const cards = isHost
     ? (mySeat >= 0 && table?.round?.hands ? table.round.hands[mySeat] : null)
     : (myHand && myHand.hand === handNo ? myHand.cards : null);
@@ -401,7 +420,7 @@ function OnlineRoom({ code, isHost = false, tv = false, name, avatar, onLeave, o
         {shown.phase === 'lobby'
           ? <TvLobby code={code} table={shown} icons={icons} onPlayHere={() => { rememberTvScreen(false); call.leave(); onPlayHere(); }} />
           : <OnlineTable code={code} table={shown} mySeat={-1} cards={null} me={me} isHost={false} call={call} room={room} icons={icons}
-              present={present} send={() => {}} toast={toast} waiting={false} tv tvBig={tvBig} onLeave={onLeave} reactions={reactions} />}
+              present={present} send={() => {}} toast={toast} waiting={false} tv tvBig={tvBig} onLeave={onLeave} reactions={reactions} teases={teases} />}
         <TvControls call={call} onLeave={() => { call.leave(); onLeave(); }}
           big={shown.phase === 'lobby' ? null : tvBig} onBig={(on) => { setTvBig(on); write(TV_BIG_VIDEO_KEY, on); }} />
       </div>
@@ -428,7 +447,7 @@ function OnlineRoom({ code, isHost = false, tv = false, name, avatar, onLeave, o
               onUseAsTv();
             }} />
         : <OnlineTable code={code} table={shown} mySeat={mySeat} cards={cards} me={me} isHost={isHost} call={call} room={room} icons={icons}
-            present={present} send={send} toast={toast} waiting={Boolean(pending)} reactions={reactions} react={react}
+            present={present} send={send} toast={toast} waiting={Boolean(pending)} reactions={reactions} react={react} teases={teases} tease={tease}
             hostActions={isHost ? hostGameActions(act) : null} onLeave={leave} />}
       <ConnectionBanner room={room} isHost={isHost} hostPeer={hostPeer} onLeave={leave} />
       {toast.node}
@@ -730,7 +749,7 @@ function RulesSheetOnline({ rules, onSave, onClose }) {
 // ---------------------------------------------------------------------------------------------
 // The card table.
 
-function OnlineTable({ reactions = [], react, code, table, mySeat, cards, me, isHost, call, room, icons, present, send, toast, waiting, hostActions, onLeave, tv = false, tvBig = false }) {
+function OnlineTable({ reactions = [], react, teases = {}, tease, code, table, mySeat, cards, me, isHost, call, room, icons, present, send, toast, waiting, hostActions, onLeave, tv = false, tvBig = false }) {
   const r = table.round;
   const game = table.game;
   const hand = currentHand(table);
@@ -852,12 +871,21 @@ function OnlineTable({ reactions = [], react, code, table, mySeat, cards, me, is
               : <p className="dock-hint">Swipe a card up to play it, or tap it. Dimmed cards can’t be played.</p>)}
     </>
   );
+  // The spade bluff slider, under your cards, any time in the hand.
+  const bluff = tease && cards && !dealing && !coverCards && ['bidding', 'playing'].includes(table.phase) && (
+    <label className="spade-bluff">
+      <span className="sb-min" aria-hidden="true">♠</span>
+      <input type="range" min="0" max="1" step="0.01" value={teases[mySeat] ?? 0} onChange={(e) => tease(Number(e.target.value))}
+        aria-label="Spade bluff: fade a spade in over your video" />
+      <span className="sb-max" aria-hidden="true">♠</span>
+    </label>
+  );
 
   return (
     <>
       {handView ? (
         <HandView reactions={reactions} onReact={canReact ? () => setReactTo(mySeat) : null} mySeat={mySeat} table={table} st={st} myTurn={myTurn} left={left} hurry={hurry} call={call}
-          handArea={handArea} actionArea={actionArea} onTable={() => setHandView(false)} onMore={() => setCallOpen(true)}
+          handArea={<>{handArea}{bluff}</>} actionArea={actionArea} onTable={() => setHandView(false)} onMore={() => setCallOpen(true)}
           onJoinCall={() => setJoinOpen(true)} entry={seatEntry(hand, mySeat)} />
       ) : <>
       <header className="online-top">
@@ -925,6 +953,7 @@ function OnlineTable({ reactions = [], react, code, table, mySeat, cards, me, is
                 {(!stream || !hasVideo(stream) || (who.id === me.id && !call.camOn)) && (
                   <Avatar value={who ? icons[who.id] : null} name={who?.name ?? '?'} bot={who?.bot} className="seat-icon" />
                 )}
+                {teases[s] > 0 && <SpadeTease level={teases[s]} />}
                 {r?.dealer === s && <span className="dealer-chip">D</span>}
               </div>
               {/* With big videos on, each player's name and books/bid are in the title bar over their tile instead */}
@@ -947,7 +976,7 @@ function OnlineTable({ reactions = [], react, code, table, mySeat, cards, me, is
 
         {big && (
           <BigVideos onTap={tapSeat} table={table} posOf={posOf} mySeat={mySeat} me={me} call={call} icons={icons}
-            videoOf={videoOf} peerOf={peerOf} left={left} hurry={hurry} scoreText={scoreText} tv={tv}
+            videoOf={videoOf} peerOf={peerOf} left={left} hurry={hurry} scoreText={scoreText} tv={tv} teases={teases}
             onMore={() => setCallOpen(true)} />
         )}
         {dealing && <DealAnimation dealer={r.dealer} posOf={posOf} />}
@@ -1000,6 +1029,7 @@ function OnlineTable({ reactions = [], react, code, table, mySeat, cards, me, is
             <span>{cards ? `${cards.length} cards` : ''}</span>
           </div>
           {handArea}
+          {bluff}
           <div className="dock-action">{actionArea}</div>
         </div>
       )}
@@ -1224,11 +1254,20 @@ function HandView({ reactions, onReact, mySeat, table, st, myTurn, left, hurry, 
   );
 }
 
+/** The spade bluff over a player's video or picture, as strong as their slider says. */
+function SpadeTease({ level }) {
+  return (
+    <svg className="spade-tease" viewBox="0 0 100 100" style={{ opacity: level }} aria-hidden="true">
+      <path d="M50 6C38 24 12 38 12 60c0 13 10 21 21 21 6 0 11-2 14-6-1 7-4 13-10 18h26c-6-5-9-11-10-18 3 4 8 6 14 6 11 0 21-8 21-21C88 38 62 24 50 6Z" />
+    </svg>
+  );
+}
+
 // Each seat's corner, going round the table the same way the seats do: you bottom left, then clockwise.
 const CORNER = { bottom: 'bl', left: 'tl', top: 'tr', right: 'br' };
 
 /** Big video tiles in the table's corners (or a player's icon, big, when their camera is off). */
-function BigVideos({ onTap, table, posOf, mySeat, me, call, icons, videoOf, peerOf, left, hurry, scoreText, tv, onMore }) {
+function BigVideos({ onTap, table, posOf, mySeat, me, call, icons, videoOf, peerOf, left, hurry, scoreText, tv, onMore, teases = {} }) {
   const r = table.round;
   const box = useRef(null);
   const [layout, setLayout] = useState(null);
@@ -1279,6 +1318,7 @@ function BigVideos({ onTap, table, posOf, mySeat, me, call, icons, videoOf, peer
             {/* Audio plays from the video element even with the camera off, so it's always there. */}
             {stream && <VideoTile stream={stream} muted={mine || !call.speakerOn} mirrored={mine} className={showVideo ? '' : 'no-video'} />}
             {!showVideo && <Avatar value={icons[who.id]} name={who.name} bot={who.bot} className="big-icon" />}
+            {teases[s] > 0 && <SpadeTease level={teases[s]} />}
             <div className="big-title">
               <span className="big-name">{micOff && <Icon name="micOff" size={13} />}{s === mySeat ? 'You' : who.name}{r?.dealer === s && <span className="big-dealer">D</span>}</span>
               <span className="big-score">{scoreText(s)}</span>

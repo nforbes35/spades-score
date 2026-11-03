@@ -1775,3 +1775,17 @@ button.choice:active { transform: scale(0.98); }
   100% { translate: 0 0; scale: 1; rotate: 0deg; opacity: 1; }
 }
 @media (prefers-reduced-motion: reduce) { .trick-card:is(.thrown, .play-spin, .play-papi, .play-papi-wait, .play-slam), .papi { animation-duration: 0.01s !important; } }
+
+/* ---------- The spade bluff: a slider under your cards fades a ♠ in over your video for everyone ---------- */
+.spade-bluff { display: flex; align-items: center; gap: 10px; width: 100%; max-width: 340px; margin: 4px auto 0; color: #fff; }
+.spade-bluff .sb-min { font-size: 13px; opacity: 0.45; }
+.spade-bluff .sb-max { font-size: 22px; line-height: 1; }
+.spade-bluff input { flex: 1; min-width: 0; height: 26px; margin: 0; accent-color: var(--btn, #2f9e62); }
+.hand-view .spade-bluff { margin-top: 12px; max-width: 420px; }
+/* A black spade with a white glow, so it shows on any video or picture */
+.spade-tease {
+  position: absolute; left: 50%; top: 50%; z-index: 1; width: 74%; height: 74%; translate: -50% -50%; pointer-events: none;
+  fill: #0b0b0b; transition: opacity 0.12s linear;
+  filter: drop-shadow(0 0 1.5px #fff) drop-shadow(0 0 6px #fff) drop-shadow(0 0 14px rgba(255, 255, 255, 0.7));
+}
+.big-tile .spade-tease { width: auto; height: 62%; max-width: 80%; top: calc(50% + 14px); }
