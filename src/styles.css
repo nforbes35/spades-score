@@ -1932,3 +1932,31 @@ button.choice:active { transform: scale(0.98); }
 .big-videos.grid-2x2 .big-tile:is(.tr, .br) .big-played { grid-column: 1; justify-self: start; }
 .big-videos.grid-2x2 .big-tile:is(.tl, .tr) .big-title { top: auto; bottom: 0; border-bottom: 0; border-top: 2px solid var(--team); }
 .big-videos.grid-2x2 .big-tile:is(.tl, .tr) .big-secs { bottom: auto; top: 6px; }
+
+/* Video chat only: the played card in a bigger box at the tile's inner corner. The title bar's team line turns
+   the corner to wrap round it. (--pw: the box's width, from the tile's width.) */
+.felt.video-only .big-played {
+  --pw: clamp(66px, 36cqw, 140px);
+  position: absolute; z-index: 2; width: var(--pw); height: calc(100% + var(--pw) * 0.5); margin: 0;
+  display: grid; place-items: center; background: rgba(0, 0, 0, 0.62); border: 0 solid var(--team);
+  -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+}
+.felt.video-only .big-played .card-chip { font-size: calc(var(--pw) * 0.4) !important; padding: 0.06em 0.28em !important; border-radius: 0.2em !important; }
+/* title bar at the top of the tile (bottom tiles in 2 × 2, all tiles four across): the box hangs down */
+.felt.video-only .big-videos:is(.grid-2x2, .grid-4x1, .grid-1x4) .big-tile:not(.grid-top) .big-played { top: 0; }
+/* inner side: right for the left tiles, left for the right tiles */
+.felt.video-only .big-videos.grid-2x2 .big-tile:is(.tl, .bl) .big-played { right: 0; left: auto; border-left-width: 2px; }
+.felt.video-only .big-videos.grid-2x2 .big-tile:is(.tr, .br) .big-played { left: 0; right: auto; border-right-width: 2px; }
+.felt.video-only .big-videos.grid-2x2 .big-tile:is(.bl, .br) .big-played { top: 0; bottom: auto; border-bottom-width: 2px; }
+.felt.video-only .big-videos.grid-2x2 .big-tile.bl .big-played { border-bottom-left-radius: 12px; }
+.felt.video-only .big-videos.grid-2x2 .big-tile.br .big-played { border-bottom-right-radius: 12px; }
+/* top two tiles: their title bar is at the bottom, so the box rises up from it */
+.felt.video-only .big-videos.grid-2x2 .big-tile:is(.tl, .tr) .big-played { top: auto; bottom: 0; border-top-width: 2px; }
+.felt.video-only .big-videos.grid-2x2 .big-tile.tl .big-played { border-top-left-radius: 12px; }
+.felt.video-only .big-videos.grid-2x2 .big-tile.tr .big-played { border-top-right-radius: 12px; }
+/* four across / stacked: the box hangs down at the right end of the title bar */
+.felt.video-only .big-videos:is(.grid-4x1, .grid-1x4) .big-played { right: 0; left: auto; top: 0; border-left-width: 3px; border-bottom-width: 3px; border-bottom-left-radius: 12px; }
+.felt.video-only .big-videos:is(.grid-4x1, .grid-1x4) .big-title { padding-right: calc(clamp(66px, 36cqw, 140px) + 8px); }
+/* the spade badge steps to the other corner where the box is */
+.felt.video-only .big-videos.grid-2x2 .big-tile.bl .spade-tease { right: auto; left: 8px; }
+.felt.video-only .big-videos:is(.grid-4x1, .grid-1x4) .big-tile .spade-tease { right: auto; left: 8px; }
