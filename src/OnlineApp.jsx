@@ -5,7 +5,7 @@ import { standings, winner, signed, scoreTeam, isNil, nilLabel, STANDARD_RULES }
 import { SEATS, teamOf, seatEntry } from './lib/table.js';
 import { sortHand } from './lib/cards.js';
 import { newTable, startGame, deal, placeBid, playCard, legalCards, backToLobby, publicTable, currentHand, ONLINE_RULES } from './lib/online.js';
-import { botBid, botPlay, botNames } from './lib/bots.js';
+import { botBid, botPlay, pickBotNames } from './lib/bots.js';
 import { useRoom, joinLink } from './lib/room.js';
 import { useDevice } from './lib/device.js';
 import { useCall } from './lib/call.js';
@@ -304,14 +304,14 @@ function hostLobbyActions(act, toast) {
   return {
     addBot: (seat) => act((t) => {
       const used = new Set(t.seats.filter(Boolean).map((s) => s.name));
-      const botName = botNames.find((n) => !used.has(n)) ?? 'Computer';
+      const botName = pickBotNames(used, 1)[0] ?? 'Computer';
       const seats = [...t.seats];
       seats[seat] = { id: `bot-${seat}-${Date.now()}`, name: botName, bot: true };
       return { ...t, seats };
     }),
     fillBots: () => act((t) => {
       const used = new Set(t.seats.filter(Boolean).map((s) => s.name));
-      const free = botNames.filter((n) => !used.has(n));
+      const free = pickBotNames(used, 4);
       return { ...t, seats: t.seats.map((s, i) => s ?? { id: `bot-${i}-${Date.now()}`, name: free.shift() ?? 'Computer', bot: true }) };
     }),
     clearSeat: (seat) => act((t) => ({ ...t, seats: t.seats.map((s, i) => (i === seat ? null : s)) })),

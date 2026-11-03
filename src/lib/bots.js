@@ -75,6 +75,20 @@ export function botPlay(table, seat) {
   return lowest(losers.length ? losers : options);
 }
 
-export const botNames = ['Ace', 'Lucky', 'Jack', 'Queenie'];
+export const botNames = [
+  'Ace', 'Lucky', 'Jack', 'Queenie', 'Duke', 'Dixie', 'Spike', 'Biscuit', 'Domino', 'Trixie', 'Bandit', 'Sunny',
+  'Rocket', 'Peaches', 'Hoss', 'Ziggy', 'Slick', 'Joker', 'Goldie', 'Tank', 'Lulu', 'Buster', 'Pepper', 'Shuffles',
+  'Diamond', 'Gus', 'Sugar', 'Moose', 'Penny', 'Tex', 'Cookie', 'Boomer',
+];
+
+/** `count` different computer names, picked at random, skipping names already at the table. */
+export function pickBotNames(used, count) {
+  const free = botNames.filter((n) => !used.has(n));
+  for (let i = free.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [free[i], free[j]] = [free[j], free[i]];
+  }
+  return free.slice(0, count);
+}
 export const isBotSeat = (table, seat) => Boolean(table.seats[seat]?.bot);
 export const seatTeam = (seat) => SEATS[seat][0];
