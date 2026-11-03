@@ -26,7 +26,6 @@ import { history } from './lib/scoring.js';
 const ID_KEY = 'spades-device-id';
 const TV_ID_KEY = 'spades-tv-id';
 // The last online game on this device, for the home screen's Rejoin button.
-const BIG_VIDEO_KEY = 'spades-big-video';
 const TABLE_MODE_KEY = 'spades-table-mode'; // 'full', 'backdrop' (no table, just the theme) or 'video' (just the video chat)
 const TV_BIG_VIDEO_KEY = 'spades-tv-big-video'; // the TV remembers its own choice
 export const LAST_ONLINE_KEY = 'spades-last-online';
@@ -767,20 +766,16 @@ function OnlineTable({ reactions = [], react, teases = {}, tease, code, table, m
   const [joinOpen, setJoinOpen] = useState(false); // choosing video or audio only
   // Hand view: just your cards, big, for playing with the table on a TV. Always starts in the table view.
   const [handView, setHandView] = useState(false);
-  const [bigVideo, setBigVideo] = useState(() => read(BIG_VIDEO_KEY) === true);
   // How much of the table to show on this device (••• menu), remembered for next time.
   const [tableMode, setTableModeState] = useState(() => (tv ? 'full' : read(TABLE_MODE_KEY) ?? 'full'));
   const setTableMode = (m) => { setTableModeState(m); write(TABLE_MODE_KEY, m); };
   const videoOnly = !tv && tableMode === 'video';
-  const big = videoOnly || (tv ? tvBig : bigVideo && call.joined);
+  const big = videoOnly || (tv && tvBig); // video tiles: video chat only here, or the TV's large video chat
   // A seat's books/bid ('bidding…' or '–' until they've bid), for its nameplate or its big video tile.
   const scoreText = (s) => {
     const entry = seatEntry(hand, s);
     const call = isNil(entry.call) ? nilLabel(entry.call) : entry.bid;
-    // (in pieces, so the upright big-video bars can stand the numbers up one over the other)
-    if (table.phase !== 'bidding') {
-      return <><span className="sc-books">{entry.books}</span><small><span className="sc-slash">/</span><span className={typeof call === 'number' ? 'sc-num' : 'sc-word'}>{call}</span></small></>;
-    }
+    if (table.phase !== 'bidding') return <>{entry.books}<small>/{call}</small></>;
     if (hasBid(table, s)) return isNil(entry.call) ? call : `bid ${call}`;
     return table.round?.turn === s ? 'bidding…' : '–';
   };
@@ -851,8 +846,6 @@ function OnlineTable({ reactions = [], react, teases = {}, tease, code, table, m
   const trickCards = showingLast ? r.lastTrick.cards : r?.trick ?? [];
 
   const { layout } = useTableLayout();
-  // Large video chat on an upright phone: the videos fill the top, the played cards sit just above your hand.
-  const videosTop = big && !videoOnly && !tv && layout === 'tall';
   // The spade bluff slider: under your cards when upright, just to their right when sideways.
   const bluff = tease && cards && !dealing && !coverCards && ['bidding', 'playing'].includes(table.phase) && (
     <label className="spade-bluff">
@@ -931,7 +924,6 @@ function OnlineTable({ reactions = [], react, teases = {}, tease, code, table, m
               call.joined
                 ? { icon: 'video', label: 'Video chat settings', onClick: () => setCallOpen(true) }
                 : { icon: 'video', label: 'Join video chat', onClick: () => setJoinOpen(true) },
-              call.joined && !videoOnly && { icon: 'grow', label: 'Large video chat', on: bigVideo, onClick: () => { setBigVideo(!bigVideo); write(BIG_VIDEO_KEY, !bigVideo); } },
               { icon: 'users', label: 'Video chat only', note: 'Hide the table, fill it with video', on: tableMode === 'video', onClick: () => setTableMode(tableMode === 'video' ? 'full' : 'video') },
               { icon: 'expand', label: 'Hide the table', note: 'Just the backdrop', on: tableMode === 'backdrop', onClick: () => setTableMode(tableMode === 'backdrop' ? 'full' : 'backdrop') },
               mySeat >= 0 && { icon: 'hand', label: 'Hand view', note: 'Just your cards, big', onClick: () => setHandView(true) },
@@ -943,7 +935,7 @@ function OnlineTable({ reactions = [], react, teases = {}, tease, code, table, m
         </div>
       </header>
 
-      <div className={`felt${big ? ' big-on' : ''}${videosTop ? ' videos-top' : ''}${tableMode !== 'full' ? ' no-table' : ''}${videoOnly ? ' video-only' : ''}`}>
+      <div className={`felt${big ? ' big-on' : ''}${tableMode !== 'full' ? ' no-table' : ''}${videoOnly ? ' video-only' : ''}`}>
         <div className="table-oval" aria-hidden="true">
           <span className="table-logo">♠</span>
           {deck.verse && <p className="table-verse">“{deck.verse}”<small>{deck.verseRef}</small></p>}
@@ -1004,7 +996,7 @@ function OnlineTable({ reactions = [], react, teases = {}, tease, code, table, m
 
         {big && (
           <BigVideos onTap={tapSeat} table={table} posOf={posOf} mySeat={mySeat} me={me} call={call} icons={icons}
-            videoOf={videoOf} peerOf={peerOf} left={left} hurry={hurry} scoreText={scoreText} tv={tv} teases={teases} fill={videoOnly} top={videosTop}
+            videoOf={videoOf} peerOf={peerOf} left={left} hurry={hurry} scoreText={scoreText} tv={tv} teases={teases} fill={videoOnly}
             played={videoOnly ? Object.fromEntries(trickCards.map((t) => [t.seat, t.card])) : null}
             wonBy={videoOnly && showingLast ? r.lastTrick.winner : null}
             onMore={() => setCallOpen(true)} />
@@ -1042,8 +1034,8 @@ function OnlineTable({ reactions = [], react, teases = {}, tease, code, table, m
           <div className="call-sheet">
             <CallButtons call={{ ...call, leave: () => { setCallOpen(false); call.leave(); } }} size={22} />
             <div className="card group call-options">
-              <Toggle label="Large video chat" checked={bigVideo}
-                onChange={(on) => { setBigVideo(on); write(BIG_VIDEO_KEY, on); }} />
+              <Toggle label="Video chat only" checked={videoOnly}
+                onChange={(on) => setTableMode(on ? 'video' : 'full')} />
             </div>
             <SoundNote call={call} />
           </div>
@@ -1405,7 +1397,7 @@ function SpadeTease({ level }) {
 const CORNER = { bottom: 'bl', left: 'tl', top: 'tr', right: 'br' };
 
 /** Big video tiles in the table's corners (or a player's icon, big, when their camera is off). */
-function BigVideos({ onTap, table, posOf, mySeat, me, call, icons, videoOf, peerOf, left, hurry, scoreText, tv, onMore, teases = {}, fill = false, top = false, played = null, wonBy = null }) {
+function BigVideos({ onTap, table, posOf, mySeat, me, call, icons, videoOf, peerOf, left, hurry, scoreText, tv, onMore, teases = {}, fill = false, played = null, wonBy = null }) {
   const r = table.round;
   const box = useRef(null);
   const [layout, setLayout] = useState(null);
@@ -1434,12 +1426,7 @@ function BigVideos({ onTap, table, posOf, mySeat, me, call, icons, videoOf, peer
         const r = g.firstElementChild.getBoundingClientRect();
         return { left: (r.left - a.left) * k - pad, right: (r.right - a.left) * k + pad, top: (r.top - a.top) * k - pad, bottom: (r.bottom - a.top) * k + pad };
       });
-      // Videos at the top: they fill everything above the played cards
-      if (top) {
-        setLayout(gridLayout({ width: W, height: Math.min(...cards.map((c) => c.top)), gap: 6 }));
-        return;
-      }
-      setLayout(bigLayout({ width: W, height: H, gap: tv ? 12 : 6, bottom, cards, tallBias: !tv && H > W ? 0.4 : 0 }));
+      setLayout(bigLayout({ width: W, height: H, gap: tv ? 12 : 6, bottom, cards }));
     };
     measure();
     const ro = new ResizeObserver(measure);
@@ -1448,7 +1435,7 @@ function BigVideos({ onTap, table, posOf, mySeat, me, call, icons, videoOf, peer
     if (ghosts) ro.observe(ghosts);
     if (dockEl) ro.observe(dockEl); // it grows and shrinks between bidding and playing
     return () => ro.disconnect();
-  }, [tv, fill, top]);
+  }, [tv, fill]);
   return (
     <div className={`big-videos${layout ? ` ${layout.kind}` : ''}`} ref={box}>
       {SEATS.map((_, s) => {

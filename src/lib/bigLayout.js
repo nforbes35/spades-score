@@ -21,9 +21,8 @@ function fit(w, h) {
  * pixels. `cards` are the boxes where played cards land (already padded); `bottom` is room to leave along
  * the bottom.
  */
-export function bigLayout({ width: W, height: H, cards, gap = 6, bottom = 0, tallBias = 0 }) {
-  // tallBias > 0 favours taller tiles over the very biggest (upright phones: faces are taller than wide)
-  const score = (t) => t.w * t.h * (t.h / t.w) ** tallBias;
+export function bigLayout({ width: W, height: H, cards, gap = 6, bottom = 0 }) {
+  const score = (t) => t.w * t.h;
   const B = H - bottom; // usable height
   const options = [];
 
