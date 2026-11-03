@@ -21,7 +21,9 @@ function fit(w, h) {
  * pixels. `cards` are the boxes where played cards land (already padded); `bottom` is room to leave along
  * the bottom.
  */
-export function bigLayout({ width: W, height: H, cards, gap = 6, bottom = 0 }) {
+export function bigLayout({ width: W, height: H, cards, gap = 6, bottom = 0, tallBias = 0 }) {
+  // tallBias > 0 favours taller tiles over the very biggest (upright phones: faces are taller than wide)
+  const score = (t) => t.w * t.h * (t.h / t.w) ** tallBias;
   const B = H - bottom; // usable height
   const options = [];
 
@@ -42,7 +44,7 @@ export function bigLayout({ width: W, height: H, cards, gap = 6, bottom = 0 }) {
   for (const h of heights) {
     if (h > (B - 3 * gap) / 2) continue;
     const t = fit(widthFor(h), h);
-    if (t && widthFor(t.h) >= t.w - 0.5 && (!options[0] || t.w * t.h > options[0].w * options[0].h)) options[0] = t;
+    if (t && widthFor(t.h) >= t.w - 0.5 && (!options[0] || score(t) > score(options[0]))) options[0] = t;
   }
   if (options[0]) {
     const { w, h } = options[0];
@@ -68,7 +70,7 @@ export function bigLayout({ width: W, height: H, cards, gap = 6, bottom = 0 }) {
   }
 
   if (!options.length) return null;
-  const best = options.reduce((a, b) => (b.w * b.h > a.w * a.h ? b : a));
+  const best = options.reduce((a, b) => (score(b) > score(a) ? b : a));
   const rects = {};
   for (const [k, r] of Object.entries(best.rects)) rects[k] = { ...r, width: best.w, height: best.h };
   return { kind: best.kind, rects };

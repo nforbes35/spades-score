@@ -1415,7 +1415,7 @@ function BigVideos({ onTap, table, posOf, mySeat, me, call, icons, videoOf, peer
     const measure = () => {
       const a = el.getBoundingClientRect();
       const k = el.offsetWidth / (a.width || 1); // screen pixels to the page's own (zoomed tables)
-      const pad = 8;
+      const pad = 6;
       const W = el.offsetWidth, H = el.offsetHeight;
       // Keep clear of your hand and bid buttons where they overlap the table (upright phones), and of the
       // TV's corner buttons; the played cards go in the middle of what's left.
@@ -1432,7 +1432,7 @@ function BigVideos({ onTap, table, posOf, mySeat, me, call, icons, videoOf, peer
         const r = g.firstElementChild.getBoundingClientRect();
         return { left: (r.left - a.left) * k - pad, right: (r.right - a.left) * k + pad, top: (r.top - a.top) * k - pad, bottom: (r.bottom - a.top) * k + pad };
       });
-      setLayout(bigLayout({ width: W, height: H, gap: tv ? 12 : 6, bottom, cards }));
+      setLayout(bigLayout({ width: W, height: H, gap: tv ? 12 : 6, bottom, cards, tallBias: !tv && H > W ? 0.4 : 0 }));
     };
     measure();
     const ro = new ResizeObserver(measure);

@@ -1958,3 +1958,5 @@ button.choice:active { transform: scale(0.98); }
 }
 :root[data-layout='tall'] .app.online:not(.tv-mode) .big-videos:is(.corners, .pairs) .big-score:has(.sc-books) small { display: contents; }
 :root[data-layout='tall'] .app.online:not(.tv-mode) .big-videos:is(.corners, .pairs) .big-score .sc-slash { display: block; font-size: 0; width: 12px; height: 2px; margin: 1px 0; background: currentColor; opacity: 0.75; border-radius: 1px; }
+/* Large video chat on upright phones: slightly smaller played cards, so the video tiles can be taller */
+:root[data-layout='tall'] .app.online:not(.tv-mode) .felt.big-on :is(.trick, .trick-ghost) .trick-card .pcard { --w: 52px; }
