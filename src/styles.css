@@ -1662,9 +1662,12 @@ button.choice:active { transform: scale(0.98); }
 .avatar.tappable, .big-tile { cursor: pointer; }
 .avatar.tappable:active { scale: 0.95; }
 .fx-layer { position: absolute; inset: 0; pointer-events: none; z-index: 6; overflow: visible; }
-.fx { position: absolute; translate: -50% -50%; font-size: 44px; line-height: 1; filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.45)); }
-/* An emoji pops up over its sender, then drifts off */
+.fx { position: absolute; translate: -50% -50%; font-size: 48px; line-height: 1; display: grid; place-items: center; }
+.fx > * { grid-area: 1 / 1; }
+.fx-item { position: relative; z-index: 1; filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.5)); }
+/* An emoji pops up over its sender in a soft glow, then drifts off */
 .fx-emoji { animation: fx-pop 2.6s cubic-bezier(.2, 1.2, .3, 1) both; }
+.fx-emoji .fx-item { font-size: 56px; padding: 10px; border-radius: 50%; background: radial-gradient(circle, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0) 68%); }
 @keyframes fx-pop {
   0% { transform: scale(0.2) translateY(10px); opacity: 0; }
   15% { transform: scale(1.35) translateY(-30px); opacity: 1; }
@@ -1672,25 +1675,60 @@ button.choice:active { transform: scale(0.98); }
   80% { transform: scale(1) translateY(-46px); opacity: 1; }
   100% { transform: scale(0.8) translateY(-70px); opacity: 0; }
 }
-/* A gift arcs from the sender to the receiver, lands with a bounce, then fades */
-.fx-gift { animation: fx-fly 3s ease-in-out both; }
+/* A gift arcs from the sender to the receiver with a spin, lands with a bounce, then fades */
+.fx-gift { animation: fx-fly 3.2s ease-in-out both; }
 @keyframes fx-fly {
-  0% { transform: translate(0, 0) scale(0.4) rotate(-20deg); opacity: 0; }
+  0% { transform: translate(0, 0) scale(0.4) rotate(-30deg); opacity: 0; }
   8% { opacity: 1; }
-  25% { transform: translate(calc(var(--dx) * 0.35), calc(var(--dy) * 0.35 - 70px)) scale(1.3) rotate(10deg); }
-  45% { transform: translate(var(--dx), var(--dy)) scale(1.5) rotate(0deg); }
-  55% { transform: translate(var(--dx), var(--dy)) scale(1) rotate(0deg); }
-  62% { transform: translate(var(--dx), calc(var(--dy) - 14px)) scale(1.15); }
-  70% { transform: translate(var(--dx), var(--dy)) scale(1); }
-  88% { transform: translate(var(--dx), var(--dy)) scale(1); opacity: 1; }
-  100% { transform: translate(var(--dx), var(--dy)) scale(0.6); opacity: 0; }
+  25% { transform: translate(calc(var(--dx) * 0.35), calc(var(--dy) * 0.35 - 80px)) scale(1.3) rotate(160deg); }
+  42% { transform: translate(var(--dx), var(--dy)) scale(1.6) rotate(360deg); }
+  52% { transform: translate(var(--dx), var(--dy)) scale(1) rotate(360deg); }
+  60% { transform: translate(var(--dx), calc(var(--dy) - 16px)) scale(1.15) rotate(360deg); }
+  68% { transform: translate(var(--dx), var(--dy)) scale(1) rotate(360deg); }
+  88% { transform: translate(var(--dx), var(--dy)) scale(1) rotate(360deg); opacity: 1; }
+  100% { transform: translate(var(--dx), var(--dy)) scale(0.6) rotate(360deg); opacity: 0; }
 }
-@media (prefers-reduced-motion: reduce) { .fx-emoji, .fx-gift { animation-duration: 0.01s; } }
-.tv-mode .fx { font-size: 72px; }
+/* The ring and sparkles: when an emoji pops (0.3s), when a gift lands (1.35s) */
+.fx-ring { width: 64px; height: 64px; border-radius: 50%; border: 3px solid rgba(255, 224, 130, 0.95); box-shadow: 0 0 18px rgba(255, 210, 90, 0.8); opacity: 0; }
+.fx-spark { width: 7px; height: 7px; border-radius: 50%; background: #fff6c8; box-shadow: 0 0 8px 2px rgba(255, 205, 80, 0.9); opacity: 0; }
+.fx-spark:nth-child(3n) { background: #ffd1e6; box-shadow: 0 0 8px 2px rgba(255, 120, 180, 0.85); }
+.fx-spark:nth-child(3n + 1) { width: 5px; height: 5px; }
+.fx-emoji .fx-ring { animation: fx-ring 0.7s ease-out 0.3s both; }
+.fx-emoji .fx-spark { animation: fx-spark 0.8s ease-out 0.3s both; }
+.fx-gift .fx-ring { animation: fx-ring 0.8s ease-out 1.35s both; }
+.fx-gift .fx-spark { animation: fx-spark 0.9s ease-out 1.35s both; }
+@keyframes fx-ring { 0% { scale: 0.3; opacity: 1; } 100% { scale: 2.2; opacity: 0; } }
+@keyframes fx-spark {
+  0% { transform: rotate(var(--a)) translateY(0) scale(1); opacity: 1; }
+  100% { transform: rotate(var(--a)) translateY(calc(var(--d) * -1)) scale(0.3); opacity: 0; }
+}
+/* Who it's from, under the gift once it lands (it undoes the gift's spin and scale) */
+.fx-tag {
+  align-self: start; margin-top: 64px; padding: 3px 10px; border-radius: 999px; white-space: nowrap;
+  background: rgba(0, 0, 0, 0.72); color: #fff; font-size: 13px; font-weight: 800; font-family: inherit;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4); animation: fx-tag 3.2s ease both;
+}
+@keyframes fx-tag { 0%, 45% { opacity: 0; translate: 0 -6px; } 55%, 88% { opacity: 1; translate: 0 0; } 100% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .fx-emoji, .fx-gift, .fx-ring, .fx-spark, .fx-tag { animation-duration: 0.01s; } }
+.tv-mode .fx { font-size: 80px; }
+.tv-mode .fx-emoji .fx-item { font-size: 92px; }
+.tv-mode .fx-ring { width: 110px; height: 110px; }
+.tv-mode .fx-tag { font-size: 22px; margin-top: 108px; }
 
 .react-sheet .section-title:first-child { margin-top: 4px; }
 .react-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; }
-.react-grid button { border: 0; border-radius: 14px; background: var(--surface); box-shadow: var(--shadow); padding: 8px 0; font-size: 28px; line-height: 1.1; display: flex; flex-direction: column; align-items: center; gap: 2px; color: var(--ink); }
+.react-subtitle { margin: 10px 2px 6px; font-size: 12px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
+.react-grid button {
+  border: 0; border-radius: 16px; padding: 8px 0 7px; font-size: 30px; line-height: 1.1; display: flex; flex-direction: column; align-items: center; gap: 3px; color: var(--ink);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--surface) 88%, #fff), color-mix(in srgb, var(--surface) 92%, #000));
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.6) inset, 0 0 0 1px color-mix(in srgb, var(--line) 70%, transparent), 0 3px 8px rgba(0, 0, 0, 0.08);
+  transition: transform 0.12s;
+}
+.react-grid button > span { filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.2)); }
+.react-grid.emojis button { font-size: 32px; padding: 9px 0; }
+.react-grid.gifts { grid-template-columns: repeat(4, 1fr); }
+.react-grid.gifts button { font-size: 34px; padding: 10px 0 8px; }
+@media (min-width: 520px) { .react-grid.gifts { grid-template-columns: repeat(6, 1fr); } }
 .react-grid button:active { transform: scale(0.92); }
 .react-grid small { font-size: 10.5px; font-weight: 700; color: var(--muted); }
 .react-grid.waiting button { opacity: 0.4; }

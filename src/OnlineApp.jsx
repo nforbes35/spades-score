@@ -986,7 +986,7 @@ function OnlineTable({ reactions = [], react, teases = {}, tease, code, table, m
             onMore={() => setCallOpen(true)} />
         )}
         {dealing && <DealAnimation dealer={r.dealer} posOf={posOf} />}
-        <ReactionsLayer reactions={reactions} />
+        <ReactionsLayer reactions={reactions} names={table.seats.map((w, s) => (s === mySeat ? 'You' : w?.name))} />
         {big && (
           <div className="trick trick-ghost" aria-hidden="true">
             {['bottom', 'left', 'top', 'right'].map((p) => <div key={p} className={`trick-card ${p}`}><PlayingCard code="AS" size="md" /></div>)}
@@ -1144,10 +1144,17 @@ function PapiGame({ g, table, mySeat, icons, send }) {
   );
 }
 
-const EMOJIS = ['😂', '😍', '👏', '🔥', '😮', '😢', '😎', '🙏', '👍', '🤔', '💪', '🎉'];
-const GIFTS = [
-  ['🌹', 'Rose'], ['☕', 'Coffee'], ['🍰', 'Cake'], ['🍕', 'Pizza'], ['🏆', 'Trophy'], ['💐', 'Flowers'],
-  ['👑', 'Crown'], ['🎈', 'Balloon'], ['🍪', 'Cookie'], ['🧁', 'Cupcake'], ['🍦', 'Ice cream'], ['💖', 'Love'],
+// Emojis pop up over you; gifts fly to someone. Grouped for the picker; all clean.
+const EMOJI_GROUPS = [
+  ['Feelings', ['😂', '🤣', '😍', '🥰', '😎', '🥳', '😮', '😱', '🤯', '😬', '😢', '😭']],
+  ['At the table', ['👏', '🔥', '💯', '🙏', '👍', '👎', '💪', '🤔', '🙄', '🤫', '😴', '🥶', '😤', '🤡', '🫡', '♠️', '💀', '🎉']],
+];
+const GIFT_GROUPS = [
+  ['Treats', [['☕', 'Coffee'], ['🍩', 'Donut'], ['🍪', 'Cookie'], ['🧁', 'Cupcake'], ['🎂', 'Cake'], ['🍕', 'Pizza'],
+    ['🌮', 'Taco'], ['🍿', 'Popcorn'], ['🍦', 'Ice cream'], ['🥤', 'Soda'], ['🍉', 'Watermelon'], ['🍫', 'Chocolate']]],
+  ['Prizes', [['🏆', 'Trophy'], ['🥇', 'Gold medal'], ['👑', 'Crown'], ['💎', 'Diamond'], ['🐐', 'GOAT'], ['⭐', 'Star']]],
+  ['Just for fun', [['🌹', 'Rose'], ['💐', 'Flowers'], ['🎈', 'Balloon'], ['🎁', 'Present'], ['🧸', 'Teddy bear'], ['🍀', 'Good luck'],
+    ['🌈', 'Rainbow'], ['🚀', 'Rocket'], ['🧯', 'Cool off'], ['🧊', 'Ice cold'], ['🎺', 'Fanfare'], ['💖', 'Love']]],
 ];
 
 /** Pick who and what: a gift for another player, or an emoji that pops up over you. */
@@ -1157,10 +1164,14 @@ function ReactSheet({ table, mySeat, icons, to, onTo, onSend, onClose }) {
   return (
     <Sheet title="Emojis & gifts" short onClose={onClose} closeLabel="Close">
       <div className="react-sheet">
-        <div className="section-title">Say it</div>
-        <div className="react-grid emojis">
-          {EMOJIS.map((e) => <button key={e} type="button" onClick={() => onSend(null, e, false)} aria-label={`Send ${e}`}>{e}</button>)}
-        </div>
+        {EMOJI_GROUPS.map(([title, list]) => (
+          <div key={title}>
+            <div className="section-title">{title}</div>
+            <div className="react-grid emojis">
+              {list.map((e) => <button key={e} type="button" onClick={() => onSend(null, e, false)} aria-label={`Send ${e}`}>{e}</button>)}
+            </div>
+          </div>
+        ))}
         <div className="section-title">Send a gift to</div>
         <div className="react-to">
           {others.map((s) => (
@@ -1170,13 +1181,18 @@ function ReactSheet({ table, mySeat, icons, to, onTo, onSend, onClose }) {
             </button>
           ))}
         </div>
-        <div className={`react-grid gifts${forMe ? ' waiting' : ''}`}>
-          {GIFTS.map(([e, name]) => (
-            <button key={e} type="button" disabled={forMe} onClick={() => onSend(to, e, true)} aria-label={`Send ${name}`}>
-              <span>{e}</span><small>{name}</small>
-            </button>
-          ))}
-        </div>
+        {GIFT_GROUPS.map(([title, list]) => (
+          <div key={title}>
+            <div className="react-subtitle">{title}</div>
+            <div className={`react-grid gifts${forMe ? ' waiting' : ''}`}>
+              {list.map(([e, name]) => (
+                <button key={e} type="button" disabled={forMe} onClick={() => onSend(to, e, true)} aria-label={`Send ${name}`}>
+                  <span>{e}</span><small>{name}</small>
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
         {forMe && <p className="footnote center">Pick who the gift is for.</p>}
       </div>
     </Sheet>
@@ -1184,11 +1200,13 @@ function ReactSheet({ table, mySeat, icons, to, onTo, onSend, onClose }) {
 }
 
 /** Emojis popping up over whoever sent them; gifts flying from sender to receiver. */
-function ReactionsLayer({ reactions }) {
-  return <div className="fx-layer" aria-hidden="true">{reactions.map((x) => <Reaction key={x.id} x={x} />)}</div>;
+function ReactionsLayer({ reactions, names = [] }) {
+  return <div className="fx-layer" aria-hidden="true">{reactions.map((x) => <Reaction key={x.id} x={x} names={names} />)}</div>;
 }
 
-function Reaction({ x }) {
+const SPARKS = Array.from({ length: 10 }, (_, i) => i);
+
+function Reaction({ x, names }) {
   const ref = useRef(null);
   const [at, setAt] = useState(null);
   useLayoutEffect(() => {
@@ -1210,7 +1228,16 @@ function Reaction({ x }) {
     left: at.from[0], top: at.from[1],
     '--dx': `${at.to ? at.to[0] - at.from[0] : 0}px`, '--dy': `${at.to ? at.to[1] - at.from[1] : 0}px`,
   } : { visibility: 'hidden' };
-  return <span ref={ref} className={`fx ${x.gift && at?.to ? 'fx-gift' : 'fx-emoji'}`} style={style}>{x.item}</span>;
+  const gift = x.gift && at?.to;
+  // A burst of sparkles and a ring as it lands (gifts) or pops (emojis); gifts also say who sent them.
+  return (
+    <span ref={ref} className={`fx ${gift ? 'fx-gift' : 'fx-emoji'}`} style={style}>
+      <span className="fx-ring" />
+      {SPARKS.map((i) => <span key={i} className="fx-spark" style={{ '--a': `${i * 36 + (i % 2) * 14}deg`, '--d': `${44 + (i % 3) * 16}px` }} />)}
+      <span className="fx-item">{x.item}</span>
+      {gift && <span className="fx-tag">{names[x.from] ?? '?'} → {names[x.to] ?? '?'}</span>}
+    </span>
+  );
 }
 
 const PLAY_STYLE_CHOICES = [
