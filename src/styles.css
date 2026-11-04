@@ -2336,3 +2336,5 @@ button.choice:active { transform: scale(0.98); }
 }
 :root[data-layout='tall'] .app.dominoes:not(.tv-mode) .dom-top .dom-score:is(.t0, .t1) { max-width: 180px; }
 :root[data-layout='tall'] .app.dominoes .dom-score:is(.t0, .t1) span { max-width: none; }
+.dom-lobby .tv-invite { padding: 16px; }
+.sheet .dom-invite { box-shadow: none; background: none; border: 0; padding: 0 0 8px; }

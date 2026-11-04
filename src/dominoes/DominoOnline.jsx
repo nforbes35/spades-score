@@ -1,6 +1,7 @@
 // Dominoes online: everyone on their own phone, like Spades online. The host's device runs the game
 // (engine.js), sends everyone the table (no hands, just counts) and each player their own tiles, locked for
 // their device. Players send moves; the host checks them. Computer players fill empty seats.
+import QRCode from 'qrcode';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { read, write, tabRead, tabWrite } from '../lib/store.js';
 import { useRoom, joinLink } from '../lib/room.js';
@@ -369,7 +370,6 @@ function DominoLobby({ code, table, isHost, me, icons, act, onSit, onStand, onSt
   const { settings } = table;
   const mine = table.seats.findIndex((s) => s?.id === me.id);
   const full = table.seats.every(Boolean);
-  const link = joinLink(code);
   const set = (patch) => act((t) => ({ ...t, settings: { ...t.settings, ...patch } }));
   const addBot = (seat) => act((t) => {
     const used = new Set(t.seats.filter(Boolean).map((s) => s.name));
@@ -445,13 +445,10 @@ function DominoLobby({ code, table, isHost, me, icons, act, onSit, onStand, onSt
         {mine < 0 && <p className="muted center">Tap “Sit here” to take a seat.</p>}
 
         <div className="section-title">Invite</div>
-        <div className="card dom-invite">
-          <div className="dom-code">{code.split('').map((c) => <span key={c + Math.random()}>{c}</span>)}</div>
-          <p className="muted small">Family Games → Dominoes → Join a game, and type this code. Or send the link:</p>
-          <button type="button" className="soft" onClick={() => { if (navigator.share) navigator.share({ title: 'Dominoes', url: link }).catch(() => {}); else navigator.clipboard?.writeText(link); }}>
-            <Icon name="share" size={18} /> Share the link
-          </button>
-        </div>
+        <DomInvite code={code} />
+        <div className="section-title">Companion TV</div>
+        <TvInviteCard code={code} as="dtv" what="tiles" />
+
         {isHost && (
           <div className="dom-start">
             {!full && <button type="button" className="secondary big" onClick={fillBots}>Fill empty seats with computer players</button>}
@@ -461,6 +458,26 @@ function DominoLobby({ code, table, isHost, me, icons, act, onSit, onStand, onSt
         {!isHost && <p className="muted center">The host starts the game.</p>}
       </main>
     </>
+  );
+}
+
+/** The game's code, a QR code of the join link (point a phone's camera at it) and a share button. */
+function DomInvite({ code }) {
+  const link = joinLink(code);
+  const [qr, setQr] = useState(null);
+  const [copied, setCopied] = useState(false);
+  useEffect(() => { QRCode.toDataURL(link, { margin: 1, width: 320 }).then(setQr).catch(() => setQr(null)); }, [link]);
+  const share = () => {
+    if (navigator.share) navigator.share({ title: 'Dominoes', url: link }).catch(() => {});
+    else navigator.clipboard?.writeText(link).then(() => setCopied(true)).catch(() => {});
+  };
+  return (
+    <div className="card dom-invite">
+      <div className="dom-code">{code.split('').map((c, i) => <span key={i}>{c}</span>)}</div>
+      {qr && <img className="qr" src={qr} alt="QR code to join this game" />}
+      <p className="muted small">Point a phone’s camera at the QR code to join, or open Family Games → Dominoes → Join a game and type the letters.</p>
+      <button type="button" className="soft" onClick={share}><Icon name="share" size={18} /> {copied ? 'Link copied' : 'Share the link'}</button>
+    </div>
   );
 }
 
@@ -484,6 +501,7 @@ function DominoTable({ table, mySeat, tiles, icons, isHost, send, act, onLeave, 
   const [callOpen, setCallOpen] = useState(false);
   const [joinOpen, setJoinOpen] = useState(false);
   const [tvOpen, setTvOpen] = useState(false);
+  const [inviteOpen, setInviteOpen] = useState(false);
   const [decksOpen, setDecksOpen] = useState(false);
   const [reactTo, setReactTo] = useState(null);
   const [lastTest, setLastTest] = useState(null);
@@ -503,6 +521,7 @@ function DominoTable({ table, mySeat, tiles, icons, isHost, send, act, onLeave, 
     call.joined
       ? { icon: 'video', label: 'Video chat settings', onClick: () => setCallOpen(true) }
       : { icon: 'video', label: 'Join A/V Chat', onClick: () => setJoinOpen(true) },
+    { icon: 'share', label: 'Game code & QR', note: 'Rejoin on another phone', onClick: () => setInviteOpen(true) },
     { icon: 'tv', label: 'Add a TV', onClick: () => setTvOpen(true) },
     { icon: 'cards', label: 'Table theme', onClick: () => setDecksOpen(true) },
     alerts && {
@@ -671,6 +690,7 @@ function DominoTable({ table, mySeat, tiles, icons, isHost, send, act, onLeave, 
           </div>
         </Sheet>
       )}
+      {inviteOpen && <Sheet title={`Game ${code}`} short onClose={() => setInviteOpen(false)} closeLabel="Done"><DomInvite code={code} /></Sheet>}
       {tvOpen && <Sheet title="Companion TV" short onClose={() => setTvOpen(false)} closeLabel="Done"><TvInviteCard code={code} as="dtv" what="tiles" /></Sheet>}
       {decksOpen && <DeckPicker onClose={() => setDecksOpen(false)} />}
       {reactTo != null && canReact && (
