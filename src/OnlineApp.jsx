@@ -11,7 +11,7 @@ import { useRoom, joinLink } from './lib/room.js';
 import { useDevice, rememberTvScreen } from './lib/device.js';
 import { useCall } from './lib/call.js';
 import { useKeys, seal, unseal } from './lib/secret.js';
-import { useWakeLock, chime, buzz, dealSound, thud, glassBreak } from './lib/fx.js';
+import { useWakeLock, chime, buzz, dealSound, thud, glassBreak, cardSound, sweepSound, setSoundSetting, useSoundSettings } from './lib/fx.js';
 import { recordGame, useStatsSync, nameKey } from './lib/stats.js';
 import Stats from './Stats.jsx';
 import DeckPicker from './DeckPicker.jsx';
@@ -776,6 +776,7 @@ function OnlineTable({ reactions = [], react, teases = {}, tease, code, table, m
   const [tableMode, setTableModeState] = useState(() => (tv ? 'full' : read(TABLE_MODE_KEY) ?? 'full'));
   const setTableMode = (m) => { setTableModeState(m); write(TABLE_MODE_KEY, m); };
   const videoOnly = tv ? tvView === 'video' : tableMode === 'video';
+  const sound = useSoundSettings();
   const big = videoOnly || (tv && tvView === 'chat'); // video tiles: video chat only, or the TV's table + chat
   // A seat's books/bid ('bidding…' or '–' until they've bid), for its nameplate or its big video tile.
   const scoreText = (s) => {
@@ -829,6 +830,22 @@ function OnlineTable({ reactions = [], react, teases = {}, tease, code, table, m
     if (broken && !(w.hand === handNo && w.broken)) glassBreak({ delay: 0.25 });
     wasBroken.current = { hand: handNo, broken };
   }, [broken, handNo]);
+  // A real card slide as each card lands (thrown and fancy plays land later; slams have their thud), and a
+  // soft sweep when the finished trick is cleared away.
+  const landDelay = (c) => (c?.style || c?.thrown ? 0.45 : 0.18);
+  const trickLen = r?.trick.length ?? 0;
+  const seenLen = useRef(trickLen);
+  useEffect(() => {
+    if (trickLen > seenLen.current) { const c = r.trick.at(-1); if (c?.style !== 'slam') cardSound({ delay: landDelay(c) }); }
+    seenLen.current = trickLen;
+  }, [trickLen, handNo]);
+  const doneAt = r?.lastTrick?.at;
+  useEffect(() => {
+    if (!doneAt || Date.now() - doneAt > 1200) return;
+    const c = r.lastTrick.cards.at(-1);
+    if (c?.style !== 'slam') cardSound({ delay: landDelay(c) });
+    sweepSound({ delay: Math.max(0.5, showMs(r.lastTrick) / 1000 - 0.1) });
+  }, [doneAt]);
   // The thud, and a hard double buzz on anything that can vibrate, as the slammed card hits the table.
   useEffect(() => {
     if (slamKey) setTimeout(() => { thud(); if (document.visibilityState === 'visible') buzz([70, 40, 120]); }, 400);
@@ -949,6 +966,8 @@ function OnlineTable({ reactions = [], react, teases = {}, tease, code, table, m
               mySeat >= 0 && { icon: 'hand', label: 'Hand view', note: 'Just your cards, big', onClick: () => setHandView(true) },
               { icon: 'tv', label: 'Add a TV', onClick: () => setTvOpen(true) },
               { icon: 'cards', label: 'Cards & table', onClick: () => setDecksOpen(true) },
+              { icon: sound.effects ? 'speaker' : 'speakerOff', label: 'Sound effects', on: sound.effects, onClick: () => setSoundSetting('effects', !sound.effects) },
+              { icon: sound.glass ? 'speaker' : 'speakerOff', label: 'Glass break sound', note: 'When spades are broken', on: sound.glass, onClick: () => setSoundSetting('glass', !sound.glass) },
               { icon: 'close', label: isHost ? 'End game' : 'Leave game', danger: true, onClick: onLeave },
             ]} />
           )}
