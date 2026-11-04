@@ -181,7 +181,13 @@ const PAPI = 'papi';
 export const papiSeat = (table) => table.seats.findIndex((s) => s && !s.bot && String(s.name).trim().toLowerCase() === PAPI);
 
 /** Both teams more than 25 from winning? */
-export const papiAllowed = (table) => standings(table.game).every((x) => table.game.target - x.score > PAPI_POINTS);
+// Only when the mini game can't end the game: every team more than its points from winning (and from the
+// losing score, when that rule is on).
+export const papiAllowed = (table) => {
+  const { rules, target } = table.game;
+  const lose = rules?.loseEnabled ? Number(rules.loseScore) : null;
+  return standings(table.game).every((x) => target - x.score > PAPI_POINTS && (lose == null || x.score - lose > PAPI_POINTS));
+};
 
 /** The host plays a card, starting the Papi Flip mini game when it's Papi's moment. */
 export function playCardAsHost(table, seat, card, style, random = cryptoRandom, thrown = false) {

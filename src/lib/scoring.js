@@ -16,6 +16,9 @@ export const STANDARD_RULES = {
   bagsEnabled: true,
   bagsLimit: 10,
   bagsPenalty: 100,
+  // If on, a team that falls to loseScore or below loses straight away.
+  loseEnabled: false,
+  loseScore: -200,
   // If true, books a nil player takes still help their partner make the bid.
   nilBooksCountTowardBid: false,
 };
@@ -127,6 +130,10 @@ export const standings = (game) => {
 /** Index of the winning team, once someone reaches the target with the higher score. */
 export function winner(game) {
   const s = standings(game).map((x) => x.score);
-  if (!s.some((x) => x >= game.target) || s[0] === s[1]) return null;
+  // Losing score (if on): a team at or below it loses, so the other team wins (both: the higher score wins).
+  const lose = game.rules?.loseEnabled ? Number(game.rules.loseScore) : null;
+  const out = lose != null && Number.isFinite(lose) ? s.map((x) => x <= lose) : [false, false];
+  if (out[0] !== out[1]) return out[0] ? 1 : 0;
+  if (!(out[0] || s.some((x) => x >= game.target)) || s[0] === s[1]) return null;
   return s[0] > s[1] ? 0 : 1;
 }

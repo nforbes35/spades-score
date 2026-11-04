@@ -70,3 +70,16 @@ test('bag penalty and winner', () => {
   game.hands.push(scored(team(p(2, 2), p(0, 0)), team(p(12, 12), p(0, 0))));
   assert.equal(winner(game), 1);
 });
+
+test('losing score: a team at or below it loses (only when the rule is on)', () => {
+  // Team 1 bids 6 and takes 2 twice (-60 each), with a nil missed once (-100): -220
+  const hands = [
+    scored(team(p(3, 3), p(0, 0)), team(p(6, 2), p(0, 1, 'nil'))),
+    scored(team(p(3, 3), p(0, 0)), team(p(6, 2), p(0, 0))),
+  ];
+  const game = { target: 500, rules: STANDARD_RULES, hands };
+  assert.ok(standings(game)[1].score <= -200);
+  assert.equal(winner(game), null); // rule off
+  assert.equal(winner({ ...game, rules: { ...STANDARD_RULES, loseEnabled: true, loseScore: -200 } }), 0);
+  assert.equal(winner({ ...game, rules: { ...STANDARD_RULES, loseEnabled: true, loseScore: -500 } }), null);
+});

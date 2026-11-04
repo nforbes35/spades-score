@@ -90,8 +90,13 @@ export function RulesFields({ rules, onChange }) {
         <NumberField label="Big bid bonus" value={rules.bigBidBonus} onChange={set('bigBidBonus')} />
         <NumberField label="Big bid is this many books or more" value={rules.bigBidThreshold} onChange={set('bigBidThreshold')} width={70} />
         <Toggle label="Nil player's books help partner's bid" checked={rules.nilBooksCountTowardBid} onChange={set('nilBooksCountTowardBid')} />
+        <Toggle label="Lose at a negative score" checked={Boolean(rules.loseEnabled)} onChange={set('loseEnabled')} />
+        {rules.loseEnabled && (
+          <NumberField label="A team loses at" value={rules.loseScore ?? -200}
+            onChange={(v) => set('loseScore')(-Math.abs(v))} />
+        )}
       </div>
-      <p className="footnote">Missing a nil or blind nil costs the same amount. A made bid is 10 per book bid plus 1 per extra book.</p>
+      <p className="footnote">Missing a nil or blind nil costs the same amount. A made bid is 10 per book bid plus 1 per extra book.{rules.loseEnabled ? ` A team that falls to ${-Math.abs(rules.loseScore ?? 200)} or below loses.` : ''}</p>
 
       <div className="section-title">Bags (extra books)</div>
       <div className="card group">
