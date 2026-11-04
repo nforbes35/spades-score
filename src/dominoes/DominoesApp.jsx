@@ -2,6 +2,10 @@ import { useState } from 'react';
 import { Icon } from '../components.jsx';
 import { read, write } from '../lib/store.js';
 import Domino from './Domino.jsx';
+import { savedGames, forgetSaved } from '../lib/saved.js';
+import { savedWhen } from '../Home.jsx';
+
+const dominoSaves = () => savedGames().filter((e) => e.kind === 'dominoes');
 
 const LAST_KEY = 'dominoes-last-online';
 const REJOIN_WINDOW_MS = 24 * 60 * 60 * 1000;
@@ -12,6 +16,11 @@ export default function DominoesApp({ onAllGames, onPlayOnline, onJoin, onRejoin
   const [code, setCode] = useState('');
   const clean = code.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 4);
   const [last, setLast] = useState(() => { const l = read(LAST_KEY); return l?.code && Date.now() - l.at < REJOIN_WINDOW_MS ? l : null; });
+  const [saved, setSaved] = useState(dominoSaves);
+  const forget = (e) => {
+    if (!confirm('Delete this saved game?')) return;
+    forgetSaved(e.id); write(`dominoes-online-table-${e.code}`, null); setSaved(dominoSaves());
+  };
   return (
     <div className="home">
       <button type="button" className="all-games" onClick={onAllGames}><Icon name="chevron" size={18} /> All games</button>
@@ -31,6 +40,23 @@ export default function DominoesApp({ onAllGames, onPlayOnline, onJoin, onRejoin
               <span className="choice-text"><b>Rejoin game {last.code}</b><span>{last.host ? 'You’re the host: pick up where you left off.' : 'Go back to your seat.'}</span></span>
             </button>
             <button type="button" className="rejoin-forget" aria-label="Forget this game" onClick={() => { write(LAST_KEY, null); setLast(null); }}><Icon name="close" size={18} /></button>
+          </div>
+        )}
+        {saved.length > 0 && (
+          <div className="saved-games">
+            <div className="saved-title">Saved games</div>
+            {saved.map((e) => (
+              <div key={e.id} className="choice saved-choice">
+                <button type="button" className="rejoin-go" onClick={() => { forgetSaved(e.id); onRejoin({ code: e.code, host: true }); }}>
+                  <span className="choice-icon"><Icon name="users" size={24} /></span>
+                  <span className="choice-text">
+                    <b>{e.teams.map((t) => `${t.name} ${t.score}`).join(' · ')}</b>
+                    <span>{`Code ${e.code} · ${e.hands} hand${e.hands === 1 ? '' : 's'} · to ${e.target} · ${savedWhen(e.at)}`}</span>
+                  </span>
+                </button>
+                <button type="button" className="rejoin-forget" aria-label="Delete this saved game" onClick={() => forget(e)}><Icon name="close" size={18} /></button>
+              </div>
+            ))}
           </div>
         )}
         <button type="button" className="choice primary-choice" onClick={onPlayOnline}>

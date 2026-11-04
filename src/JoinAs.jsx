@@ -8,8 +8,8 @@ import { Icon } from './components.jsx';
 export default function JoinAs({ code, onChoose: choose, onLeave }) {
   // Picking TV (or not) is remembered, so a TV goes straight to the table next time.
   const onChoose = (as, seat) => {
-    if (['otv', 'tv'].includes(as)) rememberTvScreen(true);
-    else if (['online', 'player', 'card'].includes(as)) rememberTvScreen(false);
+    if (['otv', 'tv', 'dtv'].includes(as)) rememberTvScreen(true);
+    else if (['online', 'player', 'card', 'dominoes'].includes(as)) rememberTvScreen(false);
     choose(as, seat);
   };
   const [tvScreen] = useState(isTvScreen);
@@ -19,9 +19,13 @@ export default function JoinAs({ code, onChoose: choose, onLeave }) {
   const room = useRoom(code, device, (m) => { if (m.type === 'state') setGame(m.game); });
   const host = room.peers.find((p) => p.role === 'host');
   const onlineHost = room.peers.find((p) => p.role === 'ohost');
-  // A dominoes game: straight in (players only for now)
+  // A dominoes game: a TV (remembered) goes straight to the TV view; otherwise ask, as for Spades
   const dominoHost = room.peers.find((p) => p.role === 'dhost');
-  useEffect(() => { if (dominoHost) choose('dominoes', null); }, [Boolean(dominoHost)]);
+  useEffect(() => {
+    if (!dominoHost) return;
+    if (tvScreen) choose('dtv', null);
+    else if (playerScreen) choose('dominoes', null);
+  }, [Boolean(dominoHost)]);
   useEffect(() => { if (host) room.send({ type: 'hello' }, host.id); }, [host?.id, room.send]);
   const seats = game ? remoteSeats(game) : [];
   // The last choice is remembered: a TV goes straight to the table view, a phone that last played goes
@@ -41,25 +45,26 @@ export default function JoinAs({ code, onChoose: choose, onLeave }) {
   }, [Boolean(game || onlineHost)]);
 
   // An online game: play on this phone, or show the table on a TV.
-  if (onlineHost) {
+  if (onlineHost || dominoHost) {
+    const dom = !onlineHost;
     return (
       <div className="app">
         <header className="hero">
           <div className="wrap hero-row">
-            <div className="brand"><span className="brand-mark">♠</span><h1>Join game {code}</h1></div>
+            <div className="brand"><span className="brand-mark">{dom ? '🁫' : '♠'}</span><h1>Join game {code}</h1></div>
             <button type="button" className="icon-btn" onClick={onLeave}>Cancel</button>
           </div>
         </header>
         <main className="wrap">
           <div className="section-title">How are you joining?</div>
           <div className="stack">
-            <button type="button" className="card join-choice" onClick={() => onChoose('online', null)}>
+            <button type="button" className="card join-choice" onClick={() => onChoose(dom ? 'dominoes' : 'online', null)}>
               <Icon name="phone" />
-              <span><b>Play on this phone</b><br /><span className="muted small">Your cards, bids and video chat.</span></span>
+              <span><b>Play on this phone</b><br /><span className="muted small">{dom ? 'Your tiles' : 'Your cards, bids'} and video chat.</span></span>
             </button>
-            <button type="button" className="card join-choice" onClick={() => onChoose('otv', null)}>
+            <button type="button" className="card join-choice" onClick={() => onChoose(dom ? 'dtv' : 'otv', null)}>
               <Icon name="tv" />
-              <span><b>Show the table on this TV</b><br /><span className="muted small">The table big in the middle, everyone’s video and sound. Players keep their cards on their phones.</span></span>
+              <span><b>Show the table on this TV</b><br /><span className="muted small">The table big in the middle, everyone’s video and sound. Players keep their {dom ? 'tiles' : 'cards'} on their phones.</span></span>
             </button>
           </div>
         </main>

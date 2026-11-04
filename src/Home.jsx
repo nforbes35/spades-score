@@ -6,7 +6,7 @@ import { useDeck } from './lib/decks.js';
 const SHOWCASE = ['10S', 'JD', 'QC', 'KH', 'AS'];
 
 /** "Today 7:42 PM", "Yesterday", or a date. */
-function savedWhen(at) {
+export function savedWhen(at) {
   const d = new Date(at), now = new Date();
   const days = Math.round((new Date(now.toDateString()) - new Date(d.toDateString())) / 86400000);
   if (days === 0) return `Today ${d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;

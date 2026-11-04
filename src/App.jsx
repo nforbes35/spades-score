@@ -8,7 +8,9 @@ import { useDevice } from './lib/device.js';
 import { useCall } from './lib/call.js';
 import { useWakeLock, chime, buzz } from './lib/fx.js';
 import { recordGame, useStatsSync } from './lib/stats.js';
-import { saveGame, savedGames, forgetSaved, savedSummary } from './lib/saved.js';
+import { saveGame, savedGames as allSaved, forgetSaved, savedSummary } from './lib/saved.js';
+// Spades' home screen lists Spades games only (dominoes saves go on the Dominoes screen)
+const savedGames = () => allSaved().filter((e) => e.kind !== 'dominoes');
 import Stats from './Stats.jsx';
 import { Sheet, RulesFields, NumberField, Icon, useToast, Confetti, StatusDot, CardText } from './components.jsx';
 import { BidsPanel, PlayPanel } from './LiveHand.jsx';
@@ -70,6 +72,7 @@ export default function App() {
   if (join?.as === 'tv') return <TvApp code={join.code} onLeave={leave} />;
   if (join?.as === 'card' && join.seat != null) return <CardDisplayApp code={join.code} seat={join.seat} onLeave={leave} />;
   if (join?.as === 'otv') return <OnlineApp code={join.code} tv onLeave={leave} onPlayHere={() => update({ code: join.code, as: 'online' })} />;
+  if (join?.as === 'dtv') return <DominoOnline code={join.code} tv onLeave={leave} />;
   if (join?.as === 'dominoes') return <DominoOnline code={join.code} isHost={Boolean(join.host)} onLeave={leave} />;
   if (join?.as === 'online') return <OnlineApp code={join.code} isHost={Boolean(join.host)} onLeave={leave} onUseAsTv={() => update({ code: join.code, as: 'otv' })} />;
   if (join?.code) return <JoinAs code={join.code} onChoose={(as, seat) => update({ code: join.code, as, seat })} onLeave={leave} />;

@@ -560,7 +560,7 @@ function awaySeatNamed(t, name, peers, hostId) {
  * A strip across the top when this device has lost the game: the connection dropped, or (for players) the
  * host's phone has gone quiet. It reconnects by itself; the button tries again right away.
  */
-function ConnectionBanner({ room, isHost, hostPeer, onLeave }) {
+export function ConnectionBanner({ room, isHost, hostPeer, onLeave }) {
   const offline = room.status === 'error' || room.status === 'offline' || room.status === 'connecting';
   const lostHost = !isHost && !hostPeer;
   const problem = offline ? 'offline' : lostHost ? 'host' : null;
@@ -1294,7 +1294,7 @@ const GIFT_GROUPS = [
 ];
 
 /** Pick who and what: emojis and gifts fly to the player picked (emojis can also just pop up over you). */
-function ReactSheet({ table, mySeat, icons, to, onTo, onSend, onClose }) {
+export function ReactSheet({ table, mySeat, icons, to, onTo, onSend, onClose }) {
   const others = SEATS.map((_, s) => s).filter((s) => s !== mySeat && table.seats[s]);
   const forMe = to === mySeat;
   return (
@@ -1340,7 +1340,7 @@ function ReactSheet({ table, mySeat, icons, to, onTo, onSend, onClose }) {
 }
 
 /** Emojis popping up over whoever sent them; gifts flying from sender to receiver. */
-function ReactionsLayer({ reactions, names = [] }) {
+export function ReactionsLayer({ reactions, names = [] }) {
   return <div className="fx-layer" aria-hidden="true">{reactions.map((x) => <Reaction key={x.id} x={x} names={names} />)}</div>;
 }
 
@@ -1439,7 +1439,7 @@ function HandView({ reactions, onReact, mySeat, table, st, myTurn, left, hurry, 
 }
 
 /** Everything that used to sit in the top right, in one drop-down: tap ••• and pick. */
-function TableMenu({ items }) {
+export function TableMenu({ items }) {
   const [open, setOpen] = useState(false);
   const list = useRef(null);
   // Fit the list to the space below it on screen (the table can be drawn enlarged on computers, so measure
@@ -1524,7 +1524,7 @@ function useLevel(stream) {
 }
 
 /** Ripples spreading from someone's picture while they talk (audio only), stronger when louder. */
-function SpeakingRings({ stream, tile = false }) {
+export function SpeakingRings({ stream, tile = false }) {
   const level = useLevel(stream);
   if (level < 0.1) return null;
   return tile
@@ -1651,7 +1651,7 @@ function BigVideos({ onTap, table, posOf, mySeat, me, call, icons, videoOf, peer
 }
 
 /** Your mic and camera, on your own seat so they're never in the way; the rest is one tap away. */
-function MyCallButtons({ call, onMore }) {
+export function MyCallButtons({ call, onMore }) {
   return (
     <div className="my-call">
       {call.local && (
@@ -1856,10 +1856,10 @@ function DealAnimation({ dealer, posOf }) {
 // ---------------------------------------------------------------------------------------------
 // Companion TV: the table big on a TV, with everyone's video and sound.
 
-const tvLink = (code) => joinLink(code, { as: 'otv' });
+const tvLink = (code, as = 'otv') => joinLink(code, { as });
 
 /** The TV draws the phone layout's sizes scaled up to fill the screen (laid out for a 720-high screen). */
-function useTvFit(on) {
+export function useTvFit(on) {
   const measure = () => {
     const zoom = Math.max(1, window.innerHeight / 720);
     return { zoom, height: window.innerHeight / zoom, minHeight: 0 };
@@ -1875,13 +1875,13 @@ function useTvFit(on) {
 }
 
 /** How to put the game on a TV: the address and code to type, or a link/QR for a laptop or iPad. */
-function TvInviteCard({ code }) {
+export function TvInviteCard({ code, as = 'otv', what = 'cards' }) {
   const [qr, setQr] = useState(null);
   const [copied, setCopied] = useState(false);
-  useEffect(() => { QRCode.toDataURL(tvLink(code), { margin: 1, width: 240 }).then(setQr).catch(() => {}); }, [code]);
+  useEffect(() => { QRCode.toDataURL(tvLink(code, as), { margin: 1, width: 240 }).then(setQr).catch(() => {}); }, [code, as]);
   return (
     <div className="card tv-invite">
-      <p>Show the table big on a TV, with everyone’s video and sound. Your phone keeps your cards, camera and mic.</p>
+      <p>Show the table big on a TV, with everyone’s video and sound. Your phone keeps your {what}, camera and mic.</p>
       <ol>
         <li>On the TV’s web browser (or a laptop or iPad hooked up to it), go to <b>{location.host}</b></li>
         <li>Tap <b>Join a game</b> and type <b className="tv-code">{code}</b></li>
@@ -1889,7 +1889,7 @@ function TvInviteCard({ code }) {
       </ol>
       <div className="row tv-invite-row">
         {qr && <img className="qr small" src={qr} alt="QR code to open the TV view" />}
-        <button type="button" className="soft" onClick={() => navigator.clipboard?.writeText(tvLink(code)).then(() => setCopied(true)).catch(() => {})}>
+        <button type="button" className="soft" onClick={() => navigator.clipboard?.writeText(tvLink(code, as)).then(() => setCopied(true)).catch(() => {})}>
           <Icon name="share" size={16} /> {copied ? 'TV link copied' : 'Copy TV link'}
         </button>
       </div>
@@ -1923,7 +1923,7 @@ function TvLobby({ code, table, icons, onPlayHere }) {
 }
 
 /** Small controls in the corner, and a note until a key press lets the TV play sound. */
-function TvControls({ call, onLeave, view, onView, grid, onGrid }) {
+export function TvControls({ call, onLeave, view, onView, grid, onGrid }) {
   const needsPress = useTvStart(call);
   // The TV's views: the table, the table with big videos round it, or just the videos (tap again: the table)
   const viewButton = (v, icon, label) => (

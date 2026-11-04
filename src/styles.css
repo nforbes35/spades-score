@@ -2205,3 +2205,20 @@ button.choice:active { transform: scale(0.98); }
 :root[data-layout='wide'] .app.dominoes .hand-dock.online-dock.dom-dock { grid-template-columns: minmax(0, 1fr) 240px; }
 :root[data-layout='wide'] .app.dominoes .hand-dock.online-dock.dom-dock:has(.dock-action:empty) { grid-template-columns: minmax(0, 1fr); }
 :root[data-layout='wide'] .app.dominoes .online-dock.dom-dock .dock-action:not(:empty) { position: static; translate: none; width: auto; grid-column: 2; grid-row: 1 / span 2; }
+
+/* Dominoes on a TV: bigger scores and a roomier board */
+.app.dominoes.tv-mode .dom-score { padding: 6px 18px; }
+.app.dominoes.tv-mode .dom-score span { font-size: 16px; }
+.app.dominoes.tv-mode .dom-score b { font-size: 34px; }
+.app.dominoes.tv-mode .online-meta span { font-size: 18px; }
+:root .app.dominoes.tv-mode .dom-board { inset: 90px 150px 90px; }
+.dom-tv-wait { display: grid; place-items: center; align-content: center; min-height: 100%; text-align: center; color: #fff; gap: 6px; }
+.dom-tv-wait h1 { font-size: 40px; margin: 0; }
+.dom-tv-wait p { font-size: 22px; opacity: 0.8; margin: 0; }
+/* Dominoes on upright phones: your seat sits at the bottom edge of the table so the line of tiles has the
+   middle to itself, and the scores stay on one row (each box shrinks to fit). */
+:root[data-layout='tall'] .app.online.dominoes.at-table:not(.tv-mode) .player-spot.bottom { top: auto; bottom: 8px; }
+:root[data-layout='tall'] .app.dominoes:not(.tv-mode) .dom-board { bottom: 56px; }
+:root[data-layout='tall'] .app.dominoes .dom-top .dom-scores { flex-wrap: nowrap; gap: 6px; }
+:root[data-layout='tall'] .app.dominoes .dom-score { flex: 0 1 auto; padding: 4px 9px; }
+:root[data-layout='tall'] .app.dominoes .dom-score span { max-width: 64px; }
