@@ -2084,3 +2084,8 @@ button.choice:active { transform: scale(0.98); }
 .tv-mode .tv-grid-pick { display: inline-flex; padding: 2px; gap: 2px; border-radius: 999px; background: rgba(255, 255, 255, 0.14); }
 .tv-mode .tv-grid-pick button { width: auto; height: 32px; padding: 0 12px; border-radius: 999px; background: none; font-weight: 800; font-size: 15px; }
 .tv-mode .tv-grid-pick button.on { background: var(--btn, #2f9e62); color: var(--btn-ink, #fff); }
+
+/* Animated emojis (flying and popping up) */
+.moving-emoji { display: block; width: 1.15em; height: 1.15em; object-fit: contain; }
+.react-person.me { gap: 6px; padding-left: 10px; }
+.react-me { font-size: 18px; }

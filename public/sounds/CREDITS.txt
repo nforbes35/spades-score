@@ -3,3 +3,6 @@ deal.m4a: made from the "card-slide" recordings in Casino Audio by Kenney (www.k
 pitch and volume, softened (highs rolled off above ~3 kHz, gentle onsets), levelled and converted to AAC.
 
 glass.m4a: "Small Glass Pane Shatter", supplied by Nick for the family game; trimmed to 1.25 s with a short fade-out and converted to AAC.
+
+Animated emojis: Noto Emoji Animation by Google (CC BY 4.0), loaded from fonts.gstatic.com when shown;
+  https://googlefonts.github.io/noto-emoji-animation/

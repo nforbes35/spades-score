@@ -1213,22 +1213,14 @@ const GIFT_GROUPS = [
     ['🌈', 'Rainbow'], ['🚀', 'Rocket'], ['🧯', 'Cool off'], ['🧊', 'Ice cold'], ['🎺', 'Fanfare'], ['💖', 'Love']]],
 ];
 
-/** Pick who and what: a gift for another player, or an emoji that pops up over you. */
+/** Pick who and what: emojis and gifts fly to the player picked (emojis can also just pop up over you). */
 function ReactSheet({ table, mySeat, icons, to, onTo, onSend, onClose }) {
   const others = SEATS.map((_, s) => s).filter((s) => s !== mySeat && table.seats[s]);
   const forMe = to === mySeat;
   return (
     <Sheet title="Emojis & gifts" short onClose={onClose} closeLabel="Close">
       <div className="react-sheet">
-        {EMOJI_GROUPS.map(([title, list]) => (
-          <div key={title}>
-            <div className="section-title">{title}</div>
-            <div className="react-grid emojis">
-              {list.map((e) => <button key={e} type="button" onClick={() => onSend(null, e, false)} aria-label={`Send ${e}`}>{e}</button>)}
-            </div>
-          </div>
-        ))}
-        <div className="section-title">Send a gift to</div>
+        <div className="section-title">Send to</div>
         <div className="react-to">
           {others.map((s) => (
             <button key={s} type="button" className={`react-person t${teamOf(s)}${to === s ? ' on' : ''}`} onClick={() => onTo(s)}>
@@ -1236,7 +1228,19 @@ function ReactSheet({ table, mySeat, icons, to, onTo, onSend, onClose }) {
               <span>{table.seats[s].name}</span>
             </button>
           ))}
+          <button type="button" className={`react-person me${forMe ? ' on' : ''}`} onClick={() => onTo(mySeat)}>
+            <span className="react-me" aria-hidden="true">✨</span><span>Just me</span>
+          </button>
         </div>
+        {EMOJI_GROUPS.map(([title, list]) => (
+          <div key={title}>
+            <div className="react-subtitle">{title}</div>
+            <div className="react-grid emojis">
+              {list.map((e) => <button key={e} type="button" onClick={() => onSend(forMe ? null : to, e, false)} aria-label={`Send ${e}`}>{e}</button>)}
+            </div>
+          </div>
+        ))}
+        <div className="section-title">Gifts{forMe ? '' : ` for ${table.seats[to]?.name ?? ''}`}</div>
         {GIFT_GROUPS.map(([title, list]) => (
           <div key={title}>
             <div className="react-subtitle">{title}</div>
@@ -1262,6 +1266,17 @@ function ReactionsLayer({ reactions, names = [] }) {
 
 const SPARKS = Array.from({ length: 10 }, (_, i) => i);
 
+/**
+ * An emoji that moves: Google's animated Noto emoji (CC BY 4.0, loaded when needed), or the ordinary emoji if
+ * there's no animated one (or no connection).
+ */
+const notoCode = (e) => [...e].map((c) => c.codePointAt(0).toString(16)).filter((h) => h !== 'fe0f').join('_');
+function MovingEmoji({ emoji }) {
+  const [failed, setFailed] = useState(false);
+  if (failed) return emoji;
+  return <img className="moving-emoji" src={`https://fonts.gstatic.com/s/e/notoemoji/latest/${notoCode(emoji)}/512.webp`} alt={emoji} draggable="false" onError={() => setFailed(true)} />;
+}
+
 function Reaction({ x, names }) {
   const ref = useRef(null);
   const [at, setAt] = useState(null);
@@ -1277,20 +1292,20 @@ function Reaction({ x, names }) {
       return r ? [(r.left + r.width / 2 - box.left) / zoom, (r.top + r.height / 2 - box.top) / zoom] : null;
     };
     const from = spot(x.from);
-    const to = x.gift ? spot(x.to) : null;
+    const to = x.to != null && x.to !== x.from ? spot(x.to) : null;
     if (from) setAt({ from, to });
   }, []);
   const style = at ? {
     left: at.from[0], top: at.from[1],
     '--dx': `${at.to ? at.to[0] - at.from[0] : 0}px`, '--dy': `${at.to ? at.to[1] - at.from[1] : 0}px`,
   } : { visibility: 'hidden' };
-  const gift = x.gift && at?.to;
+  const gift = Boolean(at?.to); // flying to someone (a gift, or an emoji sent to them)
   // A burst of sparkles and a ring as it lands (gifts) or pops (emojis); gifts also say who sent them.
   return (
     <span ref={ref} className={`fx ${gift ? 'fx-gift' : 'fx-emoji'}`} style={style}>
       <span className="fx-ring" />
       {SPARKS.map((i) => <span key={i} className="fx-spark" style={{ '--a': `${i * 36 + (i % 2) * 14}deg`, '--d': `${44 + (i % 3) * 16}px` }} />)}
-      <span className="fx-item">{x.item}</span>
+      <span className="fx-item"><MovingEmoji emoji={x.item} /></span>
       {gift && <span className="fx-tag">{names[x.from] ?? '?'} → {names[x.to] ?? '?'}</span>}
     </span>
   );
@@ -1333,7 +1348,7 @@ function HandView({ reactions, onReact, mySeat, table, st, myTurn, left, hurry, 
       <div className="hv-feed" aria-live="polite">
         {reactions.slice(-3).map((x) => (
           <span key={x.id} className="hv-react-note">
-            {table.seats[x.from]?.name ?? '?'}{x.gift ? <> → {x.to === mySeat ? 'you' : table.seats[x.to]?.name}</> : null} <b>{x.item}</b>
+            {table.seats[x.from]?.name ?? '?'}{x.to != null && x.to !== x.from ? <> → {x.to === mySeat ? 'you' : table.seats[x.to]?.name}</> : null} <b>{x.item}</b>
           </span>
         ))}
       </div>
