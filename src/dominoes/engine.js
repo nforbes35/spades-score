@@ -15,6 +15,9 @@
 //   Both play one round per double, from the highest down; leftover pips count against you (the 0|0 is 50) and
 //   the lowest total wins.
 // Sets: double-6, 9 or 12. Sides: every person for themselves, or two teams of two (partners across).
+// Scoring ("scoring"): 'points' (above), or 'rounds': each hand is a round, won by whoever goes out or, when
+// nobody can play, by the player with the fewest dots left. Best of 3 or 5 ("bestOf"; 0 = just keep count), and
+// each best-of won is a set: sets carry on from one match to the next ("Next set").
 //
 // A tile is "lo-hi" (e.g. "4-6"). The layout is a root tile and arms off it: L and R, and for a spinner U and
 // D once L and R both have a tile. Each placed tile is { t, inner, outer }: `inner` matches what it joined.
@@ -80,7 +83,7 @@ export function newDominoTable({ players = 4, setMax = 6, variant = 'draw', team
     game: 'dominoes',
     phase: 'lobby',
     seats: Array.from({ length: players }, () => null),
-    settings: { setMax, variant, teams: teams && players === 4 && VARIANTS[variant].kind === 'line', target: target ?? VARIANTS[variant].target ?? 0, rounds: null, turnTimer: 0 },
+    settings: { setMax, variant, teams: teams && players === 4 && VARIANTS[variant].kind === 'line', target: target ?? VARIANTS[variant].target ?? 0, rounds: null, scoring: 'points', bestOf: 3, turnTimer: 0 },
     match: null,
     round: null,
   };
@@ -89,7 +92,10 @@ export function newDominoTable({ players = 4, setMax = 6, variant = 'draw', team
 /** Start the match (scores at 0) and deal the first hand. */
 export function startMatch(table, random = Math.random) {
   const sides = sideCount(table);
-  const match = { id: `${Date.now().toString(36)}${Math.floor(random() * 1e6).toString(36)}`, hands: [], scores: Array(sides).fill(0), lastWinner: null };
+  // sets won carry on to the next match (same players and sides)
+  const before = table.match?.sets;
+  const sets = Array.isArray(before) && before.length === sides ? before : Array(sides).fill(0);
+  const match = { id: `${Date.now().toString(36)}${Math.floor(random() * 1e6).toString(36)}`, hands: [], scores: Array(sides).fill(0), lastWinner: null, sets };
   return deal({ ...table, match }, random);
 }
 
@@ -326,20 +332,55 @@ function addPoints(table, side, points, event) {
  * The hand is over: someone went out ('domino'), or nobody can move ('blocked': the side with the fewest pips
  * wins; a tie means nobody does). The winning side scores the other sides' pips (All Fives: rounded to 5).
  */
+export const byRounds = (table) => table.settings.scoring === 'rounds';
+/** Rounds needed to win the set (best of 3: 2, best of 5: 3), or null when just keeping count. */
+export const roundsToWin = (table) => (byRounds(table) && table.settings.bestOf ? Math.floor(table.settings.bestOf / 2) + 1 : null);
+
+/** Dots left in each player's hand (Train and Chicken Foot count the 0|0 as 50). */
+const handDots = (table) => table.round.hands.map((h) => h.reduce((sum, t) => sum + (VARIANTS[table.settings.variant].lowWins ? penalty(t) : pips(t)), 0));
+
+/**
+ * Who won the hand (a side): whoever went out, or when nobody can play, the player with the fewest dots left
+ * (null when players on different sides tie for fewest).
+ */
+function handWinner(table, outSeat, reason, seatPips) {
+  if (reason === 'domino') return sideOf(table, outSeat);
+  const low = Math.min(...seatPips);
+  const sides = new Set(seatPips.map((p, s) => (p === low ? sideOf(table, s) : null)).filter((x) => x != null));
+  return sides.size === 1 ? [...sides][0] : null;
+}
+
+/** Scoring by rounds: the winner gets a round; the first to enough rounds wins the set (and the match). */
+function endByRounds(table, outSeat, reason) {
+  const r = table.round;
+  const sides = sideCount(table);
+  const seatPips = handDots(table);
+  const winner = handWinner(table, outSeat, reason, seatPips);
+  const points = Array(sides).fill(0);
+  if (winner != null) points[winner] = 1;
+  const scores = table.match.scores.map((s, i) => s + points[i]);
+  const need = roundsToWin(table);
+  const champ = need && winner != null && scores[winner] >= need ? winner : null;
+  const sets = champ != null ? (table.match.sets ?? Array(sides).fill(0)).map((n, i) => (i === champ ? n + 1 : n)) : table.match.sets;
+  const hand = { reason, winner, outSeat, points, seatPips, engine: r.engine, at: Date.now() };
+  return {
+    ...table,
+    phase: champ != null ? 'over' : 'scored',
+    round: { ...r, result: hand },
+    match: { ...table.match, hands: [...table.match.hands, hand], scores, sets, lastWinner: reason === 'domino' ? outSeat : null, winner: champ },
+  };
+}
+
 export function endHand(table, outSeat, reason) {
+  if (byRounds(table)) return endByRounds(table, outSeat, reason);
   if (VARIANTS[table.settings.variant].lowWins) return endRound(table, outSeat, reason);
   const r = table.round;
   const sides = sideCount(table);
   const seatPips = r.hands.map((h) => h.reduce((sum, t) => sum + pips(t), 0));
   const sidePips = Array(sides).fill(0);
   seatPips.forEach((p, s) => { sidePips[sideOf(table, s)] += p; });
-  let winner = null;
-  if (reason === 'domino') winner = sideOf(table, outSeat);
-  else {
-    const low = Math.min(...sidePips);
-    const lows = sidePips.map((p, i) => (p === low ? i : -1)).filter((i) => i >= 0);
-    if (lows.length === 1) winner = lows[0];
-  }
+  // nobody can play: the player with the fewest dots left wins the hand for their side
+  const winner = handWinner(table, outSeat, reason, seatPips);
   const fives = VARIANTS[table.settings.variant].fives;
   const points = [...(r.scored ?? Array(sides).fill(0))];
   if (winner != null) {

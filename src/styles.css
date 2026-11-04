@@ -2338,3 +2338,12 @@ button.choice:active { transform: scale(0.98); }
 :root[data-layout='tall'] .app.dominoes .dom-score:is(.t0, .t1) span { max-width: none; }
 .dom-lobby .tv-invite { padding: 16px; }
 .sheet .dom-invite { box-shadow: none; background: none; border: 0; padding: 0 0 8px; }
+
+/* Scoring by rounds: sets won, and the dots left after a blocked round */
+.dom-sets { display: block; font-style: normal; font-size: 11px; font-weight: 800; color: #fbbf24; line-height: 1; }
+.dom-dots { width: 100%; margin: 4px 0 8px; }
+.dom-dots .section-title { margin: 0 0 4px; }
+.dom-dots-row { display: flex; justify-content: space-between; padding: 4px 10px; border-radius: 8px; font-size: 15px; }
+.dom-dots-row.best { background: rgba(52, 211, 153, 0.18); font-weight: 800; }
+.dom-result-row b small { font-size: 12px; font-weight: 700; opacity: 0.7; }
+.dom-result-row.best { color: #047857; }

@@ -264,3 +264,73 @@ test('Train and Chicken Foot: computer players finish whole games, lowest total 
     }
   }
 });
+
+// ---------- Scoring by rounds, best of 3 / 5, sets ----------
+import { roundsToWin, endHand } from '../src/dominoes/engine.js';
+
+const roundsTable = (opts) => {
+  const t = seated(newDominoTable({ players: 4, ...opts }));
+  return startMatch({ ...t, settings: { ...t.settings, scoring: 'rounds', bestOf: opts.bestOf ?? 3 } }, seeded(9));
+};
+const withHands = (t, hands) => ({ ...t, round: { ...t.round, hands } });
+
+test('rounds: going out wins the round; best of 3 needs 2, best of 5 needs 3', () => {
+  let t = roundsTable({ bestOf: 3 });
+  assert.equal(roundsToWin(t), 2);
+  t = endHand(withHands(t, [[], ['6-6'], ['1-2'], ['0-1']]), 0, 'domino');
+  assert.deepEqual(t.match.scores, [1, 0, 0, 0]);
+  assert.equal(t.phase, 'scored');
+  t = endHand(withHands(deal(t, seeded(2)), [[], ['6-6'], ['1-2'], ['0-1']]), 0, 'domino');
+  assert.equal(t.phase, 'over');
+  assert.equal(t.match.winner, 0);
+  assert.deepEqual(t.match.sets, [1, 0, 0, 0]);
+  assert.equal(roundsToWin(roundsTable({ bestOf: 5 })), 3);
+});
+
+test('rounds: everyone stuck → the player with the fewest dots wins; a tie between sides wins nobody the round', () => {
+  let t = roundsTable({});
+  t = endHand(withHands(t, [['6-6'], ['0-1'], ['3-4'], ['2-2']]), null, 'blocked');
+  assert.equal(t.round.result.winner, 1, 'seat 1 has 1 dot');
+  assert.deepEqual(t.round.result.seatPips, [12, 1, 7, 4]);
+  let u = roundsTable({});
+  u = endHand(withHands(u, [['0-3'], ['1-2'], ['6-6'], ['5-5']]), null, 'blocked');
+  assert.equal(u.round.result.winner, null);
+  assert.deepEqual(u.match.scores, [0, 0, 0, 0]);
+});
+
+test('rounds with teams: the lowest player wins it for their team; sets carry on to the next set', () => {
+  let t = roundsTable({ teams: true });
+  t = endHand(withHands(t, [['6-6'], ['5-5'], ['0-1'], ['4-4']]), null, 'blocked');
+  assert.equal(t.round.result.winner, 0, 'seat 2 (team 0) has the fewest');
+  t = endHand(withHands(deal(t, seeded(3)), [['6-6'], ['5-5'], [], ['4-4']]), 2, 'domino');
+  assert.equal(t.phase, 'over');
+  assert.deepEqual(t.match.sets, [1, 0]);
+  const next = startMatch(t, seeded(4));
+  assert.deepEqual(next.match.scores, [0, 0]);
+  assert.deepEqual(next.match.sets, [1, 0], 'sets kept for the next set');
+});
+
+test('rounds: "just count" never ends; works for Train and Chicken Foot too; computer players play it', () => {
+  for (const variant of ['draw', 'block', 'allfives', 'train', 'foot']) {
+    const random = seeded(variant.length * 13);
+    let t = seated(newDominoTable({ players: 3, setMax: variant === 'train' || variant === 'foot' ? 9 : 6, variant }));
+    t = startMatch({ ...t, settings: { ...t.settings, scoring: 'rounds', bestOf: variant === 'block' ? 0 : 5 } }, random);
+    let steps = 0, rounds = 0;
+    while (t.phase !== 'over' && steps < 30000 && rounds < 12) {
+      if (t.phase === 'scored') { t = deal(t, random); rounds++; continue; }
+      const seat = t.round.turn; const m = botMove(t, seat);
+      t = m.type === 'play' ? playTile(t, seat, m.tile, m.arm) : m.type === 'draw' ? drawTile(t, seat) : pass(t, seat);
+      steps++;
+    }
+    if (variant !== 'block') assert.ok(t.match.scores.every((s) => s <= 3));
+    if (variant === 'block') assert.notEqual(t.phase, 'over', 'just counting: no end');
+    else { assert.equal(t.phase, 'over', `${variant} best of 5 finished`); assert.equal(Math.max(...t.match.scores), 3); }
+  }
+});
+
+test('points games: a blocked hand goes to the player with the fewest dots (not the team total)', () => {
+  const t = fixed([['6-6'], ['0-1'], ['0-0', '1-2'], ['5-6']], { teams: true });
+  const u = endHand(t, null, 'blocked');
+  // seat 2 has 3 dots but its team has 15; seat 1 has 1 dot: team 1 wins
+  assert.equal(u.round.result.winner, 1);
+});
