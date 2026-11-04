@@ -2096,3 +2096,10 @@ button.choice:active { transform: scale(0.98); }
 .saved-choice .choice-text b { font-variant-numeric: tabular-nums; }
 .saved-players { font-size: 12px !important; opacity: 0.7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .saved-choice { padding: 0; gap: 0; }
+/* The table menu never runs off the screen (sideways phones): it scrolls instead */
+.table-menu-list {
+  max-height: calc(100dvh - 76px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; touch-action: pan-y;
+}
+.table-menu-list button { flex: none; }
+.table-menu-list { min-width: 268px; }
