@@ -30,7 +30,7 @@ export default function DominoesApp({ onAllGames, onPlayOnline, onJoin, onRejoin
           <Domino a={12} b={9} size={110} className="hub-domino two" />
         </div>
         <h1 className="home-title">Dominoes</h1>
-        <p className="home-king">Draw · Block · All Fives</p>
+        <p className="home-king">Draw · Block · All Fives · Mexican Train · Chicken Foot</p>
       </div>
       <div className="home-choices">
         {last && (

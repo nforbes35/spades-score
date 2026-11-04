@@ -2222,3 +2222,64 @@ button.choice:active { transform: scale(0.98); }
 :root[data-layout='tall'] .app.dominoes .dom-top .dom-scores { flex-wrap: nowrap; gap: 6px; }
 :root[data-layout='tall'] .app.dominoes .dom-score { flex: 0 1 auto; padding: 4px 9px; }
 :root[data-layout='tall'] .app.dominoes .dom-score span { max-width: 64px; }
+
+/* ---------- Mexican Train and Chicken Foot: players along the top, one row per line ---------- */
+.app.dominoes .felt.dom-lines { display: flex; flex-direction: column; gap: 6px; padding: 8px; }
+.felt.dom-lines .table-oval { opacity: 0.55; }
+.dom-players { position: relative; z-index: 2; display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding: 2px 2px 4px; flex: none; }
+.dom-players::-webkit-scrollbar { display: none; }
+.dom-player { position: relative; flex: 1 0 auto; min-width: 74px; max-width: 150px; display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto auto; align-items: center; column-gap: 6px; padding: 4px 8px 4px 4px; border-radius: 14px; background: rgba(0, 0, 0, 0.42); border: 2px solid transparent; }
+.dom-player.turn { border-color: var(--turn, #34d399); box-shadow: 0 0 12px rgba(52, 211, 153, 0.5); }
+.dom-player.me { background: rgba(255, 255, 255, 0.14); }
+.dom-player .avatar { grid-row: 1 / span 2; width: 36px; height: 36px; position: relative; }
+.dom-player .avatar .seat-icon { font-size: 14px; }
+.dom-player .dp-name { font-size: 12px; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #fff; }
+.dom-player .dp-info { display: flex; gap: 6px; align-items: baseline; color: rgba(255, 255, 255, 0.85); }
+.dom-player .dp-info b { font-size: 14px; font-weight: 900; }
+.dom-player .dp-info b::after { content: ' tiles'; font-size: 10px; font-weight: 700; opacity: 0.7; }
+.dom-player .dp-info small { font-size: 10px; opacity: 0.75; white-space: nowrap; }
+.dom-player .dp-open { position: absolute; top: -6px; right: -4px; font-size: 15px; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.6)); }
+.dom-player .dp-away { position: absolute; bottom: -8px; left: 50%; translate: -50% 0; font-size: 9px; background: rgba(0, 0, 0, 0.7); padding: 1px 5px; border-radius: 6px; white-space: nowrap; }
+.dom-player .dom-said { top: auto; bottom: -10px; }
+.dom-lines-board { position: relative; z-index: 1; flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 4px; overflow-y: auto; }
+.dom-engine { display: flex; align-items: center; gap: 8px; align-self: center; color: rgba(255, 255, 255, 0.85); font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; flex: none; }
+.dom-engine .domino { filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.5)); }
+.dom-row { display: flex; align-items: center; gap: 6px; padding: 2px 6px 2px 4px; border-radius: 10px; background: rgba(0, 0, 0, 0.28); border: 2px solid transparent; flex: none; overflow: hidden; }
+.dom-row.mine { background: rgba(255, 255, 255, 0.12); }
+.dom-row.turn { border-color: rgba(52, 211, 153, 0.45); }
+.dom-row.cover { border-color: #fbbf24; box-shadow: 0 0 10px rgba(251, 191, 36, 0.45); }
+.dom-row.can { border-color: var(--turn, #34d399); background: rgba(52, 211, 153, 0.22); cursor: pointer; animation: dom-can 1.2s ease-in-out infinite alternate; }
+@keyframes dom-can { to { background: rgba(52, 211, 153, 0.38); } }
+.dom-row-label { flex: none; display: flex; align-items: center; gap: 5px; min-width: 0; font-size: 12px; font-weight: 800; color: #fff; }
+.dom-row-label > span:not(.dom-row-icon):not(.dom-row-open) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dom-row-avatar { width: 24px; height: 24px; font-size: 10px; flex: none; }
+.dom-row-icon, .dom-row-open { font-size: 15px; flex: none; }
+.dom-row-tiles { flex: 1; min-width: 0; display: flex; align-items: center; gap: 3px; }
+.dom-row-tile { display: inline-flex; filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.45)); }
+.dom-row-tile.double .domino-body { stroke: #fbbf24; stroke-width: 0.06; }
+.dom-row-tile.last { animation: dom-land 0.5s ease-out; }
+.dom-row-more { font-size: 11px; font-weight: 900; color: rgba(255, 255, 255, 0.8); background: rgba(0, 0, 0, 0.35); border-radius: 8px; padding: 2px 6px; flex: none; }
+.dom-row-empty { font-size: 11px; font-style: italic; color: rgba(255, 255, 255, 0.7); }
+.dom-row-go { margin-left: auto; flex: none; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: var(--turn, #34d399); color: #06281d; font-weight: 900; font-size: 20px; }
+.dom-mycall { position: absolute; right: 8px; bottom: 6px; z-index: 3; }
+.dom-mycall .my-call { position: static; }
+.felt.dom-lines .dom-boneyard { left: 8px; bottom: 8px; top: auto; }
+.dom-round { display: flex; flex-direction: column; line-height: 1.15; color: #fff; min-width: 0; }
+.dom-round b { font-size: 17px; font-weight: 900; }
+.dom-round span { font-size: 12px; opacity: 0.8; }
+.app.dominoes.tv-mode .dom-round b { font-size: 30px; }
+.app.dominoes.tv-mode .dom-round span { font-size: 18px; }
+.app.dominoes.tv-mode .dom-player { max-width: 220px; padding: 6px 12px 6px 6px; }
+.app.dominoes.tv-mode .dom-player .avatar { width: 64px; height: 64px; }
+.app.dominoes.tv-mode .dom-player .dp-name { font-size: 18px; }
+.app.dominoes.tv-mode .dom-player .dp-info b { font-size: 20px; }
+.app.dominoes.tv-mode .dom-row-label { font-size: 18px; }
+.app.dominoes.tv-mode .dom-row-avatar { width: 40px; height: 40px; }
+.dom-variants { display: flex; flex-wrap: wrap; gap: 6px; }
+.dom-variant { flex: 1 1 auto; min-height: 42px; padding: 8px 12px; border-radius: 12px; border: 1px solid var(--line, rgba(0, 0, 0, 0.12)); background: var(--soft, rgba(0, 0, 0, 0.04)); font-weight: 800; color: inherit; }
+.dom-variant.on { background: var(--accent, #0f766e); color: #fff; border-color: transparent; }
+.dom-result-row.best { color: #b45309; }
+.dom-engine-yard { display: inline-flex; align-items: center; gap: 5px; margin-left: 10px; padding: 2px 9px 2px 4px; border-radius: 999px; background: rgba(0, 0, 0, 0.45); color: #fff; font-size: 14px; font-weight: 900; letter-spacing: 0; }
+.dom-hand.many { gap: 4px; }
+.dom-lines-board.two { display: grid; grid-template-columns: 1fr 1fr; align-content: start; column-gap: 6px; row-gap: 4px; }
+.dom-lines-board.two .dom-engine { grid-column: 1 / -1; }

@@ -22,7 +22,7 @@ import { Icon, Segmented, Toggle, useToast, Confetti, Sheet } from '../component
 import Domino from './Domino.jsx';
 import { boardLayout } from './board.js';
 import {
-  VARIANTS, SETS, halves, newDominoTable, startMatch, deal, legalMoves, playTile, drawTile, pass, publicTable, botMove, openEnds,
+  VARIANTS, SETS, kindOf, maxPlayers, roundsOf, lineName, halves, newDominoTable, startMatch, deal, legalMoves, playTile, drawTile, pass, publicTable, botMove, openEnds,
 } from './engine.js';
 
 const ID_KEY = 'spades-device-id'; // the same device id as Spades online, so a reload rejoins the same seat
@@ -348,8 +348,16 @@ function sit(t, seat, who) {
 function setPlayers(t, n) {
   const kept = t.seats.filter(Boolean).slice(0, n);
   const seats = Array.from({ length: n }, (_, i) => kept[i] ?? null);
-  return { ...t, seats, settings: { ...t.settings, teams: t.settings.teams && n === 4 } };
+  return { ...t, seats, settings: { ...t.settings, teams: t.settings.teams && n === 4 && kindOf(t) === 'line' } };
 }
+/** New rules or set: fewer seats if the game takes fewer players, and the right score settings. */
+function setRules(t, patch) {
+  const settings = { ...t.settings, ...patch };
+  const next = { ...t, settings: { ...settings, target: VARIANTS[settings.variant].target ?? 0, rounds: null } };
+  const most = maxPlayers(settings.variant, settings.setMax);
+  return setPlayers(next, Math.min(t.seats.length, most));
+}
+const roundChoices = (setMax) => [...new Set([setMax + 1, Math.ceil((setMax + 1) / 2), 3])];
 
 // ---------- Lobby ----------
 
@@ -385,22 +393,33 @@ function DominoLobby({ code, table, isHost, me, icons, act, onSit, onStand, onSt
           {isHost ? (
             <>
               <div className="field-block"><span>Rules</span>
-                <Segmented value={settings.variant} onChange={(v) => set({ variant: v, target: VARIANTS[v].target })}
-                  options={Object.entries(VARIANTS).map(([id, v]) => ({ id, label: v.name }))} />
+                <div className="dom-variants">
+                  {Object.entries(VARIANTS).map(([id, v]) => (
+                    <button key={id} type="button" className={`dom-variant${settings.variant === id ? ' on' : ''}`} aria-pressed={settings.variant === id}
+                      onClick={() => act((t) => setRules(t, { variant: id }))}>{v.name}</button>
+                  ))}
+                </div>
               </div>
               <div className="field-block"><span>Set</span>
-                <Segmented value={settings.setMax} onChange={(v) => set({ setMax: v })} options={SETS.map((m) => ({ id: m, label: `Double ${m}` }))} />
+                <Segmented value={settings.setMax} onChange={(v) => act((t) => setRules(t, { setMax: v }))} options={SETS.map((m) => ({ id: m, label: `Double ${m}` }))} />
               </div>
               <div className="field-block"><span>Players</span>
-                <Segmented value={table.seats.length} onChange={(n) => act((t) => setPlayers(t, n))} options={[2, 3, 4].map((n) => ({ id: n, label: String(n) }))} />
+                <Segmented value={table.seats.length} onChange={(n) => act((t) => setPlayers(t, n))} options={Array.from({ length: maxPlayers(settings.variant, settings.setMax) - 1 }, (_, i) => i + 2).map((n) => ({ id: n, label: String(n) }))} />
               </div>
-              {table.seats.length === 4 && <Toggle label="Teams of two (partners across)" checked={settings.teams} onChange={(v) => set({ teams: v })} />}
-              <div className="field-block"><span>Play to</span>
-                <Segmented value={settings.target} onChange={(v) => set({ target: v })} options={[100, 150, 200, 250].map((n) => ({ id: n, label: String(n) }))} />
-              </div>
+              {table.seats.length === 4 && kindOf(table) === 'line' && <Toggle label="Teams of two (partners across)" checked={settings.teams} onChange={(v) => set({ teams: v })} />}
+              {kindOf(table) === 'line' ? (
+                <div className="field-block"><span>Play to</span>
+                  <Segmented value={settings.target} onChange={(v) => set({ target: v })} options={[100, 150, 200, 250].map((n) => ({ id: n, label: String(n) }))} />
+                </div>
+              ) : (
+                <div className="field-block"><span>Rounds</span>
+                  <Segmented value={roundsOf(table)} onChange={(v) => set({ rounds: v })}
+                    options={roundChoices(settings.setMax).map((n) => ({ id: n, label: n === settings.setMax + 1 ? `All ${n}` : String(n) }))} />
+                </div>
+              )}
             </>
           ) : (
-            <p className="dom-rules-line">{VARIANTS[settings.variant].name} · Double {settings.setMax} · {settings.teams ? 'Teams' : 'Each for themselves'} · to {settings.target}</p>
+            <p className="dom-rules-line">{VARIANTS[settings.variant].name} · Double {settings.setMax} · {settings.teams ? 'Teams' : 'Each for themselves'} · {kindOf(table) === 'line' ? `to ${settings.target}` : `${roundsOf(table)} rounds, lowest wins`}</p>
           )}
         </div>
         <p className="footnote">{RULES_NOTE[settings.variant]}</p>
@@ -444,6 +463,8 @@ function DominoLobby({ code, table, isHost, me, icons, act, onSit, onStand, onSt
 const RULES_NOTE = {
   draw: 'Match a number on either end. Can’t play? Draw from the boneyard until you can. First out scores everyone else’s pips.',
   block: 'Match a number on either end. Can’t play? You pass (no drawing). First out scores everyone else’s pips; if nobody can play, the lowest hand wins.',
+  train: 'The round’s double goes in the middle. Build your own train off it, or the Mexican Train anyone can use. Can’t play? Draw one; still stuck, and your train opens to everyone until you play on it. Play a double and you go again, and it must be covered first. One round per double, highest first; pips left count against you (0|0 = 50), lowest total wins.',
+  foot: 'The round’s double goes in the middle and takes six tiles round it before anything else. Play a double and it becomes a chicken foot: three tiles go on it before play carries on anywhere else. Can’t play? Draw one, or pass. One round per double; pips left count against you (0|0 = 50), lowest total wins.',
   allfives: 'Like Draw, but the first double is a spinner (play off all four sides), and whenever the ends add up to 5, 10, 15… you score that many.',
 };
 
@@ -517,7 +538,26 @@ function DominoTable({ table, mySeat, tiles, icons, isHost, send, act, onLeave, 
   const lastAt = r?.last?.tile ? r.last.at : null;
   useEffect(() => { if (lastAt && Date.now() - lastAt < 2000) cardSound(); }, [lastAt]);
 
+  const lines = kindOf(table) !== 'line'; // Mexican Train / Chicken Foot: rows of lines, players along the top
   const sides = table.match ? table.match.scores.map((score, i) => ({ score, name: sideName(table, i) })) : [];
+  // a seat's picture (or their video, when they're in the video chat); tap it to send emojis
+  const seatAvatar = (who, s) => {
+    const stream = who && !who.bot ? videoOf(who.id) : null;
+    const showVideo = stream && hasVideo(stream) && (who.id !== me.id || call.camOn);
+    return (
+      <div className={`avatar${canReact && who && s !== mySeat ? ' tappable' : ''}`} data-seat={s} onClick={() => tapSeat(s)}>
+        {stream && <VideoTile stream={stream} muted={who.id === me.id || !call.speakerOn} mirrored={who.id === me.id} className={showVideo ? '' : 'no-video'} />}
+        {!showVideo && (
+          <>
+            <Avatar value={who ? icons[who.id] : null} name={who?.name ?? '?'} bot={who?.bot} className="seat-icon" />
+            {stream && <SpeakingRings stream={stream} />}
+          </>
+        )}
+      </div>
+    );
+  };
+  const said = (s) => r?.last?.seat === s && (r.last.passed || r.last.drew) && Date.now() - r.last.at < 4000
+    && <span className="dom-said">{r.last.passed ? (kindOf(table) === 'train' ? 'Pass · train open' : 'Pass') : 'Drew'}</span>;
   const counts = r?.counts ?? r?.hands?.map((h) => h.length) ?? [];
   const boneyard = r?.boneyardCount ?? r?.boneyard?.length ?? 0;
 
@@ -534,48 +574,56 @@ function DominoTable({ table, mySeat, tiles, icons, isHost, send, act, onLeave, 
     <>
       <header className="online-top dom-top">
         <div className="dom-scores">
-          {sides.map((s, i) => (
+          {lines && <div className="dom-round"><b>{VARIANTS[table.settings.variant].name}</b><span>Round {Math.min(handNo(table) + (table.phase === 'playing' ? 1 : 0), roundsOf(table))} of {roundsOf(table)} · lowest wins</span></div>}
+          {!lines && sides.map((s, i) => (
             <div key={i} className={`dom-score${table.settings.teams ? ` t${i}` : ''}`}>
               <span>{s.name}</span><b>{s.score}</b>
             </div>
           ))}
         </div>
         <div className="online-meta">
-          <span>{VARIANTS[table.settings.variant].name} · to {table.settings.target}</span>
+          {!lines && <span>{VARIANTS[table.settings.variant].name} · to {table.settings.target}</span>}
           {!tv && <TableMenu items={menu} />}
         </div>
       </header>
 
-      <div className="felt dom-felt">
+      <div className={`felt dom-felt${lines ? ' dom-lines' : ''}`}>
         <div className="table-oval" aria-hidden="true" />
-        <Board table={table} selectedMoves={forSelected} onEnd={(arm) => play(selected, arm)} maxUnit={tv ? 60 : 38} />
-        {table.seats.map((who, s) => (
-          <div key={s} className={`player-spot ${posOf(s)}${table.settings.teams ? ` t${s % 2}` : ''}${r?.turn === s && table.phase === 'playing' ? ' turn' : ''}${s === mySeat ? ' me' : ''}`}>
-            {(() => {
-              const stream = who && !who.bot ? videoOf(who.id) : null;
-              const showVideo = stream && hasVideo(stream) && (who.id !== me.id || call.camOn);
-              return (
-                <div className={`avatar${canReact && who && s !== mySeat ? ' tappable' : ''}`} data-seat={s} onClick={() => tapSeat(s)}>
-                  {stream && <VideoTile stream={stream} muted={who.id === me.id || !call.speakerOn} mirrored={who.id === me.id} className={showVideo ? '' : 'no-video'} />}
-                  {!showVideo && (
-                    <>
-                      <Avatar value={who ? icons[who.id] : null} name={who?.name ?? '?'} bot={who?.bot} className="seat-icon" />
-                      {stream && <SpeakingRings stream={stream} />}
-                    </>
-                  )}
+        {lines && (
+          <>
+            <div className={`dom-players n${n}`}>
+              {table.seats.map((who, s) => (
+                <div key={s} className={`dom-player${r?.turn === s && table.phase === 'playing' ? ' turn' : ''}${s === mySeat ? ' me' : ''}`}>
+                  {seatAvatar(who, s)}
+                  <span className="dp-name">{s === mySeat ? 'You' : who?.name}</span>
+                  <span className="dp-info">
+                    <b title="Tiles in hand">{counts[s] ?? 0}</b>
+                    <small title="Score so far">{table.match?.scores[s] ?? 0} pts</small>
+                  </span>
+                  {r?.markers?.[s] && <span className="dp-open" title="Train open to everyone">🚂</span>}
+                  {who?.standIn && <span className="dp-away">computer</span>}
+                  {said(s)}
                 </div>
-              );
-            })()}
+              ))}
+            </div>
+            <LinesBoard table={table} mySeat={mySeat} icons={icons} selectedMoves={forSelected} onEnd={(arm) => play(selected, arm)} tv={tv} />
+            {mySeat >= 0 && call.joined && <div className="dom-mycall"><MyCallButtons call={call} onMore={() => setCallOpen(true)} /></div>}
+          </>
+        )}
+        {!lines && <Board table={table} selectedMoves={forSelected} onEnd={(arm) => play(selected, arm)} maxUnit={tv ? 60 : 38} />}
+        {!lines && table.seats.map((who, s) => (
+          <div key={s} className={`player-spot ${posOf(s)}${table.settings.teams ? ` t${s % 2}` : ''}${r?.turn === s && table.phase === 'playing' ? ' turn' : ''}${s === mySeat ? ' me' : ''}`}>
+            {seatAvatar(who, s)}
             <div className="nameplate">
               <span className="spot-name">{s === mySeat ? 'You' : who?.name}</span>
               <span className="spot-score dom-count" title="Tiles in hand">{counts[s] ?? 0}</span>
             </div>
             {s === mySeat && call.joined && <MyCallButtons call={call} onMore={() => setCallOpen(true)} />}
             {who && who.standIn && <div className="away">computer playing</div>}
-            {r?.last?.seat === s && (r.last.passed || r.last.drew) && Date.now() - r.last.at < 4000 && <span className="dom-said">{r.last.passed ? 'Pass' : 'Drew'}</span>}
+            {said(s)}
           </div>
         ))}
-        {VARIANTS[table.settings.variant].draws && table.phase === 'playing' && <div className="dom-boneyard"><Domino a={0} b={0} faceDown size={34} /> {boneyard}</div>}
+        {!lines && VARIANTS[table.settings.variant].draws && table.phase === 'playing' && <div className="dom-boneyard"><Domino a={0} b={0} faceDown size={34} /> {boneyard}</div>}
         {r?.events?.length > 0 && <FivesPop key={r.events.length} event={r.events.at(-1)} table={table} />}
         <ReactionsLayer reactions={reactions} names={table.seats.map((w, s) => (s === mySeat ? 'You' : w?.name))} />
       </div>
@@ -612,24 +660,26 @@ function DominoTable({ table, mySeat, tiles, icons, isHost, send, act, onLeave, 
             <span>{table.phase === 'playing' ? (myTurn ? 'Your turn' : `${table.seats[r.turn]?.name ?? '…'}’s turn`) : ''}</span>
             <span>{tiles ? `${tiles.length} tile${tiles.length === 1 ? '' : 's'}` : ''}</span>
           </div>
-          <div className="dom-hand">
+          <div className={`dom-hand${(tiles?.length ?? 0) > 8 ? ' many' : ''}`}>
             {(tiles ?? []).map((t) => {
               const [a, b] = halves(t);
               return (
                 <button key={t} type="button" className={`dom-tile${selected === t ? ' sel' : ''}${myTurn && !playable.has(t) ? ' dim' : ''}`} onClick={() => tapTile(t)} aria-label={`${a} and ${b}`}>
-                  <Domino a={a} b={b} vertical size={86} />
+                  <Domino a={a} b={b} vertical size={handTileSize(tiles.length)} />
                 </button>
               );
             })}
           </div>
           <div className="dock-action dom-actions">
-            {myTurn && selected && forSelected.length > 0 && forSelected.map((m) => (
+            {myTurn && selected && forSelected.length > 0 && forSelected.length <= 3 && forSelected.map((m) => (
               <button key={m.arm ?? 'first'} type="button" className="primary big go" onClick={() => play(selected, m.arm)}>
-                {m.arm == null ? 'Play it' : forSelected.length === 1 ? 'Play' : `On the ${openEnds(table).find((e) => e.arm === m.arm)?.value} ${ARM_NAMES[m.arm]}`}
+                {m.arm == null ? 'Play it' : forSelected.length === 1 ? 'Play' : lines ? lineName(table, m.arm, mySeat) : `On the ${openEnds(table).find((e) => e.arm === m.arm)?.value} ${ARM_NAMES[m.arm]}`}
               </button>
             ))}
+            {myTurn && selected && forSelected.length > 3 && <p className="dock-hint">Tap the line to put it on.</p>}
+            {myTurn && !selected && lines && r?.openDouble && moves.length > 0 && <p className="dock-hint">Cover the double first.</p>}
             {myTurn && moves.length === 0 && canDrawPublic(table) && <button type="button" className="primary big go" onClick={() => send('d-draw')}>Draw a tile</button>}
-            {myTurn && moves.length === 0 && !canDrawPublic(table) && <button type="button" className="secondary big" onClick={() => send('d-pass')}>Pass</button>}
+            {myTurn && moves.length === 0 && !canDrawPublic(table) && <button type="button" className="secondary big" onClick={() => send('d-pass')}>{kindOf(table) === 'train' ? 'Pass (your train opens)' : 'Pass'}</button>}
             {myTurn && !selected && moves.length > 0 && <p className="dock-hint">Tap a tile to play it.</p>}
           </div>
         </div>
@@ -647,7 +697,10 @@ function movesFor(table, seat, tiles) {
   const t = { ...table, round: { ...table.round, hands: table.round.hands ?? table.seats.map((_, s) => (s === seat ? tiles : [])), boneyard: [] } };
   return legalMoves(t, seat);
 }
-const canDrawPublic = (table) => VARIANTS[table.settings.variant].draws && (table.round.boneyardCount ?? table.round.boneyard?.length ?? 0) > 0;
+const canDrawPublic = (table) => VARIANTS[table.settings.variant].draws && (table.round.boneyardCount ?? table.round.boneyard?.length ?? 0) > 0
+  && !(VARIANTS[table.settings.variant].drawOne && table.round.drew);
+/** Smaller tiles in your hand when you hold a lot (Train and Chicken Foot deal up to 15). */
+const handTileSize = (count) => (count > 12 ? 56 : count > 8 ? 60 : count > 7 ? 72 : 86);
 
 const sideName = (table, i) => {
   if (table.settings.teams) {
@@ -691,6 +744,79 @@ function Board({ table, selectedMoves, onEnd, maxUnit = 38 }) {
   );
 }
 
+/**
+ * Mexican Train and Chicken Foot: one row per line, each starting from what it comes off (the middle double, or a
+ * chicken foot's double), showing the newest tiles. When your picked tile fits a line, tap that row to play it.
+ */
+function LinesBoard({ table, mySeat, icons, selectedMoves, onEnd, tv }) {
+  const box = useRef(null);
+  const [size, setSize] = useState({ w: 340, h: 300 });
+  useEffect(() => {
+    const el = box.current;
+    if (!el) return undefined;
+    const ro = new ResizeObserver(([e]) => setSize({ w: e.contentRect.width, h: e.contentRect.height }));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const r = table.round;
+  if (!r?.layout?.lines) return null;
+  const train = kindOf(table) === 'train';
+  let rows = r.layout.lines.filter((l) => !l.closed);
+  if (train) {
+    // the Mexican Train, then yours, then everyone else's in turn order
+    const order = (l) => (l.owner == null ? -1 : l.owner === mySeat ? -0.5 : (l.owner - Math.max(mySeat, 0) + table.seats.length) % table.seats.length);
+    rows = [...rows].sort((x, y) => order(x) - order(y));
+  }
+  const fits = new Set(selectedMoves.map((m) => m.arm));
+  const mustFill = !train && rows.some((l) => !l.tiles.length);
+  const cols = size.w > 620 && rows.length > 3 ? 2 : 1; // wide screens: two columns of rows
+  const rowH = Math.max(28, Math.min(tv ? 70 : 46, (size.h - (tv ? 52 : 36)) / Math.max(Math.ceil(rows.length / cols), 1) - 4));
+  const colW = (size.w - (cols - 1) * 6) / cols;
+  const tileLong = Math.round(rowH * 1.3);
+  const labelW = train ? Math.min(118, colW * 0.3) : rowH * 0.9;
+  const room = Math.max(1, Math.floor((colW - labelW - 18 - (fits.size ? 34 : 0)) / (tileLong + 3)));
+  const lastTile = r.last?.tile;
+  return (
+    <div className={`dom-lines-board${cols > 1 ? ' two' : ''}`} ref={box}>
+      <div className="dom-engine" title="The middle double">
+        <Domino a={r.engine} b={r.engine} size={tv ? 70 : 46} />
+        <span>{train ? 'Engine' : 'Middle'}</span>
+        {(r.boneyardCount ?? r.boneyard?.length ?? 0) > 0 && <span className="dom-engine-yard" title="Tiles left to draw"><Domino a={0} b={0} faceDown size={tv ? 44 : 30} /> {r.boneyardCount ?? r.boneyard.length}</span>}
+      </div>
+      {rows.map((l) => {
+        const who = l.owner != null ? table.seats[l.owner] : null;
+        const open = train && (l.owner == null || r.markers?.[l.owner]);
+        const shown = l.tiles.length > room ? l.tiles.slice(l.tiles.length - (room - 1)) : l.tiles;
+        const hidden = l.tiles.length - shown.length;
+        const can = fits.has(l.id);
+        return (
+          <div key={l.id} role={can ? 'button' : undefined} tabIndex={can ? 0 : undefined}
+            className={`dom-row${can ? ' can' : ''}${r.openDouble === l.id ? ' cover' : ''}${l.owner != null && l.owner === mySeat ? ' mine' : ''}${l.owner != null && r.turn === l.owner ? ' turn' : ''}`}
+            style={{ height: rowH }} onClick={can ? () => onEnd(l.id) : undefined}>
+            <span className="dom-row-label" style={{ width: labelW }}>
+              {train
+                ? (l.owner == null
+                  ? <><span className="dom-row-icon">🚂</span><span>Mexican Train</span></>
+                  : <><Avatar value={who ? icons[who.id] : null} name={who?.name ?? '?'} bot={who?.bot} className="dom-row-avatar" /><span>{l.owner === mySeat ? 'You' : who?.name}</span>{open && <span className="dom-row-open" title="Open to everyone">🚂</span>}</>)
+                : (() => { const [a, b] = halves(l.on); return <Domino a={a} b={b} vertical size={rowH * 0.95} />; })()}
+            </span>
+            <span className="dom-row-tiles">
+              {hidden > 0 && <span className="dom-row-more">+{hidden}</span>}
+              {!l.tiles.length && <span className="dom-row-empty">{mustFill ? `needs a ${l.start}` : `starts with a ${l.start}`}</span>}
+              {shown.map((p) => (
+                <span key={p.t} className={`dom-row-tile${p.t === lastTile ? ' last' : ''}${p.inner === p.outer ? ' double' : ''}`}>
+                  <Domino a={p.inner} b={p.outer} size={tileLong} />
+                </span>
+              ))}
+              {can && <span className="dom-row-go" aria-label="Play here">+</span>}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 /** All Fives: "+15" pops up when someone scores off the ends. */
 function FivesPop({ event, table }) {
   const [on, setOn] = useState(true);
@@ -710,6 +836,30 @@ function HandResult({ table, isHost, act, onLeave }) {
     return () => clearInterval(t);
   }, [over]);
   const winnerName = res.winner != null ? sideName(table, res.winner) : null;
+  if (VARIANTS[table.settings.variant].lowWins) {
+    const order = table.match.scores.map((sc, i) => ({ sc, i })).sort((x, y) => x.sc - y.sc);
+    const champ = table.match.winner;
+    return (
+      <div className="dom-result">
+        {over && <Confetti />}
+        <div className="card dom-result-card">
+          <h2>{over ? (champ != null ? `${sideName(table, champ)} wins the game!` : 'It’s a tie!') : res.reason === 'domino' ? `${table.seats[res.outSeat]?.name} went out!` : 'Blocked: nobody can play'}</h2>
+          <p className="muted">{over ? 'Lowest total wins.' : `${res.reason === 'blocked' && winnerName ? `${winnerName} had the lowest hand. ` : ''}Round ${table.match.hands.length} of ${roundsOf(table)} done. Pips left in your hand count against you.`}</p>
+          <div className="dom-result-rows">
+            {order.map(({ sc, i }) => (
+              <div key={i} className={`dom-result-row${over && i === champ ? ' best' : ''}`}><span>{sideName(table, i)}</span><b>{sc}</b><small>{res.points[i] > 0 ? `+${res.points[i]}` : 'out'}</small></div>
+            ))}
+          </div>
+          {over
+            ? (isHost
+              ? <button type="button" className="primary big go" onClick={() => act((t) => startMatch(t))}>Play again</button>
+              : <p className="muted">The host can start another game.</p>)
+            : <p className="muted small">Next round ({Math.max(0, table.settings.setMax - table.match.hands.length)}|{Math.max(0, table.settings.setMax - table.match.hands.length)} in the middle) in {left}…</p>}
+          {over && <button type="button" className="text-btn" onClick={onLeave}>Leave</button>}
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="dom-result">
       {over && <Confetti />}

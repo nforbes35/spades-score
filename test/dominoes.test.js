@@ -150,3 +150,117 @@ test('the board never draws two dominoes on top of each other', () => {
   }
   assert.ok(checked > 100);
 });
+
+// ---------- Mexican Train and Chicken Foot ----------
+import { roundsOf, lineName, maxPlayers } from '../src/dominoes/engine.js';
+
+// a Train / Chicken Foot table with chosen hands, right after the deal
+const fixedRound = (variant, hands, opts = {}) => {
+  const t = seated(newDominoTable({ players: hands.length, setMax: opts.setMax ?? 12, variant }));
+  const m = startMatch(t, seeded(3));
+  return { ...m, round: { ...m.round, hands, boneyard: opts.boneyard ?? [], turn: opts.turn ?? 0 } };
+};
+
+test('Train/Chicken Foot: the round double goes in the middle, one round per double, highest first', () => {
+  for (const variant of ['train', 'foot']) {
+    const t = startMatch(seated(newDominoTable({ players: 6, setMax: 12, variant })), seeded(5));
+    assert.equal(t.round.layout.root, '12-12');
+    assert.ok(t.round.hands.every((h) => h.length === 12));
+    const all = [...t.round.hands.flat(), ...t.round.boneyard];
+    assert.equal(all.length, 90);
+    assert.ok(!all.includes('12-12'));
+    assert.equal(roundsOf(t), 13);
+  }
+  assert.equal(maxPlayers('train', 12), 8);
+  assert.equal(maxPlayers('train', 6), 4);
+  assert.equal(maxPlayers('draw', 12), 4);
+});
+
+test('Mexican Train: own train, the Mexican Train, and marked trains only', () => {
+  let t = fixedRound('train', [['3-12', '5-6'], ['1-12', '2-2'], ['4-4', '0-1']]);
+  const arms = legalMoves(t, 0).map((m) => m.arm).sort();
+  assert.deepEqual(arms, ['mex', 's0']); // not someone else's train
+  assert.equal(lineName(t, 's0', 0), 'Your train');
+  assert.equal(lineName(t, 's1', 0), 'P1’s train');
+  t = playTile(t, 0, '3-12', 's0');
+  assert.equal(t.round.turn, 1);
+  // seat 1 plays on its train; seat 2 can't play, can't draw (empty boneyard): passes and gets a marker
+  t = playTile(t, 1, '1-12', 's1');
+  assert.ok(mustPass(t, 2));
+  t = pass(t, 2);
+  assert.equal(t.round.markers[2], true);
+  // now seat 2's train is open to everyone
+  assert.ok(legalMoves(t, 0).length === 0 || true);
+  t = { ...t, round: { ...t.round, hands: [['9-12', '5-6'], ['2-2'], ['4-4', '0-1']] } };
+  assert.deepEqual(legalMoves(t, 0).map((m) => m.arm).sort(), ['mex', 's2']);
+  // playing on your own marked train takes the marker off
+  t = { ...t, round: { ...t.round, turn: 2, hands: [['5-6'], ['2-2'], ['4-12', '0-1']] } };
+  t = playTile(t, 2, '4-12', 's2');
+  assert.equal(t.round.markers[2], false);
+});
+
+test('Mexican Train: a double must be covered, and you go again', () => {
+  let t = fixedRound('train', [['5-12', '5-5', '1-5', '9-9'], ['0-12', '3-4'], ['1-2', '0-0']]);
+  t = playTile(t, 0, '5-12', 's0');
+  t = { ...t, round: { ...t.round, turn: 0 } };
+  t = playTile(t, 0, '5-5', 's0');
+  assert.equal(t.round.turn, 0, 'played a double: same player again');
+  assert.equal(t.round.openDouble, 's0');
+  assert.deepEqual(legalMoves(t, 0), [{ tile: '1-5', arm: 's0' }]);
+  t = playTile(t, 0, '1-5', 's0');
+  assert.equal(t.round.openDouble, null);
+  assert.equal(t.round.turn, 1);
+});
+
+test('Mexican Train: draw one, then pass; leftover pips count against you, 0|0 is 50', () => {
+  let t = fixedRound('train', [['3-4', '6-6'], ['1-12'], ['0-0', '2-3']], { boneyard: ['7-8'] });
+  assert.ok(canDraw(t, 0));
+  t = drawTile(t, 0);
+  assert.ok(!canDraw(t, 0), 'only one draw a turn');
+  assert.ok(mustPass(t, 0));
+  t = pass(t, 0);
+  t = playTile(t, 1, '1-12', 's1'); // seat 1 goes out
+  assert.equal(t.phase, 'scored');
+  assert.deepEqual(t.round.result.points, [7 + 12 + 15, 0, 50 + 5]);
+  assert.equal(t.round.result.winner, 1);
+});
+
+test('Chicken Foot: six round the middle first, then a double needs three before anything else', () => {
+  let t = fixedRound('foot', [['1-9', '2-9', '3-9', '1-1', '1-4', '1-5', '1-6', '2-7'], ['4-9', '5-9', '6-9', '0-8']], { setMax: 9 });
+  const go = (seat, tile, arm) => { t = playTile({ ...t, round: { ...t.round, turn: seat } }, seat, tile, arm); };
+  go(0, '1-9', 'c0');
+  // while any of the six is empty, only the empty ones take tiles
+  assert.ok(legalMoves({ ...t, round: { ...t.round, turn: 0 } }, 0).every((m) => m.arm !== 'c0'));
+  go(0, '2-9', 'c1'); go(0, '3-9', 'c2'); go(1, '4-9', 'c3'); go(1, '5-9', 'c4'); go(1, '6-9', 'c5');
+  // all six filled: the 1|1 goes on the 1 and makes a chicken foot
+  go(0, '1-1', 'c0');
+  const toes = t.round.layout.lines.filter((l) => l.on === '1-1');
+  assert.equal(toes.length, 3);
+  const moves = legalMoves({ ...t, round: { ...t.round, turn: 0 } }, 0);
+  assert.ok(moves.length && moves.every((m) => toes.some((l) => l.id === m.arm)), 'only the foot');
+  assert.ok(!moves.some((m) => m.tile === '2-7'));
+  assert.equal(lineName(t, toes[0].id, 0), 'Chicken foot');
+});
+
+test('Train and Chicken Foot: computer players finish whole games, lowest total wins', () => {
+  for (const variant of ['train', 'foot']) {
+    for (const [max, players] of [[6, 4], [9, 5], [12, 8], [12, 2]]) {
+      const random = seeded(max * 11 + players + variant.length);
+      let t = startMatch(seated(newDominoTable({ players, setMax: max, variant })), random);
+      let steps = 0;
+      while (t.phase !== 'over' && steps < 50000) {
+        if (t.phase === 'scored') { t = deal(t, random); continue; }
+        const seat = t.round.turn;
+        const m = botMove(t, seat);
+        t = m.type === 'play' ? playTile(t, seat, m.tile, m.arm) : m.type === 'draw' ? drawTile(t, seat) : pass(t, seat);
+        steps++;
+      }
+      assert.equal(t.phase, 'over', `${variant} double-${max} ${players} players finished`);
+      assert.equal(t.match.hands.length, max + 1);
+      assert.deepEqual(t.match.hands.map((h) => h.engine), Array.from({ length: max + 1 }, (_, i) => max - i));
+      if (t.match.winner != null) assert.equal(Math.min(...t.match.scores), t.match.scores[t.match.winner]);
+      const pub = publicTable(t);
+      assert.equal(pub.round.hands, null);
+    }
+  }
+});

@@ -6,16 +6,35 @@
 //   block    – the same, but no drawing: if you can't play, you pass.
 //   allfives – Draw with a spinner (a double played first opens all four sides) and points whenever the open ends
 //              add up to a multiple of 5 (Muggins).
+//   train    – Mexican Train: the round's double sits in the middle; everyone has their own train off it, plus the
+//              shared Mexican Train. Play on your own train, the Mexican Train, or anyone's train with a marker
+//              on it (you get a marker when you can't play). Play a double and you go again, and the double must
+//              be covered before anything else. Draw one tile when you can't play.
+//   foot     – Chicken Foot: six tiles go round the middle double before anything else; after that, any double
+//              played makes a "chicken foot": three tiles must go on it before play goes on anywhere else.
+//   Both play one round per double, from the highest down; leftover pips count against you (the 0|0 is 50) and
+//   the lowest total wins.
 // Sets: double-6, 9 or 12. Sides: every person for themselves, or two teams of two (partners across).
 //
 // A tile is "lo-hi" (e.g. "4-6"). The layout is a root tile and arms off it: L and R, and for a spinner U and
 // D once L and R both have a tile. Each placed tile is { t, inner, outer }: `inner` matches what it joined.
+// Train and Chicken Foot use { root, lines: [{ id, start, tiles, owner?, closed?, on? }] } instead: each line
+// starts from `start` (the middle double's number, or a chicken foot's double) and `arm` is the line's id.
 
 export const VARIANTS = {
-  draw: { name: 'Draw', draws: true, spinner: false, fives: false, target: 100 },
-  block: { name: 'Block', draws: false, spinner: false, fives: false, target: 100 },
-  allfives: { name: 'All Fives', draws: true, spinner: true, fives: true, target: 150 },
+  draw: { name: 'Draw', kind: 'line', draws: true, spinner: false, fives: false, target: 100 },
+  block: { name: 'Block', kind: 'line', draws: false, spinner: false, fives: false, target: 100 },
+  allfives: { name: 'All Fives', kind: 'line', draws: true, spinner: true, fives: true, target: 150 },
+  train: { name: 'Mexican Train', kind: 'train', draws: true, drawOne: true, lowWins: true },
+  foot: { name: 'Chicken Foot', kind: 'foot', draws: true, drawOne: true, lowWins: true },
 };
+export const kindOf = (table) => VARIANTS[table.settings.variant].kind;
+/** The most players a game takes (the line games go round a 4-seat table; double-6 has too few tiles for more). */
+export const maxPlayers = (variant, setMax) => (VARIANTS[variant].kind === 'line' || setMax === 6 ? 4 : 8);
+/** Rounds in a Train or Chicken Foot game (one per double, highest first, unless the host picked fewer). */
+export const roundsOf = (table) => Math.min(table.settings.setMax + 1, table.settings.rounds ?? table.settings.setMax + 1);
+/** Leftover pips at the end of a Train or Chicken Foot round (the double blank counts 50). */
+const penalty = (t) => (t === '0-0' ? 50 : pips(t));
 export const SETS = [6, 9, 12];
 
 export const tileId = (a, b) => (a <= b ? `${a}-${b}` : `${b}-${a}`);
@@ -32,6 +51,11 @@ export function fullSet(max) {
 
 /** Tiles each player starts with, for a set and number of players (draw games keep some in the boneyard). */
 export function handSize(max, players, variant = 'draw') {
+  if (VARIANTS[variant].kind !== 'line') {
+    if (max === 6) return players === 2 ? 7 : players === 3 ? 6 : 5;
+    if (max === 9) return players <= 3 ? 12 : players === 4 ? 10 : players <= 6 ? 8 : 6;
+    return players <= 4 ? 15 : players <= 6 ? 12 : 10;
+  }
   if (max === 6) return players === 2 ? 7 : players === 3 ? (variant === 'block' ? 9 : 6) : (variant === 'block' ? 7 : 5);
   if (max === 9) return players <= 4 ? 9 : players <= 6 ? 7 : 6;
   return players <= 4 ? 12 : players <= 6 ? 11 : 10;
@@ -56,7 +80,7 @@ export function newDominoTable({ players = 4, setMax = 6, variant = 'draw', team
     game: 'dominoes',
     phase: 'lobby',
     seats: Array.from({ length: players }, () => null),
-    settings: { setMax, variant, teams: teams && players === 4, target: target ?? VARIANTS[variant].target, turnTimer: 0 },
+    settings: { setMax, variant, teams: teams && players === 4 && VARIANTS[variant].kind === 'line', target: target ?? VARIANTS[variant].target ?? 0, rounds: null, turnTimer: 0 },
     match: null,
     round: null,
   };
@@ -71,6 +95,7 @@ export function startMatch(table, random = Math.random) {
 
 /** Deal a new hand. The first hand (or after a blocked hand with no winner) starts with the highest double. */
 export function deal(table, random = Math.random) {
+  if (kindOf(table) !== 'line') return dealRound(table, random);
   const { setMax, variant } = table.settings;
   const n = table.seats.length;
   const tiles = shuffle(fullSet(setMax), random);
@@ -94,12 +119,64 @@ export function deal(table, random = Math.random) {
   };
 }
 
+/** Train and Chicken Foot: the round's double goes in the middle, everyone gets a hand, players take turns starting. */
+function dealRound(table, random) {
+  const { setMax, variant } = table.settings;
+  const n = table.seats.length;
+  const h = table.match.hands.length;
+  const v = setMax - (h % (setMax + 1));
+  const root = tileId(v, v);
+  const tiles = shuffle(fullSet(setMax).filter((t) => t !== root), random);
+  const size = handSize(setMax, n, variant);
+  const hands = table.seats.map((_, s) => tiles.slice(s * size, (s + 1) * size));
+  const boneyard = tiles.slice(n * size);
+  const lines = kindOf(table) === 'train'
+    ? [{ id: 'mex', owner: null, start: v, tiles: [] }, ...table.seats.map((_, s) => ({ id: `s${s}`, owner: s, start: v, tiles: [] }))]
+    : Array.from({ length: 6 }, (_, i) => ({ id: `c${i}`, start: v, tiles: [], closed: false, on: root }));
+  return {
+    ...table,
+    phase: 'playing',
+    round: {
+      hands, boneyard, layout: { root, lines, feet: 0 }, turn: h % n, mustPlay: null, passes: 0, moves: 0, last: null,
+      dealtAt: Date.now(), result: null, engine: v, markers: Array(n).fill(false), openDouble: null, drew: false,
+    },
+  };
+}
+
 // ---------- the layout ----------
+
+const lineEnd = (line) => (line.tiles.length ? line.tiles.at(-1).outer : line.start);
+
+/** Train and Chicken Foot: the lines `seat` may play on now. */
+function playableLines(table, seat) {
+  const r = table.round;
+  const lines = r.layout.lines;
+  if (kindOf(table) === 'train') {
+    if (r.openDouble) return lines.filter((l) => l.id === r.openDouble);
+    return lines.filter((l) => l.owner == null || l.owner === seat || r.markers[l.owner]);
+  }
+  const open = lines.filter((l) => !l.closed);
+  const empty = open.filter((l) => !l.tiles.length); // the middle's six, or a chicken foot's three, come first
+  return empty.length ? empty : open;
+}
+
+/** A line's name, as the player whose turn it is would say it ("Your train", "Mexican Train", "Ann’s train"). */
+export function lineName(table, arm, seat) {
+  const line = table.round?.layout?.lines?.find((l) => l.id === arm);
+  if (!line) return '';
+  if (kindOf(table) === 'train') {
+    if (line.owner == null) return 'Mexican Train';
+    if (line.owner === seat) return 'Your train';
+    return `${table.seats[line.owner]?.name ?? 'Their'}’s train`;
+  }
+  return line.on === table.round.layout.root ? 'Middle' : 'Chicken foot';
+}
 
 /** The open arms and the number each needs. */
 export function openEnds(table) {
   const lay = table.round.layout;
   if (!lay) return [];
+  if (lay.lines) return lay.lines.filter((l) => !l.closed).map((l) => ({ arm: l.id, value: lineEnd(l) }));
   const [ra, rb] = halves(lay.root);
   const end = (arm, fallback) => (lay.arms[arm]?.length ? lay.arms[arm].at(-1).outer : fallback);
   const out = [{ arm: 'L', value: end('L', ra) }, { arm: 'R', value: end('R', rb) }];
@@ -111,7 +188,7 @@ export function openEnds(table) {
 /** All Fives: the open ends added up (a double on an end counts both halves). */
 export function endsTotal(table) {
   const lay = table.round.layout;
-  if (!lay) return 0;
+  if (!lay || lay.lines) return 0;
   const [ra, rb] = halves(lay.root);
   const L = lay.arms.L ?? [], R = lay.arms.R ?? [];
   if (!L.length && !R.length) return ra + rb;
@@ -132,7 +209,7 @@ export function legalMoves(table, seat) {
   if (!r || table.phase !== 'playing' || r.turn !== seat) return [];
   const hand = r.hands[seat];
   if (!r.layout) return (r.mustPlay ? hand.filter((t) => t === r.mustPlay) : hand).map((tile) => ({ tile, arm: null }));
-  const ends = openEnds(table);
+  const ends = r.layout.lines ? playableLines(table, seat).map((l) => ({ arm: l.id, value: lineEnd(l) })) : openEnds(table);
   const out = [];
   for (const tile of hand) {
     const [a, b] = halves(tile);
@@ -143,7 +220,8 @@ export function legalMoves(table, seat) {
 
 export const canDraw = (table, seat) => {
   const r = table.round;
-  return VARIANTS[table.settings.variant].draws && r.turn === seat && r.boneyard.length > 0 && legalMoves(table, seat).length === 0;
+  const v = VARIANTS[table.settings.variant];
+  return v.draws && r.turn === seat && r.boneyard.length > 0 && !(v.drawOne && r.drew) && legalMoves(table, seat).length === 0;
 };
 export const mustPass = (table, seat) => table.round.turn === seat && legalMoves(table, seat).length === 0 && !canDraw(table, seat);
 
@@ -160,6 +238,7 @@ export function playTile(table, seat, tile, arm) {
   if (!move) throw new Error('That tile doesn’t fit there.');
 
   const hands = r.hands.map((h, s) => (s === seat ? h.filter((t) => t !== tile) : h));
+  if (r.layout?.lines) return playOnLine(table, seat, tile, move.arm, hands);
   let layout;
   if (!r.layout) {
     layout = { root: tile, spinner: VARIANTS[table.settings.variant].spinner && isDouble(tile), arms: { L: [], R: [], U: [], D: [] } };
@@ -180,18 +259,55 @@ export function playTile(table, seat, tile, arm) {
   return next;
 }
 
+/** Train and Chicken Foot: put `tile` on the line `arm`. */
+function playOnLine(table, seat, tile, arm, hands) {
+  const r = table.round;
+  const lay = r.layout;
+  const line = lay.lines.find((l) => l.id === arm);
+  const value = lineEnd(line);
+  const [a, b] = halves(tile);
+  const placed = { t: tile, inner: value, outer: a === value ? b : a };
+  let lines = lay.lines.map((l) => (l.id === arm ? { ...l, tiles: [...l.tiles, placed] } : l));
+  let feet = lay.feet ?? 0;
+  let turn = nextSeat(table, seat);
+  let openDouble = null;
+  let markers = r.markers;
+  if (kindOf(table) === 'train') {
+    if (line.owner === seat && markers[seat]) markers = markers.map((m, i) => (i === seat ? false : m));
+    if (a === b) { openDouble = arm; turn = seat; } // a double: cover it, and you go again
+  } else if (a === b) {
+    // a chicken foot: this line ends here and three new ones start off the double
+    feet += 1;
+    lines = [...lines.map((l) => (l.id === arm ? { ...l, closed: true } : l)),
+      ...['a', 'b', 'c'].map((x) => ({ id: `f${feet}${x}`, start: a, tiles: [], closed: false, on: tile }))];
+  }
+  const next = {
+    ...table,
+    round: { ...r, hands, layout: { ...lay, lines, feet }, markers, openDouble, drew: false, passes: 0, moves: r.moves + 1, turn, last: { seat, tile, arm, at: Date.now() } },
+  };
+  if (!hands[seat].length) return endHand(next, seat, 'domino');
+  return next;
+}
+
 /** Draw one tile from the boneyard (only when you can't play). */
 export function drawTile(table, seat) {
   if (!canDraw(table, seat)) throw new Error(VARIANTS[table.settings.variant].draws ? 'You can play, or the boneyard is empty.' : 'No drawing in this game.');
   const r = table.round;
   const [tile, ...boneyard] = r.boneyard;
-  return { ...table, round: { ...r, boneyard, hands: r.hands.map((h, s) => (s === seat ? [...h, tile] : h)), last: { seat, drew: true, at: Date.now() } } };
+  return { ...table, round: { ...r, boneyard, drew: true, hands: r.hands.map((h, s) => (s === seat ? [...h, tile] : h)), last: { seat, drew: true, at: Date.now() } } };
 }
 
 /** Pass (only when you can't play or draw). When everyone has passed in a row, the hand is blocked. */
 export function pass(table, seat) {
   if (!mustPass(table, seat)) throw new Error('You can still play or draw.');
   const r = table.round;
+  if (VARIANTS[table.settings.variant].drawOne) {
+    // Train / Chicken Foot: a marker goes on your train; the hand is stuck once everyone has passed with no tiles left to draw
+    const passes = r.boneyard.length ? 0 : r.passes + 1;
+    const markers = kindOf(table) === 'train' ? r.markers.map((m, i) => (i === seat ? true : m)) : r.markers;
+    const next = { ...table, round: { ...r, passes, markers, drew: false, turn: nextSeat(table, seat), last: { seat, passed: true, at: Date.now() } } };
+    return passes >= table.seats.length ? endHand(next, null, 'blocked') : next;
+  }
   const passes = r.passes + 1;
   const next = { ...table, round: { ...r, passes, turn: nextSeat(table, seat), last: { seat, passed: true, at: Date.now() } } };
   if (passes >= table.seats.length) return endHand(next, null, 'blocked');
@@ -211,6 +327,7 @@ function addPoints(table, side, points, event) {
  * wins; a tie means nobody does). The winning side scores the other sides' pips (All Fives: rounded to 5).
  */
 export function endHand(table, outSeat, reason) {
+  if (VARIANTS[table.settings.variant].lowWins) return endRound(table, outSeat, reason);
   const r = table.round;
   const sides = sideCount(table);
   const seatPips = r.hands.map((h) => h.reduce((sum, t) => sum + pips(t), 0));
@@ -246,6 +363,24 @@ export function endHand(table, outSeat, reason) {
       lastWinner: reason === 'domino' ? outSeat : null,
       winner: champ,
     },
+  };
+}
+
+/** Train / Chicken Foot: everyone adds what's left in their hand; after the last round the lowest total wins. */
+function endRound(table, outSeat, reason) {
+  const r = table.round;
+  const seatPips = r.hands.map((h) => h.reduce((sum, t) => sum + penalty(t), 0));
+  const uniqueLow = (list) => { const low = Math.min(...list); return list.filter((x) => x === low).length === 1 ? list.indexOf(low) : null; };
+  const winner = reason === 'domino' ? outSeat : uniqueLow(seatPips);
+  const scores = table.match.scores.map((s, i) => s + seatPips[i]);
+  const hand = { reason, winner, outSeat, points: seatPips, seatPips, engine: r.engine, at: Date.now() };
+  const done = table.match.hands.length + 1 >= roundsOf(table);
+  const champ = done ? uniqueLow(scores) : null;
+  return {
+    ...table,
+    phase: done ? 'over' : 'scored',
+    round: { ...r, result: hand },
+    match: { ...table.match, hands: [...table.match.hands, hand], scores, lastWinner: null, winner: champ, tie: done && champ == null },
   };
 }
 
