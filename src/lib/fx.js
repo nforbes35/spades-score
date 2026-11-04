@@ -65,7 +65,8 @@ export const buzz = (pattern = 60) => {
   }
   const steps = Array.isArray(pattern) ? pattern : [pattern];
   let at = 0;
-  steps.forEach((ms, i) => { if (i % 2 === 0) setTimeout(hapticTap, at); at += ms; });
+  // (the first tap right away: iPhones only allow it during the touch itself)
+  steps.forEach((ms, i) => { if (i % 2 === 0) { if (at === 0) hapticTap(); else setTimeout(hapticTap, at); } at += ms; });
 };
 
 // ---------- Sound settings (this device): sound effects on/off, and the glass break on its own ----------
