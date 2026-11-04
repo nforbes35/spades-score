@@ -1,7 +1,7 @@
 // Dominoes online: everyone on their own phone, like Spades online. The host's device runs the game
 // (engine.js), sends everyone the table (no hands, just counts) and each player their own tiles, locked for
 // their device. Players send moves; the host checks them. Computer players fill empty seats.
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { read, write, tabRead, tabWrite } from '../lib/store.js';
 import { useRoom, joinLink } from '../lib/room.js';
 import { useDevice } from '../lib/device.js';
@@ -18,7 +18,7 @@ import { useDeck } from '../lib/decks.js';
 import { pickBotNames } from '../lib/bots.js';
 import { Avatar, ProfileEditor } from '../Avatar.jsx';
 import { loadName, saveName, loadAvatar, saveAvatar, useAvatars } from '../lib/profile.js';
-import { Icon, Segmented, Toggle, useToast, Confetti, Sheet } from '../components.jsx';
+import { Icon, Segmented, Toggle, useToast, Confetti, Sheet, useTableLayout } from '../components.jsx';
 import Domino from './Domino.jsx';
 import { boardLayout } from './board.js';
 import {
@@ -242,6 +242,7 @@ function DominoRoom({ code, isHost = false, tv = false, name, avatar, onLeave })
   const tiles = isHost ? (mySeat >= 0 ? table?.round?.hands?.[mySeat] ?? null : null) : (myTiles && shown?.round && myTiles.hand === handNo(shown) ? myTiles.tiles : null);
   useWakeLock(Boolean(shown && shown.phase !== 'lobby'));
   const tvFit = useTvFit(tv);
+  const tableLayout = useTableLayout();
 
   /** Send a move to the host (or make it, on the host). */
   const send = (type, body = {}) => {
@@ -312,8 +313,11 @@ function DominoRoom({ code, isHost = false, tv = false, name, avatar, onLeave })
     );
   }
 
+  // A laptop, desktop or iPad: the table drawn as on a phone, scaled up to fill the window (as in Spades).
+  const deskFit = shown.phase !== 'lobby' && tableLayout.zoom > 1
+    ? { zoom: tableLayout.zoom, height: window.innerHeight / tableLayout.zoom, minHeight: 0 } : undefined;
   return (
-    <div className={`app online dominoes${shown.phase === 'lobby' ? '' : ' at-table'}`}>
+    <div className={`app online dominoes${shown.phase === 'lobby' ? '' : ' at-table'}`} style={deskFit}>
       {shown.phase === 'lobby'
         ? <DominoLobby code={code} table={shown} isHost={isHost} me={me} icons={icons} act={act}
             onSit={(s) => { if (!isHost) { room.send({ type: 'd-sit', seat: s, name }, hostPeer?.id); return; } const e = act((x) => sit(x, s, { id: me.id, name })); if (e) toast.show(e); }}
@@ -538,8 +542,21 @@ function DominoTable({ table, mySeat, tiles, icons, isHost, send, act, onLeave, 
   const lastAt = r?.last?.tile ? r.last.at : null;
   useEffect(() => { if (lastAt && Date.now() - lastAt < 2000) cardSound(); }, [lastAt]);
 
+  // The table fills whatever the hand area (fixed along the bottom) leaves: measure it rather than guess.
+  const dockRef = useRef(null);
+  const [dockH, setDockH] = useState(0);
+  const hasDock = mySeat >= 0 && !tv;
+  useLayoutEffect(() => {
+    const el = dockRef.current;
+    if (!hasDock || !el) { setDockH(0); return undefined; }
+    const ro = new ResizeObserver(() => setDockH(el.offsetHeight));
+    ro.observe(el);
+    setDockH(el.offsetHeight);
+    return () => ro.disconnect();
+  }, [hasDock]);
   const lines = kindOf(table) !== 'line'; // Mexican Train / Chicken Foot: rows of lines, players along the top
-  const sides = table.match ? table.match.scores.map((score, i) => ({ score, name: sideName(table, i) })) : [];
+  // (the score boxes along the top use first names, so four of them fit on a small phone)
+  const sides = table.match ? table.match.scores.map((score, i) => ({ score, name: firstNames(table, i) })) : [];
   // a seat's picture (or their video, when they're in the video chat); tap it to send emojis
   const seatAvatar = (who, s) => {
     const stream = who && !who.bot ? videoOf(who.id) : null;
@@ -575,11 +592,18 @@ function DominoTable({ table, mySeat, tiles, icons, isHost, send, act, onLeave, 
       <header className="online-top dom-top">
         <div className="dom-scores">
           {lines && <div className="dom-round"><b>{VARIANTS[table.settings.variant].name}</b><span>Round {Math.min(handNo(table) + (table.phase === 'playing' ? 1 : 0), roundsOf(table))} of {roundsOf(table)} · lowest wins</span></div>}
+          {lines && r?.engine != null && (
+            <div className="dom-head-engine" title={kindOf(table) === 'train' ? 'The engine (middle double)' : 'The middle double'}>
+              <Domino a={r.engine} b={r.engine} size={tv ? 64 : 40} />
+              {boneyard > 0 && <span title="Tiles left to draw"><Domino a={0} b={0} faceDown size={tv ? 40 : 26} />{boneyard}</span>}
+            </div>
+          )}
           {!lines && sides.map((s, i) => (
             <div key={i} className={`dom-score${table.settings.teams ? ` t${i}` : ''}`}>
               <span>{s.name}</span><b>{s.score}</b>
             </div>
           ))}
+          {!lines && <span className="dom-caption">{VARIANTS[table.settings.variant].name} · to {table.settings.target}</span>}
         </div>
         <div className="online-meta">
           {!lines && <span>{VARIANTS[table.settings.variant].name} · to {table.settings.target}</span>}
@@ -587,7 +611,7 @@ function DominoTable({ table, mySeat, tiles, icons, isHost, send, act, onLeave, 
         </div>
       </header>
 
-      <div className={`felt dom-felt${lines ? ' dom-lines' : ''}`}>
+      <div className={`felt dom-felt${lines ? ' dom-lines' : ''}`} style={{ marginBottom: dockH }}>
         <div className="table-oval" aria-hidden="true" />
         {lines && (
           <>
@@ -655,17 +679,18 @@ function DominoTable({ table, mySeat, tiles, icons, isHost, send, act, onLeave, 
       )}
 
       {mySeat >= 0 && !tv && (
-        <div className="hand-dock online-dock dom-dock">
+        <div className="hand-dock online-dock dom-dock" ref={dockRef}>
           <div className="dock-head">
             <span>{table.phase === 'playing' ? (myTurn ? 'Your turn' : `${table.seats[r.turn]?.name ?? '…'}’s turn`) : ''}</span>
             <span>{tiles ? `${tiles.length} tile${tiles.length === 1 ? '' : 's'}` : ''}</span>
           </div>
-          <div className={`dom-hand${(tiles?.length ?? 0) > 8 ? ' many' : ''}`}>
+          {/* tiles share the row (two even rows past 10), sized to the space: see .dom-hand in styles.css */}
+          <div className="dom-hand" style={{ '--per': (tiles?.length ?? 0) > 10 ? Math.ceil(tiles.length / 2) : Math.max(tiles?.length ?? 1, 1) }}>
             {(tiles ?? []).map((t) => {
               const [a, b] = halves(t);
               return (
                 <button key={t} type="button" className={`dom-tile${selected === t ? ' sel' : ''}${myTurn && !playable.has(t) ? ' dim' : ''}`} onClick={() => tapTile(t)} aria-label={`${a} and ${b}`}>
-                  <Domino a={a} b={b} vertical size={handTileSize(tiles.length)} />
+                  <Domino a={a} b={b} vertical size={86} />
                 </button>
               );
             })}
@@ -699,9 +724,12 @@ function movesFor(table, seat, tiles) {
 }
 const canDrawPublic = (table) => VARIANTS[table.settings.variant].draws && (table.round.boneyardCount ?? table.round.boneyard?.length ?? 0) > 0
   && !(VARIANTS[table.settings.variant].drawOne && table.round.drew);
-/** Smaller tiles in your hand when you hold a lot (Train and Chicken Foot deal up to 15). */
-const handTileSize = (count) => (count > 12 ? 56 : count > 8 ? 60 : count > 7 ? 72 : 86);
 
+
+/** A side's name with first names only ("Nick & Ann"), for the small score boxes. */
+const firstNames = (table, i) => (table.settings.teams
+  ? table.seats.filter((_, s) => s % 2 === i).map((x) => x?.name?.split(' ')[0]).filter(Boolean).join(' & ') || `Team ${i + 1}`
+  : sideName(table, i).split(' ')[0]);
 const sideName = (table, i) => {
   if (table.settings.teams) {
     const names = table.seats.filter((_, s) => s % 2 === i).map((x) => x?.name).filter(Boolean);
@@ -769,8 +797,9 @@ function LinesBoard({ table, mySeat, icons, selectedMoves, onEnd, tv }) {
   }
   const fits = new Set(selectedMoves.map((m) => m.arm));
   const mustFill = !train && rows.some((l) => !l.tiles.length);
-  const cols = size.w > 620 && rows.length > 3 ? 2 : 1; // wide screens: two columns of rows
-  const rowH = Math.max(28, Math.min(tv ? 70 : 46, (size.h - (tv ? 52 : 36)) / Math.max(Math.ceil(rows.length / cols), 1) - 4));
+  // two columns of rows on wide screens, and for Chicken Foot's many short lines (only their ends matter)
+  const cols = rows.length > 3 && (size.w > 460 || (!train && rows.length > 7)) ? 2 : 1;
+  const rowH = Math.max(24, Math.min(tv ? 70 : 46, (size.h + 4) / Math.max(Math.ceil(rows.length / cols), 1) - 4));
   const colW = (size.w - (cols - 1) * 6) / cols;
   const tileLong = Math.round(rowH * 1.3);
   const labelW = train ? Math.min(118, colW * 0.3) : rowH * 0.9;
@@ -778,11 +807,6 @@ function LinesBoard({ table, mySeat, icons, selectedMoves, onEnd, tv }) {
   const lastTile = r.last?.tile;
   return (
     <div className={`dom-lines-board${cols > 1 ? ' two' : ''}`} ref={box}>
-      <div className="dom-engine" title="The middle double">
-        <Domino a={r.engine} b={r.engine} size={tv ? 70 : 46} />
-        <span>{train ? 'Engine' : 'Middle'}</span>
-        {(r.boneyardCount ?? r.boneyard?.length ?? 0) > 0 && <span className="dom-engine-yard" title="Tiles left to draw"><Domino a={0} b={0} faceDown size={tv ? 44 : 30} /> {r.boneyardCount ?? r.boneyard.length}</span>}
-      </div>
       {rows.map((l) => {
         const who = l.owner != null ? table.seats[l.owner] : null;
         const open = train && (l.owner == null || r.markers?.[l.owner]);
@@ -796,7 +820,7 @@ function LinesBoard({ table, mySeat, icons, selectedMoves, onEnd, tv }) {
             <span className="dom-row-label" style={{ width: labelW }}>
               {train
                 ? (l.owner == null
-                  ? <><span className="dom-row-icon">🚂</span><span>Mexican Train</span></>
+                  ? <><span className="dom-row-icon">🚂</span><span className="dom-row-mex">Mexican<br />Train</span></>
                   : <><Avatar value={who ? icons[who.id] : null} name={who?.name ?? '?'} bot={who?.bot} className="dom-row-avatar" /><span>{l.owner === mySeat ? 'You' : who?.name}</span>{open && <span className="dom-row-open" title="Open to everyone">🚂</span>}</>)
                 : (() => { const [a, b] = halves(l.on); return <Domino a={a} b={b} vertical size={rowH * 0.95} />; })()}
             </span>

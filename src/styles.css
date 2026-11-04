@@ -1530,7 +1530,7 @@ button.choice:active { transform: scale(0.98); }
 }
 /* A phone on its side: the title on the left, the buttons on the right */
 @media (orientation: landscape) and (max-height: 600px) {
-  .home { display: grid; grid-template-columns: 1fr minmax(320px, 1.1fr); align-items: start; height: 100dvh; min-height: 0; }
+  .home { display: grid; grid-template-columns: minmax(0, 1fr) minmax(min(320px, 56vw), 1.1fr); align-items: start; height: 100dvh; min-height: 0; }
   .home-hero { align-self: center; padding: 12px 8px 12px max(16px, env(safe-area-inset-left)); }
   .home-fan { height: 104px; margin-bottom: 6px; }
   .home-card { --w: 58px; }
@@ -1731,7 +1731,7 @@ button.choice:active { transform: scale(0.98); }
 .react-grid.gifts button { font-size: 34px; padding: 10px 0 8px; }
 @media (min-width: 520px) { .react-grid.gifts { grid-template-columns: repeat(6, 1fr); } }
 .react-grid button:active { transform: scale(0.92); }
-.react-grid small { font-size: 10.5px; font-weight: 700; color: var(--muted); }
+.react-grid small { font-size: 11px; font-weight: 700; color: var(--muted); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .react-grid.waiting button { opacity: 0.4; }
 .react-to { display: flex; gap: 8px; margin-bottom: 10px; overflow-x: auto; }
 .react-person { display: flex; align-items: center; gap: 6px; padding: 5px 12px 5px 5px; border-radius: 999px; border: 2px solid var(--line); background: var(--surface); color: var(--ink); font-weight: 800; white-space: nowrap; }
@@ -2283,3 +2283,56 @@ button.choice:active { transform: scale(0.98); }
 .dom-hand.many { gap: 4px; }
 .dom-lines-board.two { display: grid; grid-template-columns: 1fr 1fr; align-content: start; column-gap: 6px; row-gap: 4px; }
 .dom-lines-board.two .dom-engine { grid-column: 1 / -1; }
+
+/* ---------- Dominoes line games: seats sized so they never sit on the tiles or on each other ---------- */
+/* Upright: the other players share the top in thirds, picture over name */
+:root[data-layout='tall'] .app.online.dominoes.at-table:not(.tv-mode) .player-spot.left,
+:root[data-layout='tall'] .app.online.dominoes.at-table:not(.tv-mode) .player-spot.right,
+:root[data-layout='tall'] .app.online.dominoes.at-table:not(.tv-mode) .player-spot.top { width: calc((100% - 24px) / 3); top: 8px; flex-direction: column; gap: 3px; }
+:root[data-layout='tall'] .app.online.dominoes.at-table:not(.tv-mode) .player-spot.top { left: 50%; transform: translateX(-50%); }
+:root[data-layout='tall'] .app.online.dominoes.at-table:not(.tv-mode) .player-spot:not(.bottom) .nameplate { max-width: 100%; }
+:root[data-layout='tall'] .app.online.dominoes.at-table:not(.tv-mode) .player-spot:not(.bottom) .avatar { width: 48px; height: 48px; }
+:root[data-layout='tall'] .app.online.dominoes.at-table:not(.tv-mode) .dom-board { top: 96px; }
+/* Sideways: narrow side seats, and the board fills the space between all four */
+:root[data-layout='wide'] .app.online.dominoes.at-table:not(.tv-mode) .player-spot.left .nameplate,
+:root[data-layout='wide'] .app.online.dominoes.at-table:not(.tv-mode) .player-spot.right .nameplate { max-width: 96px; }
+:root[data-layout='wide'] .app.online.dominoes.at-table:not(.tv-mode) .dom-board { top: 52px; bottom: 40px; left: 132px; right: 132px; }
+/* the game's name and target: beside the menu, or under the scores on an upright phone so the scores get the width */
+.dom-caption { display: none; }
+:root[data-layout='tall'] .app.dominoes:not(.tv-mode) .dom-top .dom-scores { flex-wrap: wrap; row-gap: 3px; }
+:root[data-layout='tall'] .app.dominoes:not(.tv-mode) .dom-caption { display: block; flex-basis: 100%; font-size: 11px; font-weight: 700; color: rgba(255, 255, 255, 0.75); }
+:root[data-layout='tall'] .app.dominoes:not(.tv-mode) .dom-top .online-meta > span { display: none; }
+:root[data-layout='tall'] .app.dominoes .dom-score span { max-width: 84px; }
+:root[data-layout='wide'] .app.online.dominoes.at-table:not(.tv-mode) .dom-boneyard { left: calc(50% + 66px); bottom: 4px; }
+
+/* Your dominoes: as big as fits (up to 86px tall), all on one row, or two even rows when you hold more than 10 */
+.app.dominoes .dom-hand { container-type: inline-size; flex-wrap: wrap; gap: 5px; --tile-max: 43px; }
+.app.dominoes .dom-hand .dom-tile { width: min(var(--tile-max), calc((100cqw - (var(--per, 7) - 1) * 5px) / var(--per, 7))); flex: none; }
+.app.dominoes .dom-hand .dom-tile .domino { display: block; width: 100%; height: auto; }
+:root[data-layout='wide'] .app.dominoes .dom-hand { --tile-max: 30px; padding-bottom: 4px; }
+.dom-player .dp-info small { font-size: 11px; }
+.dom-row-avatar { width: 26px; height: 26px; font-size: 11px; }
+.dom-row-mex { font-size: 11px; line-height: 1.05; white-space: normal !important; }
+.dom-head-engine { display: flex; align-items: center; gap: 8px; margin-left: 10px; flex: none; }
+.dom-head-engine .domino { filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5)); }
+.dom-head-engine > span { display: inline-flex; align-items: center; gap: 4px; color: #fff; font-weight: 900; font-size: 14px; }
+.app.dominoes.tv-mode .dom-head-engine > span { font-size: 24px; }
+.app.dominoes .dom-top .dom-scores:has(.dom-round) { flex-wrap: nowrap; align-items: center; }
+
+/* The Family Games / Dominoes pictures on a phone on its side: smaller, so the choices keep their room */
+@media (orientation: landscape) and (max-height: 600px) {
+  .hub-showcase { height: 96px; margin-bottom: 6px; }
+  .hub-showcase .hub-card { --w: 56px; }
+  .hub-showcase .hub-domino { width: auto; height: 42px; }
+  .hub-showcase .hub-domino[width][height]:is(.tilt-l, .two) { height: 38px; }
+}
+.home-season { min-height: 36px; }
+:root[data-layout='tall'] .app.dominoes:not(.tv-mode) .dom-top .dom-score { flex: 1 1 0; min-width: 0; max-width: 104px; padding: 4px 7px; }
+/* Train / Chicken Foot on a phone on its side: a slimmer players strip leaves the rows more room */
+@media (orientation: landscape) and (max-height: 600px) {
+  .app.dominoes:not(.tv-mode) .felt.dom-lines { padding: 5px 8px; gap: 4px; }
+  .app.dominoes:not(.tv-mode) .dom-player { padding: 2px 8px 2px 3px; }
+  .app.dominoes:not(.tv-mode) .dom-player .avatar { width: 30px; height: 30px; }
+}
+:root[data-layout='tall'] .app.dominoes:not(.tv-mode) .dom-top .dom-score:is(.t0, .t1) { max-width: 180px; }
+:root[data-layout='tall'] .app.dominoes .dom-score:is(.t0, .t1) span { max-width: none; }

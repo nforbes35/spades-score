@@ -548,7 +548,8 @@ function measureLayout() {
   // Big screens: lay out as on a phone (sideways ~900 wide, upright ~430 wide), then scale up to fill the window.
   const zoom = bigSideways ? Math.max(1, Math.min(h / 440, w / 900))
     : bigUpright ? Math.max(1, Math.min(w / 430, h / 932)) : 1;
-  return { layout: phoneSideways || bigSideways ? 'wide' : 'tall', zoom };
+  // (h: the window's height, so a window made taller or shorter at the same zoom still redraws to fill it)
+  return { layout: phoneSideways || bigSideways ? 'wide' : 'tall', zoom, h: zoom > 1 ? h : 0 };
 }
 let current = measureLayout();
 const layoutListeners = new Set();
@@ -556,7 +557,7 @@ if (typeof window !== 'undefined') {
   document.documentElement.dataset.layout = current.layout;
   addEventListener('resize', () => {
     const next = measureLayout();
-    if (next.layout === current.layout && next.zoom === current.zoom) return;
+    if (next.layout === current.layout && next.zoom === current.zoom && next.h === current.h) return;
     current = next;
     document.documentElement.dataset.layout = next.layout;
     layoutListeners.forEach((fn) => fn());
