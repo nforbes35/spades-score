@@ -38,7 +38,35 @@ export function chime(high = false) {
   } catch { /* no sound available */ }
 }
 
-export const buzz = (pattern = 60) => { try { navigator.vibrate?.(pattern); } catch { /* not supported */ } };
+// iPhones don't let websites vibrate, but flipping a (hidden) on/off switch gives a haptic tap there
+// (iOS 18 and later); one tap for each pulse of the pattern.
+let hapticSwitch;
+function hapticTap() {
+  try {
+    if (!hapticSwitch) {
+      hapticSwitch = document.createElement('label');
+      hapticSwitch.setAttribute('aria-hidden', 'true');
+      hapticSwitch.style.display = 'none';
+      const input = document.createElement('input');
+      input.type = 'checkbox';
+      input.setAttribute('switch', '');
+      hapticSwitch.appendChild(input);
+      document.head.appendChild(hapticSwitch);
+    }
+    hapticSwitch.click();
+  } catch { /* no haptics */ }
+}
+
+/** A buzz: `pattern` is milliseconds on (or [on, off, on, ...]). Vibrates where it can; on iPhones, haptic taps. */
+export const buzz = (pattern = 60) => {
+  if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
+    try { navigator.vibrate(pattern); } catch { /* not allowed */ }
+    return;
+  }
+  const steps = Array.isArray(pattern) ? pattern : [pattern];
+  let at = 0;
+  steps.forEach((ms, i) => { if (i % 2 === 0) setTimeout(hapticTap, at); at += ms; });
+};
 
 // ---------- Sound settings (this device): sound effects on/off, and the glass break on its own ----------
 const EFFECTS_KEY = 'spades-sound-effects';
