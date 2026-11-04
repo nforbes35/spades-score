@@ -18,6 +18,8 @@ export const needsHomeScreen = () => {
   return ios && !standalone;
 };
 
+const withTimeout = (p, ms) => Promise.race([p, new Promise((_, no) => setTimeout(() => no(new Error('timed out')), ms))]);
+
 const keyBytes = (b64) => {
   const s = atob((b64 + '='.repeat((4 - (b64.length % 4)) % 4)).replace(/-/g, '+').replace(/_/g, '/'));
   return Uint8Array.from(s, (c) => c.charCodeAt(0));
@@ -43,10 +45,26 @@ async function subscription(ask) {
 export function useTurnAlerts() {
   const [on, setOn] = useState(() => read(ALERTS_KEY) === true);
   const [sub, setSub] = useState(null);
+  const [problem, setProblem] = useState(null); // why signing this phone up failed
   const why = !pushSupported() ? 'This browser can’t show alerts.' : needsHomeScreen() ? 'Add Family Spades to your Home Screen first (Share → Add to Home Screen), then turn this on from there.' : null;
   useEffect(() => {
-    if (on && !why) subscription(false).then(setSub).catch(() => setSub(null));
+    if (on && !why) signUp(false);
   }, [on, why]);
+  /** Sign this phone up for alerts; returns why it couldn't (or null). */
+  const signUp = async (ask) => {
+    try {
+      const s = await withTimeout(subscription(ask), 15000);
+      setSub(s);
+      const p = s ? null : Notification.permission === 'denied' ? 'Notifications are blocked in Settings' : 'Notifications not allowed yet';
+      setProblem(p);
+      return p;
+    } catch (err) {
+      const p = `Couldn’t sign up (${err?.message || err})`;
+      setSub(null);
+      setProblem(p);
+      return p;
+    }
+  };
   const toggle = async () => {
     if (on) {
       write(ALERTS_KEY, false);
@@ -66,7 +84,7 @@ export function useTurnAlerts() {
       return 'Couldn’t turn on alerts on this phone.';
     }
   };
-  return { on, sub, toggle, why };
+  return { on, sub, toggle, why, problem, retry: () => signUp(true) };
 }
 
 /**

@@ -1020,15 +1020,25 @@ function OnlineTable({ reactions = [], react, teases = {}, tease, alerts = null,
               mySeat >= 0 && { icon: 'hand', label: 'Hand view', note: 'Just your cards, big', onClick: () => setHandView(true) },
               { icon: 'tv', label: 'Add a TV', onClick: () => setTvOpen(true) },
               { icon: 'cards', label: 'Cards & table', onClick: () => setDecksOpen(true) },
-              alerts && mySeat >= 0 && !isHost && {
-                icon: 'bell', label: 'Turn alerts', note: alerts.why && !alerts.on ? 'Add to Home Screen first' : 'Buzz when it’s your turn, even in the background',
-                on: alerts.on, onClick: () => { alerts.toggle().then((err) => { if (err) toast.show(err); }); },
+              // Turn alerts: always listed, with a note saying what's needed when they can't work here
+              alerts && {
+                icon: 'bell', label: 'Turn alerts', on: alerts.on,
+                note: isHost ? 'Not for the host’s phone (it runs the game)'
+                  : alerts.why && !alerts.on ? 'Open the app from your Home Screen first'
+                  : alerts.on && !alerts.sub ? (alerts.problem ?? 'Signing this phone up…')
+                  : 'Buzz when it’s your turn, even in the background',
+                onClick: () => {
+                  if (isHost) { toast.show('The host’s phone runs the game, so it can’t get alerts. Join from another device as a player to get them.'); return; }
+                  alerts.toggle().then((err) => { if (err) toast.show(err); });
+                },
               },
-              alerts && alerts.on && alerts.sub && mySeat >= 0 && !isHost && {
-                icon: 'bell', label: 'Send a test alert', note: lastTest ? `Last test: ${lastTest}` : 'Arrives in about 6 seconds: lock your phone',
+              alerts && alerts.on && !isHost && {
+                icon: 'bell', label: 'Send a test alert',
+                note: lastTest ? `Last test: ${lastTest}` : alerts.sub ? 'Arrives in about 6 seconds: lock your phone' : 'This phone isn’t signed up yet',
                 onClick: () => {
                   const perm = alertPermission();
-                  if (perm !== 'granted') { toast.show(`Notifications for Family Spades are ${perm === 'denied' ? 'blocked' : 'not allowed yet'}: allow them in Settings → Notifications → Family Spades.`); return; }
+                  if (perm !== 'granted') { setLastTest(`notifications are ${perm}`); toast.show(`Notifications for Family Spades are ${perm === 'denied' ? 'blocked' : 'not allowed yet'}: allow them in Settings → Notifications → Family Spades.`); return; }
+                  if (!alerts.sub) { alerts.retry().then((why) => { setLastTest(why ?? 'signed up: try the test again'); toast.show(why ?? 'Signed up: tap Send a test alert again.'); }); return; }
                   toast.show('Test alert on its way: lock your phone or go to the home screen');
                   // (the result shows when you come back to the app)
                   setLastTest('sending…');
