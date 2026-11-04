@@ -95,6 +95,17 @@ export function newDominoTable({ players = 4, setMax = 6, variant = 'draw', team
   };
 }
 
+/**
+ * Tiles each player starts with. Double-6 line games can start with 7 each, or 5 each with the rest in the
+ * boneyard (`settings.startTiles`); otherwise the usual number for the set and players.
+ */
+export function startingTiles(table) {
+  const { setMax, variant, startTiles } = table.settings;
+  const n = table.seats.length;
+  if (setMax === 6 && VARIANTS[variant].kind === 'line' && (startTiles === 7 || startTiles === 5) && startTiles * n <= 28) return startTiles;
+  return handSize(setMax, n, variant);
+}
+
 /** Start the match (scores at 0) and deal the first hand. */
 export function startMatch(table, random = Math.random) {
   const sides = sideCount(table);
@@ -111,7 +122,7 @@ export function deal(table, random = Math.random) {
   const { setMax, variant } = table.settings;
   const n = table.seats.length;
   const tiles = shuffle(fullSet(setMax), random);
-  const size = handSize(setMax, n, variant);
+  const size = startingTiles(table);
   const hands = table.seats.map((_, s) => tiles.slice(s * size, (s + 1) * size));
   const boneyard = tiles.slice(n * size);
   let turn = table.match.lastWinner;

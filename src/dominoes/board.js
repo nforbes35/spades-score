@@ -15,28 +15,35 @@ export function boardLayout(layout, { reach = 8 } = {}) {
   tiles.push({ t: layout.root, cx: 0, cy: 0, vertical: rootDouble, a: ra, b: rb, root: true });
   const hw = rootDouble ? 0.5 : 1; // half the root's length along the line
 
-  // L and R: rows of tiles that turn (one tile across) when they reach `reach`, and turn again near the middle
+  // L and R: rows of tiles that turn when they reach `reach`, and turn again near the middle. A turn is one tile
+  // standing across the row's end; the row comes back two rows further on, so rows never touch each other.
+  // Each tile notes the tile it's joined to (`link`), so tests can check nothing else touches it.
   const snake = (arm, side) => {
     const list = layout.arms[arm] ?? [];
     let dir = side; // +1 right, -1 left
     let x = side * hw; // the open edge of the row
     let y = 0;
     const turn = side; // the right side turns down (+1), the left side up (-1)
-    const near = hw + 0.4;
+    // where a returning row turns outward again: well clear of the middle (and of a spinner's up/down arms)
+    const near = hw + (layout.spinner ? 1.5 : 0.6);
+    let link = 0;
     for (const p of list) {
       const along = 2;
       const edge = Math.abs(x + dir * along);
       const outward = dir === side;
       if ((outward && edge > reach) || (!outward && edge < near)) {
-        // a corner: this tile stands across, its first half beside the row's end, then the row comes back
+        // a corner: this tile stands across, its first half beside the row's end; the next row starts under its far half
         const cx = x + dir * 0.5;
         const cy = y + turn * 0.5;
-        tiles.push({ t: p.t, cx, cy, vertical: true, a: turn > 0 ? p.inner : p.outer, b: turn > 0 ? p.outer : p.inner });
-        y += turn;
+        tiles.push({ t: p.t, cx, cy, vertical: true, a: turn > 0 ? p.inner : p.outer, b: turn > 0 ? p.outer : p.inner, link });
+        link = tiles.length - 1;
+        x += dir; // the corner's far side: the next row's first tile reaches back under the corner
+        y += turn * 2;
         dir = -dir;
         continue;
       }
-      tiles.push({ t: p.t, cx: x + (dir * along) / 2, cy: y, vertical: false, a: dir > 0 ? p.inner : p.outer, b: dir > 0 ? p.outer : p.inner });
+      tiles.push({ t: p.t, cx: x + (dir * along) / 2, cy: y, vertical: false, a: dir > 0 ? p.inner : p.outer, b: dir > 0 ? p.outer : p.inner, link });
+      link = tiles.length - 1;
       x += dir * along;
     }
     ends[arm] = { x: x + dir * 1, y, vertical: false };
@@ -48,9 +55,11 @@ export function boardLayout(layout, { reach = 8 } = {}) {
   if (layout.spinner && layout.arms.L?.length && layout.arms.R?.length) {
     for (const [arm, dir] of [['U', -1], ['D', 1]]) {
       let y = dir * 1; // the double stands across the line, so it reaches 1 up and 1 down
+      let prev = 0;
       for (const p of layout.arms[arm] ?? []) {
         const along = 2;
-        tiles.push({ t: p.t, cx: 0, cy: y + (dir * along) / 2, vertical: true, a: dir > 0 ? p.inner : p.outer, b: dir > 0 ? p.outer : p.inner });
+        tiles.push({ t: p.t, cx: 0, cy: y + (dir * along) / 2, vertical: true, a: dir > 0 ? p.inner : p.outer, b: dir > 0 ? p.outer : p.inner, link: prev });
+        prev = tiles.length - 1;
         y += dir * along;
       }
       ends[arm] = { x: 0, y: y + dir * 1, vertical: true };
@@ -66,4 +75,19 @@ export function boardLayout(layout, { reach = 8 } = {}) {
     box = { x0: Math.min(box.x0, e.x - 0.6), y0: Math.min(box.y0, e.y - 0.6), x1: Math.max(box.x1, e.x + 0.6), y1: Math.max(box.y1, e.y + 0.6) };
   }
   return { tiles, ends, box };
+}
+
+/**
+ * The layout for a board `w` × `h` pixels: tries runs of different lengths and takes the longest one that keeps
+ * the tiles nearly as big as they can be (so the line runs a good way before it turns). Returns the layout and
+ * the size of one unit (half a tile's length) in pixels.
+ */
+export function fitBoard(layout, w, h, maxUnit = 38) {
+  const tries = [6, 7, 8, 9, 10, 11, 12, 14, 16].map((reach) => {
+    const L = boardLayout(layout, { reach });
+    const unit = Math.min(maxUnit, w / (L.box.x1 - L.box.x0), h / (L.box.y1 - L.box.y0));
+    return { L, unit, reach };
+  });
+  const best = Math.max(...tries.map((t) => t.unit));
+  return [...tries].reverse().find((t) => t.unit >= best * 0.85);
 }

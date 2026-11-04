@@ -125,13 +125,14 @@ import { deal } from '../src/dominoes/engine.js';
 const startMatchHand = (t, random) => deal(t, random);
 
 import { boardLayout } from '../src/dominoes/board.js';
-test('the board never draws two dominoes on top of each other', () => {
+test('the board: dominoes only touch the one they join, with long runs before turning', () => {
   const box = (t) => (t.vertical ? [t.cx - 0.5, t.cy - 1, t.cx + 0.5, t.cy + 1] : [t.cx - 1, t.cy - 0.5, t.cx + 1, t.cy + 0.5]);
-  const overlap = (p, q) => Math.min(p[2], q[2]) - Math.max(p[0], q[0]) > 0.05 && Math.min(p[3], q[3]) - Math.max(p[1], q[1]) > 0.05;
+  // the gap between two boxes (0 = touching, negative = overlapping)
+  const gap = (p, q) => Math.max(Math.max(p[0], q[0]) - Math.min(p[2], q[2]), Math.max(p[1], q[1]) - Math.min(p[3], q[3]));
   let checked = 0;
   for (const variant of ['draw', 'block', 'allfives']) {
     for (const max of [6, 9, 12]) {
-      for (const reach of [5, 8]) {
+      for (const reach of [6, 9, 14]) {
         const random = seeded(max * 31 + reach + variant.length);
         let t = startMatch(seated(newDominoTable({ players: 2, setMax: max, variant, target: 1 })), random);
         while (t.phase === 'playing') {
@@ -140,8 +141,16 @@ test('the board never draws two dominoes on top of each other', () => {
           t = m.type === 'play' ? playTile(t, s, m.tile, m.arm) : m.type === 'draw' ? drawTile(t, s) : pass(t, s);
           const { tiles } = boardLayout(t.round.layout, { reach });
           const boxes = tiles.map(box);
-          for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++) {
-            assert.ok(!overlap(boxes[i], boxes[j]), `${variant} d${max} reach ${reach}: ${tiles[i].t} and ${tiles[j].t} overlap`);
+          for (let i = 0; i < boxes.length; i++) {
+            if (tiles[i].link != null) assert.ok(Math.abs(gap(boxes[i], boxes[tiles[i].link])) < 0.01, `${tiles[i].t} meets the tile it joins`);
+            for (let j = i + 1; j < boxes.length; j++) {
+              const joined = tiles[i].link === j || tiles[j].link === i;
+              if (!joined) assert.ok(gap(boxes[i], boxes[j]) >= 0.4, `${variant} d${max} reach ${reach}: ${tiles[i].t} and ${tiles[j].t} touch`);
+            }
+          }
+          // runs: no row turns before it has gone `reach` out from the middle
+          for (const t2 of tiles.filter((x) => x.vertical && x.link != null && !x.root)) {
+            if (Math.abs(t2.cy) < 1) assert.ok(Math.abs(t2.cx) > reach - 2.5 || variant === 'allfives', `first turn of ${t2.t} only after a long run`);
           }
           checked++;
         }
@@ -375,4 +384,32 @@ test('teams: computer players finish whole games of every kind with 4, 6 and 8 p
       if (scoring === 'rounds') assert.equal(t.match.sets.reduce((a, b) => a + b, 0), 1);
     }
   }
+});
+
+// ---------- Double 6: start with 7, or 5 and a boneyard ----------
+import { startingTiles } from '../src/dominoes/engine.js';
+
+test('double 6: start with 7 tiles or with 5 and a boneyard', () => {
+  const deal4 = (startTiles, variant = 'draw') => {
+    const t = seated(newDominoTable({ players: 4, setMax: 6, variant }));
+    return startMatch({ ...t, settings: { ...t.settings, startTiles } }, seeded(77));
+  };
+  let t = deal4(7);
+  assert.ok(t.round.hands.every((h) => h.length === 7));
+  assert.equal(t.round.boneyard.length, 0);
+  t = deal4(5);
+  assert.ok(t.round.hands.every((h) => h.length === 5));
+  assert.equal(t.round.boneyard.length, 8);
+  // two players starting with 5: 18 to draw from
+  const two = seated(newDominoTable({ players: 2, setMax: 6, variant: 'allfives' }));
+  const t2 = startMatch({ ...two, settings: { ...two.settings, startTiles: 5 } }, seeded(5));
+  assert.deepEqual([t2.round.hands[0].length, t2.round.boneyard.length], [5, 18]);
+  // not for other sets or Train / Chicken Foot: the usual deal
+  const nine = seated(newDominoTable({ players: 4, setMax: 9, variant: 'draw' }));
+  assert.equal(startingTiles({ ...nine, settings: { ...nine.settings, startTiles: 5 } }), 9);
+  const train = seated(newDominoTable({ players: 4, setMax: 6, variant: 'train' }));
+  assert.equal(startingTiles({ ...train, settings: { ...train.settings, startTiles: 7 } }), 5);
+  // later hands deal the same way
+  const after = deal(endHand({ ...t, round: { ...t.round, hands: [[], ['1-2'], ['1-3'], ['1-4']] } }, 0, 'domino'), seeded(8));
+  assert.ok(after.round.hands.every((h) => h.length === 5));
 });

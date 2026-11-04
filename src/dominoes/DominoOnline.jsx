@@ -21,9 +21,9 @@ import { Avatar, ProfileEditor } from '../Avatar.jsx';
 import { loadName, saveName, loadAvatar, saveAvatar, useAvatars } from '../lib/profile.js';
 import { Icon, Segmented, Toggle, useToast, Confetti, Sheet, useTableLayout } from '../components.jsx';
 import Domino from './Domino.jsx';
-import { boardLayout } from './board.js';
+import { fitBoard } from './board.js';
 import {
-  VARIANTS, SETS, kindOf, sideOf, teamsPossible, maxPlayers, roundsOf, lineName, byRounds, roundsToWin, halves, newDominoTable, startMatch, deal, legalMoves, playTile, drawTile, pass, publicTable, botMove, openEnds,
+  VARIANTS, SETS, startingTiles, kindOf, sideOf, teamsPossible, maxPlayers, roundsOf, lineName, byRounds, roundsToWin, halves, newDominoTable, startMatch, deal, legalMoves, playTile, drawTile, pass, publicTable, botMove, openEnds,
 } from './engine.js';
 
 const ID_KEY = 'spades-device-id'; // the same device id as Spades online, so a reload rejoins the same seat
@@ -446,6 +446,13 @@ function DominoLobby({ code, table, isHost, me, icons, act, onSit, onStand, onSt
               <div className="field-block"><span>Set</span>
                 <Segmented value={settings.setMax} onChange={(v) => act((t) => setRules(t, { setMax: v }))} options={SETS.map((m) => ({ id: m, label: `Double ${m}` }))} />
               </div>
+              {settings.setMax === 6 && kindOf(table) === 'line' && VARIANTS[settings.variant].draws && (
+                <div className="field-block"><span>Start with</span>
+                  <Segmented value={startingTiles(table)} onChange={(v) => set({ startTiles: v })}
+                    options={[{ id: 7, label: '7 tiles' }, { id: 5, label: '5 + boneyard' }]} />
+                  <small className="dom-teams-note">{startingTiles(table) * table.seats.length >= 28 ? 'Every tile is dealt, so there’s nothing to draw.' : `${28 - startingTiles(table) * table.seats.length} tiles left in the boneyard to draw from.`}</small>
+                </div>
+              )}
               <div className="field-block"><span>Players</span>
                 <Segmented value={table.seats.length} onChange={(n) => act((t) => setPlayers(t, n))} options={Array.from({ length: maxPlayers(settings.variant, settings.setMax) - 1 }, (_, i) => i + 2).map((n) => ({ id: n, label: String(n) }))} />
               </div>
@@ -477,7 +484,7 @@ function DominoLobby({ code, table, isHost, me, icons, act, onSit, onStand, onSt
               )}
             </>
           ) : (
-            <p className="dom-rules-line">{VARIANTS[settings.variant].name} · Double {settings.setMax} · {settings.teams ? `${table.seats.length / 2} teams of 2` : 'Each for themselves'} · {scoringText(table)}</p>
+            <p className="dom-rules-line">{VARIANTS[settings.variant].name} · Double {settings.setMax} · {startingTiles(table)} tiles each · {settings.teams ? `${table.seats.length / 2} teams of 2` : 'Each for themselves'} · {scoringText(table)}</p>
           )}
         </div>
         <p className="footnote">{byRounds(table) ? RULES_PLAY[settings.variant] : RULES_NOTE[settings.variant]}{byRounds(table) ? ` Scoring by rounds: each hand is a round, won by whoever goes out first, or if nobody can play, by the player with the fewest dots left.${settings.bestOf ? ` First to win ${roundsToWin(table)} rounds wins the set; the app keeps count of sets won.` : ' The app counts rounds won until you end the game.'}` : ''}</p>
@@ -847,10 +854,9 @@ function Board({ table, selectedMoves, onEnd, maxUnit = 38 }) {
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
-  const reach = Math.max(4, Math.min(10, Math.round((size.w / Math.max(size.h, 1)) * 4)));
-  const { tiles, ends, box: b } = boardLayout(table.round?.layout, { reach });
+  // the longest runs before turning that still keep the tiles a good size
+  const { L: { tiles, ends, box: b }, unit } = fitBoard(table.round?.layout, size.w, size.h, maxUnit);
   const unitW = (b.x1 - b.x0), unitH = (b.y1 - b.y0);
-  const unit = Math.min(maxUnit, size.w / unitW, size.h / unitH);
   const ox = (size.w - unitW * unit) / 2 - b.x0 * unit;
   const oy = (size.h - unitH * unit) / 2 - b.y0 * unit;
   const last = table.round?.last?.tile;
