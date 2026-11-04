@@ -322,7 +322,7 @@ export function FannedHand({ cards, selected, onSelect, disabled, dim = [], deal
   // On a big screen the table is drawn zoomed (useTableFit): finger movements are in screen pixels, the
   // hand's own sizes aren't.
   const zoomOf = () => (box.current ? box.current.getBoundingClientRect().width / box.current.offsetWidth || 1 : 1);
-  const buzzOnce = buzz; // (vibration, or haptic taps on iPhones)
+  const buzzOnce = buzz;
 
   const down = (e) => {
     if (!swipeable || e.button > 0) return;
