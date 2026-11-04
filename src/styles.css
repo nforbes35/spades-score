@@ -2126,3 +2126,74 @@ button.choice:active { transform: scale(0.98); }
 .domino-bar { stroke: rgba(0, 0, 0, 0.35); stroke-width: 0.03; stroke-linecap: round; }
 .domino-spinner { fill: #b08d3c; }
 .domino.face-down .domino-body { fill: #1f2a37; stroke: rgba(255, 255, 255, 0.25); }
+
+/* ---------- Dominoes ---------- */
+.hub-showcase .hub-domino.tilt-l { rotate: -10deg; }
+.dom-lobby .field-block { display: flex; flex-direction: column; gap: 6px; padding: 10px 14px; }
+.dom-lobby .field-block > span { font-weight: 800; font-size: 14px; color: var(--muted); }
+.dom-rules-line { padding: 12px 14px; font-weight: 700; }
+.dom-seats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.dom-seat { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 14px 8px; text-align: center; border: 2px solid var(--line); }
+.dom-seat.t0 { --team: var(--t0); border-color: color-mix(in srgb, var(--t0) 45%, transparent); }
+.dom-seat.t1 { --team: var(--t1); border-color: color-mix(in srgb, var(--t1) 45%, transparent); }
+.dom-seat.mine { box-shadow: 0 0 0 3px var(--btn, var(--gold)); }
+.dom-seat small { color: var(--muted); font-weight: 700; }
+.dom-empty { width: 58px; height: 58px; border-radius: 50%; border: 2px dashed var(--line); display: grid; place-items: center; font-size: 26px; color: var(--muted); }
+.dom-invite { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 16px; text-align: center; }
+.dom-code { display: flex; gap: 8px; }
+.dom-code span { width: 52px; height: 60px; display: grid; place-items: center; border-radius: 12px; background: var(--surface-2, #f1f3f1); border: 2px solid var(--line); font-size: 32px; font-weight: 900; }
+.dom-start { display: flex; flex-direction: column; gap: 10px; margin: 14px 0 24px; }
+.muted-light { color: rgba(255, 255, 255, 0.8); font-weight: 600; }
+
+/* The table */
+.dom-top .dom-scores { display: flex; gap: 8px; flex-wrap: wrap; min-width: 0; }
+.dom-score { display: flex; flex-direction: column; padding: 4px 12px; border-radius: 12px; background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.1); line-height: 1.1; min-width: 0; }
+.dom-score.t0 { box-shadow: inset 0 3px 0 var(--t0); }
+.dom-score.t1 { box-shadow: inset 0 3px 0 var(--t1); }
+.dom-score span { font-size: 11px; font-weight: 800; opacity: 0.8; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dom-score b { font-size: 22px; font-weight: 900; font-variant-numeric: tabular-nums; }
+.dom-felt { overflow: hidden; }
+.dom-board { position: absolute; inset: 70px 70px 60px; }
+:root[data-layout='tall'] .dom-board { inset: 96px 8px 84px; }
+.dom-placed { position: absolute; translate: -50% -50%; }
+.dom-placed .domino { filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.45)); }
+.dom-placed.last .domino { filter: drop-shadow(0 0 6px var(--gold)) drop-shadow(0 2px 3px rgba(0, 0, 0, 0.45)); animation: dom-land 0.35s ease-out; }
+@keyframes dom-land { from { scale: 1.4; opacity: 0.4; } }
+.dom-end {
+  position: absolute; translate: -50% -50%; min-width: 34px; min-height: 34px; border-radius: 10px; border: 3px dashed #fff;
+  background: color-mix(in srgb, var(--turn, #34d399) 55%, transparent); color: #fff; font-size: 22px; font-weight: 900;
+  box-shadow: 0 0 16px var(--turn, #34d399); animation: dom-pulse 1s ease-in-out infinite alternate;
+}
+@keyframes dom-pulse { to { scale: 1.12; } }
+.dom-board-hint { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; color: rgba(255, 255, 255, 0.85); font-weight: 800; font-size: 17px; padding: 0 20px; }
+.dom-count { min-width: 26px; text-align: center; }
+.dom-said { position: absolute; top: -8px; left: 50%; translate: -50% 0; padding: 2px 10px; border-radius: 999px; background: rgba(0, 0, 0, 0.7); color: #fff; font-weight: 800; font-size: 13px; animation: fade 0.3s; }
+.dom-boneyard { position: absolute; left: 10px; bottom: 10px; display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px 4px 6px; border-radius: 999px; background: rgba(0, 0, 0, 0.45); color: #fff; font-weight: 900; font-size: 15px; }
+.dom-fives { position: absolute; left: 50%; top: 42%; translate: -50% -50%; z-index: 6; padding: 8px 18px; border-radius: 999px; background: var(--gold); color: var(--gold-ink, #2a1a00); font-size: 24px; font-weight: 900; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4); animation: dom-fives 1.8s ease-out forwards; pointer-events: none; }
+@keyframes dom-fives { 0% { scale: 0.4; opacity: 0; } 15% { scale: 1.15; opacity: 1; } 80% { opacity: 1; } 100% { translate: -50% -110%; opacity: 0; } }
+
+/* Your tiles */
+.dom-dock { padding-top: 6px; }
+.dom-hand { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; padding: 4px 4px 8px; }
+.dom-tile { border: 0; background: none; padding: 0; border-radius: 8px; transition: translate 0.15s, filter 0.15s; filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.4)); }
+.dom-tile.sel { translate: 0 -12px; filter: drop-shadow(0 0 8px var(--turn, #34d399)) drop-shadow(0 6px 8px rgba(0, 0, 0, 0.4)); }
+.dom-tile.dim { opacity: 0.45; }
+.dom-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+.dom-actions .big { flex: 1 1 140px; }
+:root[data-layout='wide'] .dom-hand { justify-content: flex-start; }
+
+/* Between hands */
+.dom-result { position: fixed; inset: 0; z-index: 70; display: grid; place-items: center; padding: 16px; background: rgba(0, 0, 0, 0.45); }
+.dom-result-card { width: min(420px, 100%); display: flex; flex-direction: column; gap: 10px; padding: 20px; text-align: center; }
+.dom-result-rows { display: flex; flex-direction: column; gap: 6px; }
+.dom-result-row { display: flex; align-items: baseline; gap: 10px; padding: 8px 12px; border-radius: 12px; background: var(--surface-2, #f1f3f1); font-weight: 800; }
+.dom-result-row span { flex: 1; text-align: left; }
+.dom-result-row b { font-size: 22px; font-variant-numeric: tabular-nums; }
+.dom-result-row small { color: #16a34a; font-weight: 900; }
+/* Upright phones: the other players sit along the top, so the line of dominoes has the whole middle */
+:root[data-layout='tall'] .app.dominoes .player-spot.left { top: 10px; left: 6px; transform: none; }
+:root[data-layout='tall'] .app.dominoes .player-spot.right { top: 10px; right: 6px; left: auto; transform: none; }
+:root[data-layout='tall'] .app.dominoes .player-spot.top { top: 10px; }
+:root[data-layout='tall'] .dom-board { inset: 120px 8px 92px; }
+:root[data-layout='wide'] .dom-board { inset: 64px 120px 56px; }
+.dom-end { z-index: 3; }

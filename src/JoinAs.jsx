@@ -19,6 +19,9 @@ export default function JoinAs({ code, onChoose: choose, onLeave }) {
   const room = useRoom(code, device, (m) => { if (m.type === 'state') setGame(m.game); });
   const host = room.peers.find((p) => p.role === 'host');
   const onlineHost = room.peers.find((p) => p.role === 'ohost');
+  // A dominoes game: straight in (players only for now)
+  const dominoHost = room.peers.find((p) => p.role === 'dhost');
+  useEffect(() => { if (dominoHost) choose('dominoes', null); }, [Boolean(dominoHost)]);
   useEffect(() => { if (host) room.send({ type: 'hello' }, host.id); }, [host?.id, room.send]);
   const seats = game ? remoteSeats(game) : [];
   // The last choice is remembered: a TV goes straight to the table view, a phone that last played goes
@@ -32,7 +35,7 @@ export default function JoinAs({ code, onChoose: choose, onLeave }) {
   // Nobody answers after a while: probably an old code for a game that's over.
   const [slow, setSlow] = useState(false);
   useEffect(() => {
-    if (game || onlineHost) return undefined;
+    if (game || onlineHost || dominoHost) return undefined;
     const t = setTimeout(() => setSlow(true), 15000);
     return () => clearTimeout(t);
   }, [Boolean(game || onlineHost)]);

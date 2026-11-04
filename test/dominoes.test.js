@@ -123,3 +123,30 @@ test('computer players finish whole matches without breaking the rules', () => {
 
 import { deal } from '../src/dominoes/engine.js';
 const startMatchHand = (t, random) => deal(t, random);
+
+import { boardLayout } from '../src/dominoes/board.js';
+test('the board never draws two dominoes on top of each other', () => {
+  const box = (t) => (t.vertical ? [t.cx - 0.5, t.cy - 1, t.cx + 0.5, t.cy + 1] : [t.cx - 1, t.cy - 0.5, t.cx + 1, t.cy + 0.5]);
+  const overlap = (p, q) => Math.min(p[2], q[2]) - Math.max(p[0], q[0]) > 0.05 && Math.min(p[3], q[3]) - Math.max(p[1], q[1]) > 0.05;
+  let checked = 0;
+  for (const variant of ['draw', 'block', 'allfives']) {
+    for (const max of [6, 9, 12]) {
+      for (const reach of [5, 8]) {
+        const random = seeded(max * 31 + reach + variant.length);
+        let t = startMatch(seated(newDominoTable({ players: 2, setMax: max, variant, target: 1 })), random);
+        while (t.phase === 'playing') {
+          const s = t.round.turn;
+          const m = botMove(t, s);
+          t = m.type === 'play' ? playTile(t, s, m.tile, m.arm) : m.type === 'draw' ? drawTile(t, s) : pass(t, s);
+          const { tiles } = boardLayout(t.round.layout, { reach });
+          const boxes = tiles.map(box);
+          for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++) {
+            assert.ok(!overlap(boxes[i], boxes[j]), `${variant} d${max} reach ${reach}: ${tiles[i].t} and ${tiles[j].t} overlap`);
+          }
+          checked++;
+        }
+      }
+    }
+  }
+  assert.ok(checked > 100);
+});

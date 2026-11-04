@@ -16,6 +16,7 @@ import NewGame from './NewGame.jsx';
 import Home from './Home.jsx';
 import GameHub from './GameHub.jsx';
 import DominoesApp from './dominoes/DominoesApp.jsx';
+import DominoOnline from './dominoes/DominoOnline.jsx';
 import HandSheet from './HandSheet.jsx';
 import ScanCards from './ScanCards.jsx';
 import Invite from './Invite.jsx';
@@ -69,6 +70,7 @@ export default function App() {
   if (join?.as === 'tv') return <TvApp code={join.code} onLeave={leave} />;
   if (join?.as === 'card' && join.seat != null) return <CardDisplayApp code={join.code} seat={join.seat} onLeave={leave} />;
   if (join?.as === 'otv') return <OnlineApp code={join.code} tv onLeave={leave} onPlayHere={() => update({ code: join.code, as: 'online' })} />;
+  if (join?.as === 'dominoes') return <DominoOnline code={join.code} isHost={Boolean(join.host)} onLeave={leave} />;
   if (join?.as === 'online') return <OnlineApp code={join.code} isHost={Boolean(join.host)} onLeave={leave} onUseAsTv={() => update({ code: join.code, as: 'otv' })} />;
   if (join?.code) return <JoinAs code={join.code} onChoose={(as, seat) => update({ code: join.code, as, seat })} onLeave={leave} />;
   if (!picked) {
@@ -79,7 +81,11 @@ export default function App() {
       </>
     );
   }
-  if (picked === 'dominoes') return <DominoesApp onAllGames={() => pick(null)} />;
+  if (picked === 'dominoes') {
+    return <DominoesApp onAllGames={() => pick(null)} onJoin={(code) => update({ code })}
+      onPlayOnline={() => update({ code: makeCode(), as: 'dominoes', host: true })}
+      onRejoin={(last) => update({ code: last.code, as: 'dominoes', host: last.host })} />;
+  }
   return <HostApp onAllGames={() => pick(null)} onJoin={(code) => update({ code })} onPlayOnline={() => update({ code: makeCode(), as: 'online', host: true })}
     onRejoin={(last) => update({ code: last.code, as: 'online', host: last.host })} />;
 }
