@@ -65,10 +65,14 @@ export default function DominoOnline({ code, isHost, tv = false, onLeave }) {
       </div>
     );
   }
-  return <DominoRoom code={code} isHost={isHost} name={name.trim()} avatar={avatar} onLeave={onLeave} />;
+  return (
+    <DominoRoom code={code} isHost={isHost} name={name.trim()} avatar={avatar} onLeave={onLeave}
+      onProfile={(next) => { setName(next.name); saveName(next.name); setAvatar(next.avatar); saveAvatar(next.avatar); }} />
+  );
 }
 
-function DominoRoom({ code, isHost = false, tv = false, name, avatar, onLeave }) {
+function DominoRoom({ code, isHost = false, tv = false, name, avatar, onLeave, onProfile }) {
+  const [editingProfile, setEditingProfile] = useState(null); // { name, avatar } while the "You" sheet is open
   const keys = useKeys();
   const [deviceId] = useState(() => stableId(tv ? TV_ID_KEY : ID_KEY));
   // (the TV uses the same role as a Spades TV, so video chat treats it the same: it plays everyone's sound)
@@ -144,6 +148,7 @@ function DominoRoom({ code, isHost = false, tv = false, name, avatar, onLeave })
       }
       else if (m.type === 'd-sit') error = act((x) => sit(x, m.seat, { id: from.id, name: String(m.name || from.name || 'Player').slice(0, 14) }));
       else if (m.type === 'd-stand') error = act((x) => ({ ...x, seats: x.seats.map((s) => (s?.id !== from.id ? s : x.phase === 'lobby' ? null : { ...s, standIn: true })) }));
+      else if (seat >= 0 && m.type === 'd-rename') error = act((x) => renameSeat(x, seat, m.name));
       else if (seat >= 0 && m.type === 'd-play') error = act((x) => (handNo(x) === m.hand ? playTile(x, seat, m.tile, m.arm) : x));
       else if (seat >= 0 && m.type === 'd-draw') error = act((x) => (handNo(x) === m.hand ? drawTile(x, seat) : x));
       else if (seat >= 0 && m.type === 'd-pass') error = act((x) => (handNo(x) === m.hand ? pass(x, seat) : x));
@@ -240,6 +245,22 @@ function DominoRoom({ code, isHost = false, tv = false, name, avatar, onLeave })
   const shown = isHost ? (table ? publicTable(table) : null) : view;
   const mySeat = shown ? seatOf(shown, me.id) : -1;
   mySeatRef.current = mySeat;
+  // A new name shows on your seat for everyone (the host changes the table; others ask the host)
+  const myShownName = mySeat >= 0 ? shown?.seats[mySeat]?.name : null;
+  useEffect(() => {
+    if (tv || mySeat < 0 || !myShownName || myShownName === seatName(name)) return;
+    if (isHost) act((x) => renameSeat(x, mySeat, name));
+    else if (hostPeer) room.send({ type: 'd-rename', name: seatName(name) }, hostPeer.id);
+  }, [name, mySeat, myShownName, hostPeer?.id]);
+  const editProfile = tv || !onProfile ? null : () => setEditingProfile({ name, avatar });
+  const profileSheet = editingProfile && (
+    <Sheet title="You" onClose={() => setEditingProfile(null)}
+      action={{ label: 'Done', onClick: () => { if (editingProfile.name.trim()) onProfile({ ...editingProfile, name: editingProfile.name.trim() }); setEditingProfile(null); } }}>
+      <ProfileEditor name={editingProfile.name} avatar={editingProfile.avatar}
+        onName={(n) => setEditingProfile((x) => ({ ...x, name: n }))} onAvatar={(a) => setEditingProfile((x) => ({ ...x, avatar: a }))} />
+      <p className="footnote center">Everyone at the table sees the change straight away.</p>
+    </Sheet>
+  );
   const tiles = isHost ? (mySeat >= 0 ? table?.round?.hands?.[mySeat] ?? null : null) : (myTiles && shown?.round && myTiles.hand === handNo(shown) ? myTiles.tiles : null);
   useWakeLock(Boolean(shown && shown.phase !== 'lobby'));
   const tvFit = useTvFit(tv);
@@ -323,9 +344,12 @@ function DominoRoom({ code, isHost = false, tv = false, name, avatar, onLeave })
         ? <DominoLobby code={code} table={shown} isHost={isHost} me={me} icons={icons} act={act}
             onSit={(s) => { if (!isHost) { room.send({ type: 'd-sit', seat: s, name }, hostPeer?.id); return; } const e = act((x) => sit(x, s, { id: me.id, name })); if (e) toast.show(e); }}
             onStand={() => (isHost ? act((x) => ({ ...x, seats: x.seats.map((s) => (s?.id === me.id ? null : s)) })) : room.send({ type: 'd-stand' }, hostPeer?.id))}
-            onStart={() => { const e = act((x) => startMatch(x)); if (e) toast.show(e); }} onLeave={leave} />
+            onStart={() => { const e = act((x) => startMatch(x)); if (e) toast.show(e); }} onLeave={leave}
+            profile={{ name, avatar }} onEditProfile={editProfile} />
         : <DominoTable table={shown} mySeat={mySeat} tiles={tiles} icons={icons} isHost={isHost} send={send} act={act} onLeave={leave}
-            call={call} me={me} code={code} reactions={reactions} react={react} alerts={alerts} toast={toast} onSave={isHost ? saveForLater : null} />}
+            call={call} me={me} code={code} reactions={reactions} react={react} alerts={alerts} toast={toast} onSave={isHost ? saveForLater : null}
+            onEditProfile={mySeat >= 0 ? editProfile : null} />}
+      {profileSheet}
       <ConnectionBanner room={room} isHost={isHost} hostPeer={hostPeer} onLeave={onLeave} />
       {toast.node}
     </div>
@@ -333,6 +357,14 @@ function DominoRoom({ code, isHost = false, tv = false, name, avatar, onLeave })
 }
 
 const handNo = (t) => t?.match?.hands.length ?? 0;
+
+const seatName = (name) => String(name ?? '').trim().slice(0, 14);
+/** A player changed their name: it shows on their seat (any time, mid-game too). */
+function renameSeat(t, seat, name) {
+  const n = seatName(name);
+  if (!n || !t.seats[seat] || t.seats[seat].name === n) return t;
+  return { ...t, seats: t.seats.map((x, i) => (i === seat ? { ...x, name: n } : x)) };
+}
 
 /** The seat of a player who isn't here and goes by `name` (-1 if none): someone back on a new device. */
 function awaySeatNamed(t, name, peers, hostId) {
@@ -366,7 +398,7 @@ const roundChoices = (setMax) => [...new Set([setMax + 1, Math.ceil((setMax + 1)
 
 // ---------- Lobby ----------
 
-function DominoLobby({ code, table, isHost, me, icons, act, onSit, onStand, onStart, onLeave }) {
+function DominoLobby({ code, table, isHost, me, icons, act, onSit, onStand, onStart, onLeave, profile, onEditProfile }) {
   const { settings } = table;
   const mine = table.seats.findIndex((s) => s?.id === me.id);
   const full = table.seats.every(Boolean);
@@ -389,6 +421,13 @@ function DominoLobby({ code, table, isHost, me, icons, act, onSit, onStand, onSt
           <div className="brand"><span className="brand-mark">🁫</span><h1>Dominoes</h1></div>
           <button type="button" className="icon-btn round" aria-label="Leave" onClick={onLeave}><Icon name="close" /></button>
         </div>
+        {onEditProfile && (
+          <div className="wrap lobby-me">
+            <button type="button" className="profile-chip" onClick={onEditProfile} aria-label="Change your name and picture">
+              <Avatar value={profile.avatar} name={profile.name} /> {profile.name} <Icon name="edit" size={14} />
+            </button>
+          </div>
+        )}
         <p className="wrap muted-light">Game {code}{isHost ? ' · You’re the host' : ''}</p>
       </header>
       <main className="wrap dom-lobby">
@@ -529,7 +568,7 @@ const RULES_NOTE = {
 // Where each seat sits around the table, from your seat (you're always at the bottom).
 const AROUND = { 2: ['bottom', 'top'], 3: ['bottom', 'left', 'right'], 4: ['bottom', 'left', 'top', 'right'] };
 
-function DominoTable({ table, mySeat, tiles, icons, isHost, send, act, onLeave, call, me, code, reactions = [], react, alerts, toast, onSave, tv = false }) {
+function DominoTable({ table, mySeat, tiles, icons, isHost, send, act, onLeave, call, me, code, reactions = [], react, alerts, toast, onSave, onEditProfile, tv = false }) {
   const r = table.round;
   const deck = useDeck();
   const sound = useSoundSettings();
@@ -556,6 +595,7 @@ function DominoTable({ table, mySeat, tiles, icons, isHost, send, act, onLeave, 
     call.joined
       ? { icon: 'video', label: 'Video chat settings', onClick: () => setCallOpen(true) }
       : { icon: 'video', label: 'Join A/V Chat', onClick: () => setJoinOpen(true) },
+    onEditProfile && { icon: 'edit', label: 'My name & picture', onClick: onEditProfile },
     { icon: 'share', label: 'Game code & QR', note: 'Rejoin on another phone', onClick: () => setInviteOpen(true) },
     { icon: 'tv', label: 'Add a TV', onClick: () => setTvOpen(true) },
     { icon: 'cards', label: 'Table theme', onClick: () => setDecksOpen(true) },
