@@ -33,6 +33,9 @@ export default async function handler(req, res) {
     tag: String(body.tag ?? 'turn').slice(0, 40),
     url: '/',
   });
+  // A test alert can wait a few seconds first, so there's time to lock the phone
+  const wait = Math.min(Math.max(Number(body.delay) || 0, 0), 8);
+  if (wait) await new Promise((r) => setTimeout(r, wait * 1000));
   try {
     webpush.setVapidDetails(VAPID_SUBJECT || 'https://spades-score-three.vercel.app', VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
     await webpush.sendNotification(sub, payload, { TTL: 60, urgency: 'high' });

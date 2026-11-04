@@ -1023,6 +1023,14 @@ function OnlineTable({ reactions = [], react, teases = {}, tease, alerts = null,
                 icon: 'bell', label: 'Turn alerts', note: alerts.why && !alerts.on ? 'Add to Home Screen first' : 'Buzz when it’s your turn, even in the background',
                 on: alerts.on, onClick: () => { alerts.toggle().then((err) => { if (err) toast.show(err); }); },
               },
+              alerts && alerts.on && alerts.sub && mySeat >= 0 && !isHost && {
+                icon: 'bell', label: 'Send a test alert', note: 'Arrives in about 6 seconds: lock your phone',
+                onClick: () => {
+                  toast.show('Test alert on its way: lock your phone or go to the home screen');
+                  sendTurnAlert(alerts.sub, { body: 'Test: this is your turn alert', tag: 'test', delay: 6 })
+                    .then((ok) => { if (!ok) toast.show('This phone can’t get alerts any more: turn Turn alerts off and on again.'); });
+                },
+              },
               { icon: sound.effects ? 'speaker' : 'speakerOff', label: 'Sound effects', on: sound.effects, onClick: () => setSoundSetting('effects', !sound.effects) },
               { icon: sound.glass ? 'speaker' : 'speakerOff', label: 'Glass break sound', note: 'When spades are broken', on: sound.glass, onClick: () => setSoundSetting('glass', !sound.glass) },
               onSave && { icon: 'home', label: 'Save for later', note: 'Pick it up again from the home screen', onClick: onSave },

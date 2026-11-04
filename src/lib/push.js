@@ -70,11 +70,11 @@ export function useTurnAlerts() {
 }
 
 /** Host: send one player's phone a "your turn" alert. Returns false if that phone can't be reached any more. */
-export async function sendTurnAlert(sub, { title = 'Family Spades', body = 'Your turn', tag = 'turn' } = {}) {
+export async function sendTurnAlert(sub, { title = 'Family Spades', body = 'Your turn', tag = 'turn', delay = 0 } = {}) {
   try {
     const res = await fetch('/api/push', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ subscription: sub, title, body, tag }),
+      body: JSON.stringify({ subscription: sub, title, body, tag, delay }),
     });
     return res.status !== 410;
   } catch {
