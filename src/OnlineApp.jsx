@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import QRCode from 'qrcode';
 import { read, write, tabRead, tabWrite } from './lib/store.js';
 import { bigLayout, gridLayout } from './lib/bigLayout.js';
+import { useTurnAlerts, sendTurnAlert } from './lib/push.js';
 import { standings, winner, signed, scoreTeam, isNil, nilLabel, STANDARD_RULES } from './lib/scoring.js';
 import { SEATS, teamOf, seatEntry } from './lib/table.js';
 import { sortHand, cardLabel } from './lib/cards.js';
@@ -43,6 +44,7 @@ const DEAL_MS = 2500;
 // (A little slack: the host's clock and this phone's may differ by a second or two.)
 const JUST_DEALT_MS = 6000;
 const TRICK_SHOW_MS = 1600;
+const TURN_ALERT_AFTER_MS = 3000;
 const BOOK_FLY_DELAY_MS = 450;
 const BOOK_FLY_MS = 800;
 // A book ending in a Papi Flip stays up until the card has flipped and been seen.
@@ -181,6 +183,9 @@ function OnlineRoom({ code, isHost = false, tv = false, name, avatar, onLeave, o
     }
     if (isHost) {
       if (!from) return;
+      // Turn alerts: how to reach a player's phone, and whether their app is on screen right now
+      if (m.type === 'o-alerts') { if (m.sub?.endpoint) pushSubs.current[from.id] = m.sub; else delete pushSubs.current[from.id]; return; }
+      if (m.type === 'o-vis') { if (m.visible) awayIds.current.delete(from.id); else awayIds.current.add(from.id); return; }
       const t = tableRef.current;
       const seat = seatOf(t, from.id);
       let error = null;
@@ -248,6 +253,40 @@ function OnlineRoom({ code, isHost = false, tv = false, name, avatar, onLeave, o
 
   // Host: computer players (and stand-ins for someone who dropped out) take their turns.
   const present = new Set([me.id, ...room.peers.map((p) => p.id)]);
+
+  // ----- Turn alerts: a push notification when it's your turn and the app isn't on screen -----
+  const alerts = useTurnAlerts();
+  const pushSubs = useRef({}); // host: player id → their phone's push subscription
+  const awayIds = useRef(new Set()); // host: players whose app is off screen
+  // Players tell the host how to reach this phone (if alerts are on), and when the app goes off screen.
+  useEffect(() => {
+    if (!isHost && !tv && hostPeer) room.send({ type: 'o-alerts', sub: alerts.on ? alerts.sub : null }, hostPeer.id);
+  }, [isHost, tv, hostPeer?.id, alerts.on, alerts.sub?.endpoint]);
+  useEffect(() => {
+    if (isHost || tv) return undefined;
+    const tell = () => { if (hostRef.current) room.send({ type: 'o-vis', visible: document.visibilityState === 'visible' }, hostRef.current.id); };
+    document.addEventListener('visibilitychange', tell);
+    return () => document.removeEventListener('visibilitychange', tell);
+  }, [isHost, tv]);
+  // Host: when it's someone's turn and they've been away (app off screen or disconnected) for a few seconds,
+  // send their phone the alert.
+  const turnSeat = isHost && table && ['bidding', 'playing'].includes(table.phase) ? table.round?.turn : null;
+  const alertKey = turnSeat != null ? `${table.game?.hands.length}:${table.round?.tricks.length}:${table.round?.trick.length}:${table.phase}:${turnSeat}` : null;
+  useEffect(() => {
+    if (alertKey == null) return undefined;
+    const who = table.seats[turnSeat];
+    if (!who || who.bot || who.standIn || who.id === me.id || !pushSubs.current[who.id]) return undefined;
+    const timer = setTimeout(() => {
+      const now = tableRef.current;
+      if (now.round?.turn !== turnSeat || !['bidding', 'playing'].includes(now.phase)) return;
+      const away = awayIds.current.has(who.id) || !room.peers.some((p) => p.id === who.id);
+      const sub = pushSubs.current[who.id];
+      if (!away || !sub) return;
+      sendTurnAlert(sub, { body: now.phase === 'bidding' ? `${who.name}, it’s your bid` : `${who.name}, it’s your turn`, tag: `turn-${code}` })
+        .then((ok) => { if (!ok) delete pushSubs.current[who.id]; });
+    }, TURN_ALERT_AFTER_MS);
+    return () => clearTimeout(timer);
+  }, [alertKey]);
   const autoSeat = (t, s) => t.seats[s]?.bot || (t.seats[s] && !present.has(t.seats[s].id) && t.seats[s].standIn);
   useEffect(() => {
     if (!isHost || !table || !['bidding', 'playing'].includes(table.phase) || table.round.papiGame) return undefined;
@@ -453,7 +492,7 @@ function OnlineRoom({ code, isHost = false, tv = false, name, avatar, onLeave, o
               onUseAsTv();
             }} />
         : <OnlineTable code={code} table={shown} mySeat={mySeat} cards={cards} me={me} isHost={isHost} call={call} room={room} icons={icons}
-            present={present} send={send} toast={toast} waiting={Boolean(pending)} reactions={reactions} react={react} teases={teases} tease={tease}
+            present={present} send={send} toast={toast} waiting={Boolean(pending)} reactions={reactions} react={react} teases={teases} tease={tease} alerts={alerts}
             hostActions={isHost ? hostGameActions(act) : null} onLeave={leave} />}
       <ConnectionBanner room={room} isHost={isHost} hostPeer={hostPeer} onLeave={leave} />
       {toast.node}
@@ -755,7 +794,7 @@ function RulesSheetOnline({ rules, onSave, onClose }) {
 // ---------------------------------------------------------------------------------------------
 // The card table.
 
-function OnlineTable({ reactions = [], react, teases = {}, tease, code, table, mySeat, cards, me, isHost, call, room, icons, present, send, toast, waiting, hostActions, onLeave, tv = false, tvView = 'table', tvGrid = null }) {
+function OnlineTable({ reactions = [], react, teases = {}, tease, alerts = null, code, table, mySeat, cards, me, isHost, call, room, icons, present, send, toast, waiting, hostActions, onLeave, tv = false, tvView = 'table', tvGrid = null }) {
   const r = table.round;
   const game = table.game;
   const hand = currentHand(table);
@@ -966,6 +1005,10 @@ function OnlineTable({ reactions = [], react, teases = {}, tease, code, table, m
               mySeat >= 0 && { icon: 'hand', label: 'Hand view', note: 'Just your cards, big', onClick: () => setHandView(true) },
               { icon: 'tv', label: 'Add a TV', onClick: () => setTvOpen(true) },
               { icon: 'cards', label: 'Cards & table', onClick: () => setDecksOpen(true) },
+              alerts && mySeat >= 0 && !isHost && {
+                icon: 'bell', label: 'Turn alerts', note: alerts.why && !alerts.on ? 'Add to Home Screen first' : 'Buzz when it’s your turn, even in the background',
+                on: alerts.on, onClick: () => { alerts.toggle().then((err) => { if (err) toast.show(err); }); },
+              },
               { icon: sound.effects ? 'speaker' : 'speakerOff', label: 'Sound effects', on: sound.effects, onClick: () => setSoundSetting('effects', !sound.effects) },
               { icon: sound.glass ? 'speaker' : 'speakerOff', label: 'Glass break sound', note: 'When spades are broken', on: sound.glass, onClick: () => setSoundSetting('glass', !sound.glass) },
               { icon: 'close', label: isHost ? 'End game' : 'Leave game', danger: true, onClick: onLeave },
