@@ -23,7 +23,7 @@ import { Icon, Segmented, Toggle, useToast, Confetti, Sheet, useTableLayout } fr
 import Domino from './Domino.jsx';
 import { boardLayout } from './board.js';
 import {
-  VARIANTS, SETS, kindOf, maxPlayers, roundsOf, lineName, byRounds, roundsToWin, halves, newDominoTable, startMatch, deal, legalMoves, playTile, drawTile, pass, publicTable, botMove, openEnds,
+  VARIANTS, SETS, kindOf, sideOf, teamsPossible, maxPlayers, roundsOf, lineName, byRounds, roundsToWin, halves, newDominoTable, startMatch, deal, legalMoves, playTile, drawTile, pass, publicTable, botMove, openEnds,
 } from './engine.js';
 
 const ID_KEY = 'spades-device-id'; // the same device id as Spades online, so a reload rejoins the same seat
@@ -353,7 +353,7 @@ function sit(t, seat, who) {
 function setPlayers(t, n) {
   const kept = t.seats.filter(Boolean).slice(0, n);
   const seats = Array.from({ length: n }, (_, i) => kept[i] ?? null);
-  return { ...t, seats, settings: { ...t.settings, teams: t.settings.teams && n === 4 && kindOf(t) === 'line' } };
+  return { ...t, seats, settings: { ...t.settings, teams: t.settings.teams && teamsPossible(n) } };
 }
 /** New rules or set: fewer seats if the game takes fewer players, and the right score settings. */
 function setRules(t, patch) {
@@ -410,7 +410,13 @@ function DominoLobby({ code, table, isHost, me, icons, act, onSit, onStand, onSt
               <div className="field-block"><span>Players</span>
                 <Segmented value={table.seats.length} onChange={(n) => act((t) => setPlayers(t, n))} options={Array.from({ length: maxPlayers(settings.variant, settings.setMax) - 1 }, (_, i) => i + 2).map((n) => ({ id: n, label: String(n) }))} />
               </div>
-              {table.seats.length === 4 && kindOf(table) === 'line' && <Toggle label="Teams of two (partners across)" checked={settings.teams} onChange={(v) => set({ teams: v })} />}
+              {teamsPossible(table.seats.length) && (
+                <div className="field-block"><span>Play as</span>
+                  <Segmented value={settings.teams ? 'teams' : 'solo'} onChange={(v) => set({ teams: v === 'teams' })}
+                    options={[{ id: 'solo', label: 'Individuals' }, { id: 'teams', label: `${table.seats.length / 2} teams of 2` }]} />
+                  {settings.teams && <small className="dom-teams-note">Partners sit across the table from each other and score together.</small>}
+                </div>
+              )}
               <div className="field-block"><span>Scoring</span>
                 <Segmented value={settings.scoring ?? 'points'} onChange={(v) => set({ scoring: v })}
                   options={[{ id: 'points', label: VARIANTS[settings.variant].lowWins ? 'Lowest total' : 'Points' }, { id: 'rounds', label: 'Rounds won' }]} />
@@ -432,7 +438,7 @@ function DominoLobby({ code, table, isHost, me, icons, act, onSit, onStand, onSt
               )}
             </>
           ) : (
-            <p className="dom-rules-line">{VARIANTS[settings.variant].name} · Double {settings.setMax} · {settings.teams ? 'Teams' : 'Each for themselves'} · {scoringText(table)}</p>
+            <p className="dom-rules-line">{VARIANTS[settings.variant].name} · Double {settings.setMax} · {settings.teams ? `${table.seats.length / 2} teams of 2` : 'Each for themselves'} · {scoringText(table)}</p>
           )}
         </div>
         <p className="footnote">{byRounds(table) ? RULES_PLAY[settings.variant] : RULES_NOTE[settings.variant]}{byRounds(table) ? ` Scoring by rounds: each hand is a round, won by whoever goes out first, or if nobody can play, by the player with the fewest dots left.${settings.bestOf ? ` First to win ${roundsToWin(table)} rounds wins the set; the app keeps count of sets won.` : ' The app counts rounds won until you end the game.'}` : ''}</p>
@@ -440,10 +446,10 @@ function DominoLobby({ code, table, isHost, me, icons, act, onSit, onStand, onSt
         <div className="section-title">Seats</div>
         <div className={`dom-seats n${table.seats.length}`}>
           {table.seats.map((s, i) => (
-            <div key={i} className={`card dom-seat${settings.teams ? ` t${i % 2}` : ''}${s?.id === me.id ? ' mine' : ''}`}>
+            <div key={i} className={`card dom-seat${settings.teams ? ` t${sideOf(table, i)}` : ''}${s?.id === me.id ? ' mine' : ''}`}>
               {s ? <Avatar value={icons[s.id]} name={s.name} bot={s.bot} className="lobby-avatar" /> : <span className="dom-empty">+</span>}
               <b>{s ? (s.id === me.id ? 'You' : s.name) : `Seat ${i + 1}`}</b>
-              {settings.teams && <small>Team {i % 2 + 1}</small>}
+              {settings.teams && <small>Team {sideOf(table, i) + 1}</small>}
               {!s && <button type="button" className="soft small" onClick={() => onSit(i)}>Sit here</button>}
               {!s && isHost && <button type="button" className="text-btn small" onClick={() => addBot(i)}>Add computer</button>}
               {s?.id === me.id && <button type="button" className="text-btn small" onClick={onStand}>Stand up</button>}
@@ -666,12 +672,13 @@ function DominoTable({ table, mySeat, tiles, icons, isHost, send, act, onLeave, 
           <>
             <div className={`dom-players n${n}`}>
               {table.seats.map((who, s) => (
-                <div key={s} className={`dom-player${r?.turn === s && table.phase === 'playing' ? ' turn' : ''}${s === mySeat ? ' me' : ''}`}>
+                <div key={s} className={`dom-player${table.settings.teams ? ` team t${sideOf(table, s)}` : ''}${r?.turn === s && table.phase === 'playing' ? ' turn' : ''}${s === mySeat ? ' me' : ''}`}>
                   {seatAvatar(who, s)}
+                  {table.settings.teams && <span className="dp-team" title={`Team ${sideOf(table, s) + 1} (the score is the team’s)`}>T{sideOf(table, s) + 1}</span>}
                   <span className="dp-name">{s === mySeat ? 'You' : who?.name}</span>
                   <span className="dp-info">
                     <b title="Tiles in hand">{counts[s] ?? 0}</b>
-                    <small title={byRounds(table) ? 'Rounds won' : 'Score so far'}>{table.match?.scores[s] ?? 0} {byRounds(table) ? 'won' : 'pts'}{setsWon(table, s) > 0 ? ` · ${setsWon(table, s)} set${setsWon(table, s) === 1 ? '' : 's'}` : ''}</small>
+                    <small title={byRounds(table) ? 'Rounds won' : 'Score so far'}>{table.match?.scores[sideOf(table, s)] ?? 0} {byRounds(table) ? 'won' : 'pts'}{setsWon(table, sideOf(table, s)) > 0 ? ` · ${setsWon(table, sideOf(table, s))} set${setsWon(table, sideOf(table, s)) === 1 ? '' : 's'}` : ''}</small>
                   </span>
                   {r?.markers?.[s] && <span className="dp-open" title="Train open to everyone">🚂</span>}
                   {who?.standIn && <span className="dp-away">computer</span>}
@@ -685,7 +692,7 @@ function DominoTable({ table, mySeat, tiles, icons, isHost, send, act, onLeave, 
         )}
         {!lines && <Board table={table} selectedMoves={forSelected} onEnd={(arm) => play(selected, arm)} maxUnit={tv ? 60 : 38} />}
         {!lines && table.seats.map((who, s) => (
-          <div key={s} className={`player-spot ${posOf(s)}${table.settings.teams ? ` t${s % 2}` : ''}${r?.turn === s && table.phase === 'playing' ? ' turn' : ''}${s === mySeat ? ' me' : ''}`}>
+          <div key={s} className={`player-spot ${posOf(s)}${table.settings.teams ? ` t${sideOf(table, s)}` : ''}${r?.turn === s && table.phase === 'playing' ? ' turn' : ''}${s === mySeat ? ' me' : ''}`}>
             {seatAvatar(who, s)}
             <div className="nameplate">
               <span className="spot-name">{s === mySeat ? 'You' : who?.name}</span>
@@ -778,12 +785,12 @@ const canDrawPublic = (table) => VARIANTS[table.settings.variant].draws && (tabl
 
 /** A side's name with first names only ("Nick & Ann"), for the small score boxes. */
 const firstNames = (table, i) => (table.settings.teams
-  ? table.seats.filter((_, s) => s % 2 === i).map((x) => x?.name?.split(' ')[0]).filter(Boolean).join(' & ') || `Team ${i + 1}`
+  ? table.seats.filter((_, s) => sideOf(table, s) === i).map((x) => x?.name?.split(' ')[0]).filter(Boolean).join(' & ') || `Team ${i + 1}`
   : sideName(table, i).split(' ')[0]);
 const setsWon = (table, i) => table.match?.sets?.[i] ?? 0;
 const sideName = (table, i) => {
   if (table.settings.teams) {
-    const names = table.seats.filter((_, s) => s % 2 === i).map((x) => x?.name).filter(Boolean);
+    const names = table.seats.filter((_, s) => sideOf(table, s) === i).map((x) => x?.name).filter(Boolean);
     return names.join(' & ') || `Team ${i + 1}`;
   }
   return table.seats[i]?.name ?? `Player ${i + 1}`;
@@ -866,7 +873,7 @@ function LinesBoard({ table, mySeat, icons, selectedMoves, onEnd, tv }) {
         const can = fits.has(l.id);
         return (
           <div key={l.id} role={can ? 'button' : undefined} tabIndex={can ? 0 : undefined}
-            className={`dom-row${can ? ' can' : ''}${r.openDouble === l.id ? ' cover' : ''}${l.owner != null && l.owner === mySeat ? ' mine' : ''}${l.owner != null && r.turn === l.owner ? ' turn' : ''}`}
+            className={`dom-row${table.settings.teams && l.owner != null ? ` team t${sideOf(table, l.owner)}` : ''}${can ? ' can' : ''}${r.openDouble === l.id ? ' cover' : ''}${l.owner != null && l.owner === mySeat ? ' mine' : ''}${l.owner != null && r.turn === l.owner ? ' turn' : ''}`}
             style={{ height: rowH }} onClick={can ? () => onEnd(l.id) : undefined}>
             <span className="dom-row-label" style={{ width: labelW }}>
               {train
@@ -962,7 +969,7 @@ function HandResult({ table, isHost, act, onLeave }) {
       <div className="dom-result">
         {over && <Confetti />}
         <div className="card dom-result-card">
-          <h2>{over ? (champ != null ? `${sideName(table, champ)} wins the game!` : 'It’s a tie!') : res.reason === 'domino' ? `${table.seats[res.outSeat]?.name} went out!` : 'Blocked: nobody can play'}</h2>
+          <h2>{over ? (champ != null ? `${sideName(table, champ)} win${table.settings.teams ? '' : 's'} the game!` : 'It’s a tie!') : res.reason === 'domino' ? `${table.seats[res.outSeat]?.name} went out!` : 'Blocked: nobody can play'}</h2>
           <p className="muted">{over ? 'Lowest total wins.' : `${res.reason === 'blocked' && winnerName ? `${winnerName} had the lowest hand. ` : ''}Round ${table.match.hands.length} of ${roundsOf(table)} done. Pips left in your hand count against you.`}</p>
           <div className="dom-result-rows">
             {order.map(({ sc, i }) => (

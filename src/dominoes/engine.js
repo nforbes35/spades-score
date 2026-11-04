@@ -14,7 +14,8 @@
 //              played makes a "chicken foot": three tiles must go on it before play goes on anywhere else.
 //   Both play one round per double, from the highest down; leftover pips count against you (the 0|0 is 50) and
 //   the lowest total wins.
-// Sets: double-6, 9 or 12. Sides: every person for themselves, or two teams of two (partners across).
+// Sets: double-6, 9 or 12. Sides: every person for themselves, or teams of two (partners across the table)
+// with 4, 6 or 8 players.
 // Scoring ("scoring"): 'points' (above), or 'rounds': each hand is a round, won by whoever goes out or, when
 // nobody can play, by the player with the fewest dots left. Best of 3 or 5 ("bestOf"; 0 = just keep count), and
 // each best-of won is a set: sets carry on from one match to the next ("Next set").
@@ -73,9 +74,14 @@ export function shuffle(list, random = Math.random) {
   return a;
 }
 
-/** The sides that score: each seat on its own, or two teams (seats 0 & 2, 1 & 3). */
-export const sideOf = (table, seat) => (table.settings.teams ? seat % 2 : seat);
-export const sideCount = (table) => (table.settings.teams ? 2 : table.seats.length);
+/** Teams of two are possible with an even number of players, 4 or more. */
+export const teamsPossible = (players) => players >= 4 && players % 2 === 0;
+/**
+ * The sides that score: each seat on its own, or teams of two with partners across the table
+ * (4 players: seats 0 & 2, 1 & 3; 6 players: 0 & 3, 1 & 4, 2 & 5; 8 players: 0 & 4 …).
+ */
+export const sideOf = (table, seat) => (table.settings.teams ? seat % (table.seats.length / 2) : seat);
+export const sideCount = (table) => (table.settings.teams ? table.seats.length / 2 : table.seats.length);
 
 /** A new table: seats (null = empty) and settings. */
 export function newDominoTable({ players = 4, setMax = 6, variant = 'draw', teams = false, target } = {}) {
@@ -83,7 +89,7 @@ export function newDominoTable({ players = 4, setMax = 6, variant = 'draw', team
     game: 'dominoes',
     phase: 'lobby',
     seats: Array.from({ length: players }, () => null),
-    settings: { setMax, variant, teams: teams && players === 4 && VARIANTS[variant].kind === 'line', target: target ?? VARIANTS[variant].target ?? 0, rounds: null, scoring: 'points', bestOf: 3, turnTimer: 0 },
+    settings: { setMax, variant, teams: teams && teamsPossible(players), target: target ?? VARIANTS[variant].target ?? 0, rounds: null, scoring: 'points', bestOf: 3, turnTimer: 0 },
     match: null,
     round: null,
   };
@@ -412,9 +418,12 @@ function endRound(table, outSeat, reason) {
   const r = table.round;
   const seatPips = r.hands.map((h) => h.reduce((sum, t) => sum + penalty(t), 0));
   const uniqueLow = (list) => { const low = Math.min(...list); return list.filter((x) => x === low).length === 1 ? list.indexOf(low) : null; };
-  const winner = reason === 'domino' ? outSeat : uniqueLow(seatPips);
-  const scores = table.match.scores.map((s, i) => s + seatPips[i]);
-  const hand = { reason, winner, outSeat, points: seatPips, seatPips, engine: r.engine, at: Date.now() };
+  const winner = handWinner(table, outSeat, reason, seatPips);
+  // each side adds what its players have left (teams: both partners' hands)
+  const points = Array(sideCount(table)).fill(0);
+  seatPips.forEach((p, s) => { points[sideOf(table, s)] += p; });
+  const scores = table.match.scores.map((s, i) => s + points[i]);
+  const hand = { reason, winner, outSeat, points, seatPips, engine: r.engine, at: Date.now() };
   const done = table.match.hands.length + 1 >= roundsOf(table);
   const champ = done ? uniqueLow(scores) : null;
   return {

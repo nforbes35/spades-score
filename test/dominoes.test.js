@@ -334,3 +334,45 @@ test('points games: a blocked hand goes to the player with the fewest dots (not 
   // seat 2 has 3 dots but its team has 15; seat 1 has 1 dot: team 1 wins
   assert.equal(u.round.result.winner, 1);
 });
+
+// ---------- Teams of two with 4, 6 or 8 players ----------
+import { sideOf, sideCount, teamsPossible } from '../src/dominoes/engine.js';
+
+test('teams: partners sit across; 6 players make 3 teams, 8 make 4; odd numbers play individually', () => {
+  const six = seated(newDominoTable({ players: 6, setMax: 9, variant: 'train', teams: true }));
+  assert.equal(sideCount(six), 3);
+  assert.deepEqual([0, 1, 2, 3, 4, 5].map((s) => sideOf(six, s)), [0, 1, 2, 0, 1, 2]);
+  const eight = seated(newDominoTable({ players: 8, setMax: 12, variant: 'foot', teams: true }));
+  assert.equal(sideCount(eight), 4);
+  assert.equal(sideOf(eight, 5), 1);
+  assert.equal(newDominoTable({ players: 5, setMax: 9, variant: 'train', teams: true }).settings.teams, false);
+  assert.ok(teamsPossible(4) && teamsPossible(6) && teamsPossible(8) && !teamsPossible(2) && !teamsPossible(3));
+});
+
+test('teams in Mexican Train: both partners’ leftover dots count against the team; lowest team total wins', () => {
+  let t = startMatch(seated(newDominoTable({ players: 4, setMax: 9, variant: 'train', teams: true })), seeded(21));
+  t = endHand({ ...t, round: { ...t.round, hands: [[], ['3-4'], ['1-1'], ['0-0']] } }, 0, 'domino');
+  assert.deepEqual(t.round.result.points, [2, 57], 'team 0: 0 + 2; team 1: 7 + 50');
+  assert.deepEqual(t.match.scores, [2, 57]);
+  assert.equal(t.round.result.winner, 0);
+});
+
+test('teams: computer players finish whole games of every kind with 4, 6 and 8 players', () => {
+  for (const [variant, setMax, players] of [['draw', 6, 4], ['allfives', 9, 4], ['train', 9, 6], ['foot', 12, 8], ['train', 12, 8]]) {
+    for (const scoring of ['points', 'rounds']) {
+      const random = seeded(players * 31 + setMax + scoring.length);
+      let t = seated(newDominoTable({ players, setMax, variant, teams: true }));
+      t = startMatch({ ...t, settings: { ...t.settings, scoring, bestOf: 3, rounds: 4, target: 100 } }, random);
+      let steps = 0;
+      while (t.phase !== 'over' && steps < 60000) {
+        if (t.phase === 'scored') { t = deal(t, random); continue; }
+        const seat = t.round.turn; const m = botMove(t, seat);
+        t = m.type === 'play' ? playTile(t, seat, m.tile, m.arm) : m.type === 'draw' ? drawTile(t, seat) : pass(t, seat);
+        steps++;
+      }
+      assert.equal(t.phase, 'over', `${variant} ${players} players ${scoring}`);
+      assert.equal(t.match.scores.length, players / 2);
+      if (scoring === 'rounds') assert.equal(t.match.sets.reduce((a, b) => a + b, 0), 1);
+    }
+  }
+});
