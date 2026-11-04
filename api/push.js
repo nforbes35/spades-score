@@ -42,6 +42,7 @@ export default async function handler(req, res) {
     res.status(200).json({ ok: true });
   } catch (err) {
     // 404/410: that phone turned notifications off or the subscription expired
-    res.status(err.statusCode === 404 || err.statusCode === 410 ? 410 : 502).json({ error: 'Send failed' });
+    res.status(err.statusCode === 404 || err.statusCode === 410 ? 410 : 502)
+      .json({ error: 'Send failed', detail: `${err.statusCode ?? ''} ${String(err.body ?? err.message ?? '').slice(0, 120)}`.trim() });
   }
 }

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import QRCode from 'qrcode';
 import { read, write, tabRead, tabWrite } from './lib/store.js';
 import { bigLayout, gridLayout } from './lib/bigLayout.js';
-import { useTurnAlerts, sendTurnAlert } from './lib/push.js';
+import { useTurnAlerts, sendTurnAlert, alertPermission } from './lib/push.js';
 import { saveGame, savedSummary } from './lib/saved.js';
 import { standings, winner, signed, scoreTeam, isNil, nilLabel, STANDARD_RULES } from './lib/scoring.js';
 import { SEATS, teamOf, seatEntry } from './lib/table.js';
@@ -284,7 +284,7 @@ function OnlineRoom({ code, isHost = false, tv = false, name, avatar, onLeave, o
       const sub = pushSubs.current[who.id];
       if (!away || !sub) return;
       sendTurnAlert(sub, { body: now.phase === 'bidding' ? `${who.name}, it’s your bid` : `${who.name}, it’s your turn`, tag: `turn-${code}` })
-        .then((ok) => { if (!ok) delete pushSubs.current[who.id]; });
+        .then((r) => { if (r.gone) delete pushSubs.current[who.id]; });
     }, TURN_ALERT_AFTER_MS);
     return () => clearTimeout(timer);
   }, [alertKey]);
@@ -830,6 +830,7 @@ function OnlineTable({ reactions = [], react, teases = {}, tease, alerts = null,
   const setTableMode = (m) => { setTableModeState(m); write(TABLE_MODE_KEY, m); };
   const videoOnly = tv ? tvView === 'video' : tableMode === 'video';
   const sound = useSoundSettings();
+  const [lastTest, setLastTest] = useState(null); // the test alert's result (shown in the menu)
   const big = videoOnly || (tv && tvView === 'chat'); // video tiles: video chat only, or the TV's table + chat
   // A seat's books/bid ('bidding…' or '–' until they've bid), for its nameplate or its big video tile.
   const scoreText = (s) => {
@@ -1024,11 +1025,14 @@ function OnlineTable({ reactions = [], react, teases = {}, tease, alerts = null,
                 on: alerts.on, onClick: () => { alerts.toggle().then((err) => { if (err) toast.show(err); }); },
               },
               alerts && alerts.on && alerts.sub && mySeat >= 0 && !isHost && {
-                icon: 'bell', label: 'Send a test alert', note: 'Arrives in about 6 seconds: lock your phone',
+                icon: 'bell', label: 'Send a test alert', note: lastTest ? `Last test: ${lastTest}` : 'Arrives in about 6 seconds: lock your phone',
                 onClick: () => {
+                  const perm = alertPermission();
+                  if (perm !== 'granted') { toast.show(`Notifications for Family Spades are ${perm === 'denied' ? 'blocked' : 'not allowed yet'}: allow them in Settings → Notifications → Family Spades.`); return; }
                   toast.show('Test alert on its way: lock your phone or go to the home screen');
-                  sendTurnAlert(alerts.sub, { body: 'Test: this is your turn alert', tag: 'test', delay: 6 })
-                    .then((ok) => { if (!ok) toast.show('This phone can’t get alerts any more: turn Turn alerts off and on again.'); });
+                  // (the result shows when you come back to the app)
+                  setLastTest('sending…');
+                  sendTurnAlert(alerts.sub, { body: 'Test: this is your turn alert', tag: 'test', delay: 6 }).then((r) => { setLastTest(r.why); toast.show(r.why); });
                 },
               },
               { icon: sound.effects ? 'speaker' : 'speakerOff', label: 'Sound effects', on: sound.effects, onClick: () => setSoundSetting('effects', !sound.effects) },

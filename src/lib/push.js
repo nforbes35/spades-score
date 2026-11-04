@@ -69,15 +69,27 @@ export function useTurnAlerts() {
   return { on, sub, toggle, why };
 }
 
-/** Host: send one player's phone a "your turn" alert. Returns false if that phone can't be reached any more. */
+/**
+ * Send one player's phone a "your turn" alert. Resolves to { ok, gone, why }: `gone` if that phone can't be
+ * reached any more, `why` a plain description of what happened (for the test alert).
+ */
 export async function sendTurnAlert(sub, { title = 'Family Spades', body = 'Your turn', tag = 'turn', delay = 0 } = {}) {
   try {
     const res = await fetch('/api/push', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ subscription: sub, title, body, tag, delay }),
     });
-    return res.status !== 410;
+    let info = {};
+    try { info = await res.json(); } catch { /* no body */ }
+    const service = /apple/.test(sub?.endpoint) ? 'Apple' : /google/.test(sub?.endpoint) ? 'Google' : 'the push service';
+    if (res.ok) return { ok: true, gone: false, why: `Sent: ${service} accepted the alert.` };
+    if (res.status === 410) return { ok: false, gone: true, why: `${service} says this phone isn’t signed up any more. Turn Turn alerts off and on again.` };
+    if (res.status === 503) return { ok: false, gone: false, why: 'Alerts aren’t set up on the server yet.' };
+    return { ok: false, gone: false, why: `Couldn’t send (${res.status}${info.detail ? `: ${info.detail}` : ''}).` };
   } catch {
-    return true;
+    return { ok: false, gone: false, why: 'Couldn’t reach the server to send the alert.' };
   }
 }
+
+/** Is this phone allowed to show notifications right now? (for the test alert) */
+export const alertPermission = () => (pushSupported() ? Notification.permission : 'unsupported');
