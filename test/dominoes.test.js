@@ -413,3 +413,35 @@ test('double 6: start with 7 tiles or with 5 and a boneyard', () => {
   const after = deal(endHand({ ...t, round: { ...t.round, hands: [[], ['1-2'], ['1-3'], ['1-4']] } }, 0, 'domino'), seeded(8));
   assert.ok(after.round.hands.every((h) => h.length === 5));
 });
+
+// ---------- Hand mode ----------
+import { aimPages, swipeDirection, handTileWidth } from '../src/dominoes/handmode.js';
+
+test('hand mode: places get top, bottom, left, right in turn; more than four go on further pages', () => {
+  const m = (arm) => ({ tile: '1-2', arm });
+  assert.deepEqual(aimPages([m('L'), m('R'), { tile: '3-4', arm: 'L' }], '1-2'), [[{ arm: 'L', dir: 'up' }, { arm: 'R', dir: 'down' }]]);
+  assert.deepEqual(aimPages([m(null)], '1-2'), [[{ arm: null, dir: 'up' }]]);
+  const six = aimPages(['a', 'b', 'c', 'd', 'e', 'f'].map(m), '1-2');
+  assert.deepEqual(six.map((p) => p.map((x) => x.dir)), [['up', 'down', 'left', 'right'], ['up', 'down']]);
+  assert.deepEqual(aimPages([m('L')], '5-5'), []);
+});
+
+test('hand mode: swipes go the way the finger mostly moved; small wobbles are taps', () => {
+  assert.equal(swipeDirection(4, -80), 'up');
+  assert.equal(swipeDirection(-10, 60), 'down');
+  assert.equal(swipeDirection(-70, 20), 'left');
+  assert.equal(swipeDirection(70, -20), 'right');
+  assert.equal(swipeDirection(10, 12), null);
+});
+
+test('hand mode: tiles fill the space on any screen', () => {
+  for (const [w, h] of [[250, 300], [800, 180], [1200, 500]]) {
+    for (const count of [1, 5, 7, 12, 15]) {
+      const { width, perRow } = handTileWidth(count, w, h);
+      const rows = Math.ceil(count / perRow);
+      assert.ok(width * perRow + 8 * (perRow - 1) <= w + 1, `${count} tiles fit ${w} wide`);
+      assert.ok(width * 2 * rows + 8 * (rows - 1) <= h + 1, `${count} tiles fit ${h} high`);
+      assert.ok(width >= 14);
+    }
+  }
+});

@@ -22,6 +22,7 @@ import { loadName, saveName, loadAvatar, saveAvatar, useAvatars } from '../lib/p
 import { Icon, Segmented, Toggle, useToast, Confetti, Sheet, useTableLayout } from '../components.jsx';
 import Domino from './Domino.jsx';
 import { fitBoard } from './board.js';
+import { AIM, aimPages, swipeDirection, handTileWidth } from './handmode.js';
 import {
   VARIANTS, SETS, startingTiles, kindOf, sideOf, teamsPossible, maxPlayers, roundsOf, lineName, byRounds, roundsToWin, halves, newDominoTable, startMatch, deal, legalMoves, playTile, drawTile, pass, publicTable, botMove, openEnds,
 } from './engine.js';
@@ -35,6 +36,7 @@ const BOT_DELAY_MS = 1100;
 const NEXT_HAND_MS = 7000;
 const RESYNC_MS = 5000;
 const LAST_KEY = 'dominoes-last-online';
+const HAND_MODE_KEY = 'dominoes-hand-mode'; // this device stays in hand mode
 
 function stableId(key = ID_KEY) {
   let id = tabRead(key);
@@ -82,6 +84,13 @@ function DominoRoom({ code, isHost = false, tv = false, name, avatar, onLeave, o
   const viewRef = useRef(null);
   const [myTiles, setMyTiles] = useState(null); // { hand: hand number, tiles }
   const [closed, setClosed] = useState(null);
+  const [aim, setAim] = useState(null);
+  // (a phone that's gone quiet stops highlighting: it repeats its aim every couple of seconds while it lasts)
+  useEffect(() => {
+    if (!aim) return undefined;
+    const timer = setTimeout(() => setAim(null), 5000);
+    return () => clearTimeout(timer);
+  }, [aim]);
   // Emojis and gifts on their way across the table (the same picker and animations as Spades)
   const [reactions, setReactions] = useState([]);
   const addReaction = (x) => {
@@ -118,14 +127,20 @@ function DominoRoom({ code, isHost = false, tv = false, name, avatar, onLeave, o
 
   const room = useRoom(code, me, onMessage);
   const call = useCall({ room, me, setMe, facing: 'user', receiveOnly: tv });
-  const [icons] = useAvatars(room, me, avatar);
+  const [icons, handleAvatar] = useAvatars(room, me, avatar);
   const hostPeer = isHost ? null : room.peers.find((p) => p.role === 'dhost');
   const hostRef = useRef(hostPeer);
   hostRef.current = hostPeer;
   const seatOf = (t, id) => (t?.seats ?? []).findIndex((s) => s && !s.bot && s.id === id);
 
   function onMessage(m, from) {
+    if (handleAvatar(m, from)) return;
     if (m.type === 'rtc') { call.handle(m); return; }
+    // hand mode: the spots a player is aiming at, in their colours (shown on the TV)
+    if (m.type === 'd-aim') {
+      if (tv && from) setAim(Array.isArray(m.spots) && m.spots.length ? { id: from.id, hand: m.hand, moves: m.moves, spots: m.spots, at: Date.now() } : null);
+      return;
+    }
     if (m.type === 'd-react') {
       const t = tableRef.current ?? viewRef.current;
       const seatFrom = from && t ? seatOf(t, from.id) : -1;
@@ -243,6 +258,8 @@ function DominoRoom({ code, isHost = false, tv = false, name, avatar, onLeave, o
   }, [isHost, table, peerKey]);
 
   const shown = isHost ? (table ? publicTable(table) : null) : view;
+  const shownRef = useRef(shown);
+  shownRef.current = shown;
   const mySeat = shown ? seatOf(shown, me.id) : -1;
   mySeatRef.current = mySeat;
   // A new name shows on your seat for everyone (the host changes the table; others ask the host)
@@ -252,6 +269,10 @@ function DominoRoom({ code, isHost = false, tv = false, name, avatar, onLeave, o
     if (isHost) act((x) => renameSeat(x, mySeat, name));
     else if (hostPeer) room.send({ type: 'd-rename', name: seatName(name) }, hostPeer.id);
   }, [name, mySeat, myShownName, hostPeer?.id]);
+  const sendAim = useCallback((spots) => {
+    const t = shownRef.current;
+    room.send({ type: 'd-aim', hand: handNo(t), moves: t?.round?.moves ?? 0, spots });
+  }, [room.send]);
   const editProfile = tv || !onProfile ? null : () => setEditingProfile({ name, avatar });
   const profileSheet = editingProfile && (
     <Sheet title="You" onClose={() => setEditingProfile(null)}
@@ -329,7 +350,7 @@ function DominoRoom({ code, isHost = false, tv = false, name, avatar, onLeave, o
         {shown.phase === 'lobby'
           ? <div className="dom-tv-wait"><h1>Dominoes · game {code}</h1><p>Waiting for the host to start…</p></div>
           : <DominoTable table={shown} mySeat={-1} tiles={null} icons={icons} isHost={false} send={() => {}} act={act} onLeave={onLeave}
-              call={call} me={me} reactions={reactions} tv />}
+              call={call} me={me} reactions={reactions} tv aim={aim} />}
         <TvControls call={call} onLeave={() => { call.leave(); onLeave(); }} view={null} onView={() => {}} />
       </div>
     );
@@ -348,7 +369,7 @@ function DominoRoom({ code, isHost = false, tv = false, name, avatar, onLeave, o
             profile={{ name, avatar }} onEditProfile={editProfile} />
         : <DominoTable table={shown} mySeat={mySeat} tiles={tiles} icons={icons} isHost={isHost} send={send} act={act} onLeave={leave}
             call={call} me={me} code={code} reactions={reactions} react={react} alerts={alerts} toast={toast} onSave={isHost ? saveForLater : null}
-            onEditProfile={mySeat >= 0 ? editProfile : null} />}
+            onEditProfile={mySeat >= 0 ? editProfile : null} sendAim={sendAim} />}
       {profileSheet}
       <ConnectionBanner room={room} isHost={isHost} hostPeer={hostPeer} onLeave={onLeave} />
       {toast.node}
@@ -575,7 +596,7 @@ const RULES_NOTE = {
 // Where each seat sits around the table, from your seat (you're always at the bottom).
 const AROUND = { 2: ['bottom', 'top'], 3: ['bottom', 'left', 'right'], 4: ['bottom', 'left', 'top', 'right'] };
 
-function DominoTable({ table, mySeat, tiles, icons, isHost, send, act, onLeave, call, me, code, reactions = [], react, alerts, toast, onSave, onEditProfile, tv = false }) {
+function DominoTable({ table, mySeat, tiles, icons, isHost, send, act, onLeave, call, me, code, reactions = [], react, alerts, toast, onSave, onEditProfile, sendAim, aim, tv = false }) {
   const r = table.round;
   const deck = useDeck();
   const sound = useSoundSettings();
@@ -586,6 +607,9 @@ function DominoTable({ table, mySeat, tiles, icons, isHost, send, act, onLeave, 
   const [decksOpen, setDecksOpen] = useState(false);
   const [reactTo, setReactTo] = useState(null);
   const [lastTest, setLastTest] = useState(null);
+  const [handMode, setHandModeState] = useState(() => read(HAND_MODE_KEY) === true);
+  const setHandMode = (on) => { setHandModeState(on); write(HAND_MODE_KEY, on); };
+  const inHandMode = handMode && mySeat >= 0 && !tv;
   const canReact = Boolean(react) && mySeat >= 0;
   const tapSeat = (s) => { if (canReact && table.seats[s]) setReactTo(s); };
   const videoOf = (id) => (id === me.id ? call.local : call.videos.find((v) => v.peer.id === id)?.stream);
@@ -602,6 +626,7 @@ function DominoTable({ table, mySeat, tiles, icons, isHost, send, act, onLeave, 
     call.joined
       ? { icon: 'video', label: 'Video chat settings', onClick: () => setCallOpen(true) }
       : { icon: 'video', label: 'Join A/V Chat', onClick: () => setJoinOpen(true) },
+    mySeat >= 0 && !tv && { icon: 'hand', label: 'Hand mode', note: 'Just your tiles: swipe to play on the TV', on: handMode, onClick: () => setHandMode(!handMode) },
     onEditProfile && { icon: 'edit', label: 'My name & picture', onClick: onEditProfile },
     { icon: 'share', label: 'Game code & QR', note: 'Rejoin on another phone', onClick: () => setInviteOpen(true) },
     { icon: 'tv', label: 'Add a TV', onClick: () => setTvOpen(true) },
@@ -674,6 +699,21 @@ function DominoTable({ table, mySeat, tiles, icons, isHost, send, act, onLeave, 
       </div>
     );
   };
+  // In a video chat: bigger videos across the top instead of the round pictures
+  const videoMode = call.joined || call.videos.length > 0;
+  const seatMedia = (who, s) => {
+    const stream = who && !who.bot ? videoOf(who.id) : null;
+    const showVideo = stream && hasVideo(stream) && (who.id !== me.id || call.camOn);
+    return (
+      <div className={`dom-vmedia${canReact && who && s !== mySeat ? ' tappable' : ''}`} data-seat={s} onClick={() => tapSeat(s)}>
+        {stream && <VideoTile stream={stream} muted={who.id === me.id || !call.speakerOn} mirrored={who.id === me.id} className={showVideo ? '' : 'no-video'} />}
+        {!showVideo && <Avatar value={who ? icons[who.id] : null} name={who?.name ?? '?'} bot={who?.bot} className="seat-icon" />}
+        {stream && <SpeakingRings stream={stream} tile />}
+      </div>
+    );
+  };
+  // Hand mode on someone's phone: where their picked tile can go, in the colours lit on their screen (TV only)
+  const aimSpots = tv && aim && r && aim.hand === handNo(table) && aim.moves === r.moves && table.seats[r.turn]?.id === aim.id ? aim.spots : [];
   const said = (s) => r?.last?.seat === s && (r.last.passed || r.last.drew) && Date.now() - r.last.at < 4000
     && <span className="dom-said">{r.last.passed ? (kindOf(table) === 'train' ? 'Pass · train open' : 'Pass') : 'Drew'}</span>;
   const counts = r?.counts ?? r?.hands?.map((h) => h.length) ?? [];
@@ -705,19 +745,37 @@ function DominoTable({ table, mySeat, tiles, icons, isHost, send, act, onLeave, 
               {setsWon(table, i) > 0 && <i className="dom-sets" title="Sets won">{setsWon(table, i)} set{setsWon(table, i) === 1 ? '' : 's'}</i>}
             </div>
           ))}
-          {!lines && <span className="dom-caption">{VARIANTS[table.settings.variant].name} · {scoringText(table)}</span>}
+          {!lines && <span className="dom-caption">{VARIANTS[table.settings.variant].name} · {scoringText(table)}{videoMode && !lines && VARIANTS[table.settings.variant].draws && table.phase === 'playing' ? ` · ${boneyard} to draw` : ''}</span>}
         </div>
         <div className="online-meta">
-          {!lines && <span>{VARIANTS[table.settings.variant].name} · {scoringText(table)}</span>}
+          {!lines && <span>{VARIANTS[table.settings.variant].name} · {scoringText(table)}{videoMode && !lines && VARIANTS[table.settings.variant].draws && table.phase === 'playing' ? ` · ${boneyard} to draw` : ''}</span>}
           {!tv && <TableMenu items={menu} />}
         </div>
       </header>
 
-      <div className={`felt dom-felt${lines ? ' dom-lines' : ''}`} style={{ marginBottom: dockH }}>
+      <div className={`felt dom-felt${lines ? ' dom-lines' : ''}${videoMode ? ' dom-video' : ''}`} style={{ marginBottom: dockH }}>
         <div className="table-oval" aria-hidden="true" />
+        {videoMode && (
+          <div className={`dom-vstrip n${n}`}>
+            {table.seats.map((who, s) => (
+              <div key={s} className={`dom-vtile${table.settings.teams ? ` t${sideOf(table, s)}` : ''}${r?.turn === s && table.phase === 'playing' ? ' turn' : ''}${s === mySeat ? ' me' : ''}`}>
+                {seatMedia(who, s)}
+                <div className="dom-vbar">
+                  <span className="dom-vname">{s === mySeat ? 'You' : who?.name}</span>
+                  {r?.markers?.[s] && <span title="Train open to everyone">🚂</span>}
+                  <b title="Tiles in hand">{counts[s] ?? 0}</b>
+                </div>
+                {lines && <span className="dom-vscore">{table.settings.teams ? `T${sideOf(table, s) + 1} · ` : ''}{table.match?.scores[sideOf(table, s)] ?? 0}{byRounds(table) ? ' won' : ' pts'}</span>}
+                {s === mySeat && call.joined && <div className="dom-vcall"><MyCallButtons call={call} onMore={() => setCallOpen(true)} /></div>}
+                {who?.standIn && <span className="dp-away">computer</span>}
+                {said(s)}
+              </div>
+            ))}
+          </div>
+        )}
         {lines && (
           <>
-            <div className={`dom-players n${n}`}>
+            {!videoMode && <div className={`dom-players n${n}`}>
               {table.seats.map((who, s) => (
                 <div key={s} className={`dom-player${table.settings.teams ? ` team t${sideOf(table, s)}` : ''}${r?.turn === s && table.phase === 'playing' ? ' turn' : ''}${s === mySeat ? ' me' : ''}`}>
                   {seatAvatar(who, s)}
@@ -732,13 +790,12 @@ function DominoTable({ table, mySeat, tiles, icons, isHost, send, act, onLeave, 
                   {said(s)}
                 </div>
               ))}
-            </div>
-            <LinesBoard table={table} mySeat={mySeat} icons={icons} selectedMoves={forSelected} onEnd={(arm) => play(selected, arm)} tv={tv} />
-            {mySeat >= 0 && call.joined && <div className="dom-mycall"><MyCallButtons call={call} onMore={() => setCallOpen(true)} /></div>}
+            </div>}
+            <LinesBoard table={table} mySeat={mySeat} icons={icons} selectedMoves={forSelected} onEnd={(arm) => play(selected, arm)} tv={tv} aimSpots={aimSpots} />
           </>
         )}
-        {!lines && <Board table={table} selectedMoves={forSelected} onEnd={(arm) => play(selected, arm)} maxUnit={tv ? 60 : 38} />}
-        {!lines && table.seats.map((who, s) => (
+        {!lines && <Board table={table} selectedMoves={forSelected} onEnd={(arm) => play(selected, arm)} maxUnit={tv ? 60 : 38} aimSpots={aimSpots} />}
+        {!lines && !videoMode && table.seats.map((who, s) => (
           <div key={s} className={`player-spot ${posOf(s)}${table.settings.teams ? ` t${sideOf(table, s)}` : ''}${r?.turn === s && table.phase === 'playing' ? ' turn' : ''}${s === mySeat ? ' me' : ''}`}>
             {seatAvatar(who, s)}
             <div className="nameplate">
@@ -750,7 +807,7 @@ function DominoTable({ table, mySeat, tiles, icons, isHost, send, act, onLeave, 
             {said(s)}
           </div>
         ))}
-        {!lines && VARIANTS[table.settings.variant].draws && table.phase === 'playing' && <div className="dom-boneyard"><Domino a={0} b={0} faceDown size={34} /> {boneyard}</div>}
+        {!lines && !videoMode && VARIANTS[table.settings.variant].draws && table.phase === 'playing' && <div className="dom-boneyard"><Domino a={0} b={0} faceDown size={34} /> {boneyard}</div>}
         {r?.events?.length > 0 && <FivesPop key={r.events.length} event={r.events.at(-1)} table={table} />}
         <ReactionsLayer reactions={reactions} names={table.seats.map((w, s) => (s === mySeat ? 'You' : w?.name))} />
       </div>
@@ -814,6 +871,10 @@ function DominoTable({ table, mySeat, tiles, icons, isHost, send, act, onLeave, 
         </div>
       )}
 
+      {inHandMode && (
+        <DomHandView table={table} mySeat={mySeat} tiles={tiles ?? []} moves={moves} myTurn={myTurn} boneyard={boneyard} call={call}
+          send={send} sendAim={sendAim} onExit={() => setHandMode(false)} onMore={() => setCallOpen(true)} />
+      )}
       {(table.phase === 'scored' || table.phase === 'over') && <HandResult table={table} isHost={isHost} act={act} onLeave={onLeave} />}
     </>
   );
@@ -844,7 +905,7 @@ const sideName = (table, i) => {
 };
 
 /** The line of play, scaled to fit the table, with buttons on the ends the picked tile can go. */
-function Board({ table, selectedMoves, onEnd, maxUnit = 38 }) {
+function Board({ table, selectedMoves, onEnd, maxUnit = 38, aimSpots = [] }) {
   const box = useRef(null);
   const [size, setSize] = useState({ w: 360, h: 300 });
   useEffect(() => {
@@ -871,7 +932,15 @@ function Board({ table, selectedMoves, onEnd, maxUnit = 38 }) {
       {Object.entries(ends).filter(([arm]) => pickArms.has(arm)).map(([arm, e]) => (
         <button key={arm} type="button" className="dom-end" style={{ left: ox + e.x * unit, top: oy + e.y * unit, width: unit * 1.6, height: unit * 1.6 }} onClick={() => onEnd(arm)} aria-label="Play here">+</button>
       ))}
-      {!tiles.length && table.phase === 'playing' && <p className="dom-board-hint">{table.round.mustPlay ? `${table.seats[table.round.turn]?.name ?? 'Someone'} starts with the ${table.round.mustPlay.replace('-', '|')}` : 'First tile: anything goes'}</p>}
+      {aimSpots.map((sp) => {
+        const e = sp.arm == null ? { x: 0, y: 0 } : ends[sp.arm];
+        if (!e || !AIM[sp.dir]) return null;
+        const px = Math.max(unit * 2, 44);
+        return (
+          <span key={sp.dir} className="dom-aim" style={{ left: tiles.length ? Math.min(size.w - px / 2, Math.max(px / 2, ox + e.x * unit)) : size.w / 2, top: tiles.length ? Math.min(size.h - px / 2, Math.max(px / 2, oy + e.y * unit)) : size.h / 2, width: px, height: px, '--aim': AIM[sp.dir].color, fontSize: px * 0.5 }}>{AIM[sp.dir].arrow}</span>
+        );
+      })}
+      {!tiles.length && !aimSpots.length && table.phase === 'playing' && <p className="dom-board-hint">{table.round.mustPlay ? `${table.seats[table.round.turn]?.name ?? 'Someone'} starts with the ${table.round.mustPlay.replace('-', '|')}` : 'First tile: anything goes'}</p>}
     </div>
   );
 }
@@ -880,7 +949,7 @@ function Board({ table, selectedMoves, onEnd, maxUnit = 38 }) {
  * Mexican Train and Chicken Foot: one row per line, each starting from what it comes off (the middle double, or a
  * chicken foot's double), showing the newest tiles. When your picked tile fits a line, tap that row to play it.
  */
-function LinesBoard({ table, mySeat, icons, selectedMoves, onEnd, tv }) {
+function LinesBoard({ table, mySeat, icons, selectedMoves, onEnd, tv, aimSpots = [] }) {
   const box = useRef(null);
   const [size, setSize] = useState({ w: 340, h: 300 });
   useEffect(() => {
@@ -917,10 +986,11 @@ function LinesBoard({ table, mySeat, icons, selectedMoves, onEnd, tv }) {
         const shown = l.tiles.length > room ? l.tiles.slice(l.tiles.length - (room - 1)) : l.tiles;
         const hidden = l.tiles.length - shown.length;
         const can = fits.has(l.id);
+        const aimed = AIM[aimSpots.find((sp) => sp.arm === l.id)?.dir];
         return (
           <div key={l.id} role={can ? 'button' : undefined} tabIndex={can ? 0 : undefined}
             className={`dom-row${table.settings.teams && l.owner != null ? ` team t${sideOf(table, l.owner)}` : ''}${can ? ' can' : ''}${r.openDouble === l.id ? ' cover' : ''}${l.owner != null && l.owner === mySeat ? ' mine' : ''}${l.owner != null && r.turn === l.owner ? ' turn' : ''}`}
-            style={{ height: rowH }} onClick={can ? () => onEnd(l.id) : undefined}>
+            style={{ height: rowH, ...(aimed ? { '--aim': aimed.color, borderColor: aimed.color, boxShadow: `0 0 14px ${aimed.color}`, background: `color-mix(in srgb, ${aimed.color} 35%, transparent)` } : {}) }} onClick={can ? () => onEnd(l.id) : undefined}>
             <span className="dom-row-label" style={{ width: labelW }}>
               {train
                 ? (l.owner == null
@@ -937,10 +1007,153 @@ function LinesBoard({ table, mySeat, icons, selectedMoves, onEnd, tv }) {
                 </span>
               ))}
               {can && <span className="dom-row-go" aria-label="Play here">+</span>}
+              {aimed && <span className="dom-row-aim" style={{ background: aimed.color }}>{aimed.arrow}</span>}
             </span>
           </div>
         );
       })}
+    </div>
+  );
+}
+
+/**
+ * Hand mode: this device shows only your dominoes. Pick one and the screen's edges light up, a colour for each
+ * place it can go (a TV shows the same colours on those spots). Swipe toward a colour, or tap it, to play there.
+ */
+function DomHandView({ table, mySeat, tiles, moves, myTurn, boneyard, call, send, sendAim, onExit, onMore }) {
+  const r = table.round;
+  const lines = kindOf(table) !== 'line';
+  const [selected, setSelected] = useState(null);
+  const [page, setPage] = useState(0);
+  const [drag, setDrag] = useState(null);
+  const [note, setNote] = useState(null);
+  const area = useRef(null);
+  const root = useRef(null);
+  const start = useRef(null);
+  const [box, setBox] = useState({ w: 300, h: 300 });
+  useLayoutEffect(() => {
+    const el = area.current;
+    if (!el) return undefined;
+    const measure = () => setBox({ w: el.clientWidth, h: el.clientHeight });
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const playing = table.phase === 'playing';
+  const playable = useMemo(() => new Set(moves.map((m) => m.tile)), [moves]);
+  // the picked tile can stop being playable (turn over, someone else's tile changed the ends)
+  useEffect(() => { if (selected && (!myTurn || !playable.has(selected))) { setSelected(null); setPage(0); } }, [myTurn, playable, selected]);
+  useEffect(() => { if (!note) return undefined; const t = setTimeout(() => setNote(null), 2200); return () => clearTimeout(t); }, [note]);
+
+  const pages = selected ? aimPages(moves, selected) : [];
+  const spots = pages[page] ?? pages[0] ?? [];
+  const byDir = Object.fromEntries(spots.map((sp) => [sp.dir, sp]));
+  // tell the TV where this tile can go; repeated while it's picked (and cleared when it's not)
+  const aimKey = `${r?.moves}:${spots.map((sp) => `${sp.arm}${sp.dir}`).join(',')}`;
+  useEffect(() => {
+    sendAim(spots);
+    if (!spots.length) return undefined;
+    const timer = setInterval(() => sendAim(spots), 2000);
+    return () => clearInterval(timer);
+  }, [aimKey]);
+  useEffect(() => () => sendAim([]), []);
+
+  const playTo = (dir) => {
+    const sp = byDir[dir];
+    if (!selected || !sp) return false;
+    buzz(40);
+    send('d-play', { tile: selected, arm: sp.arm });
+    setSelected(null); setPage(0); setDrag(null);
+    return true;
+  };
+  const label = (sp) => {
+    if (sp.arm == null) return 'Play it here';
+    if (lines) return lineName(table, sp.arm, mySeat);
+    return `On the ${openEnds(table).find((e) => e.arm === sp.arm)?.value} ${ARM_NAMES[sp.arm]}`;
+  };
+  // arrow keys on a computer
+  useEffect(() => {
+    const onKey = (e) => {
+      const dir = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right' }[e.key];
+      if (dir && playTo(dir)) e.preventDefault();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  });
+
+  // A swipe can start on a tile (it's picked up in the same move) or anywhere once one is picked.
+  const onDown = (e) => {
+    // (video sound needs a tap to start on some phones; the videos are behind this screen)
+    document.querySelectorAll('video').forEach((v) => { if (v.paused) v.play?.().catch(() => {}); });
+    const el = e.target.closest?.('button');
+    if (el && !el.dataset.tile) return;
+    const tile = el?.dataset.tile ?? null;
+    let picked = selected;
+    if (tile) {
+      if (!myTurn) { setNote(`It’s ${table.seats[r?.turn]?.name ?? 'someone else'}’s turn`); return; }
+      if (!playable.has(tile)) { setNote(moves.length ? 'That one doesn’t fit anywhere yet' : 'None of your tiles fit'); return; }
+      if (tile !== selected) { buzz(15); setSelected(tile); setPage(0); }
+      picked = tile;
+    }
+    if (!picked) return;
+    const k = root.current ? root.current.getBoundingClientRect().width / (root.current.offsetWidth || 1) : 1;
+    start.current = { x: e.clientX, y: e.clientY, k: k || 1, moved: false, onTile: Boolean(tile) };
+    root.current?.setPointerCapture?.(e.pointerId);
+  };
+  const onMove = (e) => {
+    const s = start.current;
+    if (!s) return;
+    setDrag({ x: (e.clientX - s.x) / s.k, y: (e.clientY - s.y) / s.k });
+  };
+  const onUp = (e) => {
+    const s = start.current;
+    start.current = null;
+    setDrag(null);
+    if (!s) return;
+    const dir = swipeDirection(e.clientX - s.x, e.clientY - s.y);
+    if (dir) { if (!playTo(dir)) setNote('No color that way'); return; }
+    if (!s.onTile) { setSelected(null); setPage(0); } // a tap off the tiles: put it back
+  };
+  const dragDir = drag ? swipeDirection(drag.x, drag.y, 16) : null;
+
+  const { width, perRow } = handTileWidth(tiles.length, box.w, box.h);
+  const message = note ?? (!playing ? '' : !myTurn ? `${table.seats[r?.turn]?.name ?? '…'}’s turn`
+    : selected ? (spots.length > 1 ? 'Swipe toward a color' : `Swipe ${spots[0]?.dir ?? 'up'} to play`)
+      : moves.length ? 'Your turn: pick a domino' : canDrawPublic(table) ? 'Nothing fits: draw a tile' : 'Nothing fits: pass');
+  return (
+    <div className={`dom-handview${myTurn && playing ? ' my-turn' : ''}`} ref={root} onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={() => { start.current = null; setDrag(null); }}>
+      {Object.entries(AIM).map(([dir, a]) => (
+        <button key={dir} type="button" className={`dh-edge ${dir}${byDir[dir] ? ' lit' : ''}${dragDir === dir && byDir[dir] ? ' hot' : ''}`} style={{ '--aim': a.color }}
+          disabled={!byDir[dir]} tabIndex={byDir[dir] ? 0 : -1} aria-hidden={!byDir[dir]} onClick={() => playTo(dir)}>
+          {byDir[dir] && <span><i aria-hidden="true">{a.arrow}</i> {label(byDir[dir])}</span>}
+        </button>
+      ))}
+      <div className="dh-top">
+        <button type="button" className="dh-exit" onClick={onExit}><Icon name="close" size={16} /> Table</button>
+        <span className={`dh-count${byDir.up ? ' hide' : ''}`}>{tiles.length} tile{tiles.length === 1 ? '' : 's'}{VARIANTS[table.settings.variant].draws ? ` · ${boneyard} to draw` : ''}</span>
+        {call.joined && <MyCallButtons call={call} onMore={onMore} />}
+      </div>
+      <p className={`dh-status${myTurn && playing ? ' turn' : ''}`} role="status">{message}</p>
+      <div className="dh-tiles" ref={area}>
+        <div className="dh-grid" style={{ width: perRow * width + (perRow - 1) * 8, '--w': `${width}px` }}>
+          {tiles.map((t) => {
+            const [a, b] = halves(t);
+            const sel = selected === t;
+            return (
+              <button key={t} type="button" data-tile={t} className={`dh-tile${sel ? ' sel' : ''}${myTurn && !playable.has(t) ? ' dim' : ''}`} aria-label={`${a} and ${b}`} aria-pressed={sel}
+                style={sel && drag ? { transform: `translate(${drag.x}px, ${drag.y}px) scale(1.06)`, transition: 'none' } : undefined}>
+                <Domino a={a} b={b} vertical size={width * 2} />
+              </button>
+            );
+          })}
+        </div>
+      </div>
+      <div className="dh-actions">
+        {pages.length > 1 && <button type="button" className="secondary" onClick={() => setPage((p) => (p + 1) % pages.length)}>More spots ({page + 1} of {pages.length})</button>}
+        {myTurn && playing && moves.length === 0 && canDrawPublic(table) && <button type="button" className="primary big go" onClick={() => send('d-draw')}>Draw a tile</button>}
+        {myTurn && playing && moves.length === 0 && !canDrawPublic(table) && <button type="button" className="secondary big" onClick={() => send('d-pass')}>{kindOf(table) === 'train' ? 'Pass (your train opens)' : 'Pass'}</button>}
+      </div>
     </div>
   );
 }

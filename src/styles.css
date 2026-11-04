@@ -2364,3 +2364,95 @@ button.choice:active { transform: scale(0.98); }
 .dom-row.team { box-shadow: inset 4px 0 0 var(--team); }
 /* two even rows when you hold more than 10: the hand is only as wide as --per tiles */
 .app.dominoes .dom-hand { max-width: calc(var(--per, 7) * (var(--tile-max) + 5px)); margin-left: auto; margin-right: auto; }
+
+/* ---------- Dominoes in a video chat: bigger videos across the top instead of round pictures ---------- */
+.app.dominoes .felt.dom-video { display: flex; flex-direction: column; gap: 6px; padding: 6px; }
+:root[data-layout] .app.online.dominoes.at-table .felt.dom-video .dom-board { position: relative; inset: auto; flex: 1; min-height: 0; width: 100%; }
+.dom-vstrip { position: relative; z-index: 2; flex: none; display: grid; gap: 6px; grid-template-columns: repeat(var(--cols, 4), minmax(0, 1fr)); grid-auto-rows: 128px; }
+.dom-vstrip.n2 { --cols: 2; grid-auto-rows: 150px; }
+.dom-vstrip.n3 { --cols: 3; grid-auto-rows: 136px; }
+.dom-vstrip.n4 { --cols: 4; }
+.dom-vstrip.n5, .dom-vstrip.n6 { --cols: 3; grid-auto-rows: 88px; }
+.dom-vstrip.n7, .dom-vstrip.n8 { --cols: 4; grid-auto-rows: 84px; }
+:root[data-layout='wide'] .dom-vstrip { --cols: var(--count, 4); grid-auto-rows: 92px; }
+:root[data-layout='wide'] .dom-vstrip.n2 { --count: 2; }
+:root[data-layout='wide'] .dom-vstrip.n3 { --count: 3; }
+:root[data-layout='wide'] .dom-vstrip.n4 { --count: 4; }
+:root[data-layout='wide'] .dom-vstrip.n5 { --count: 5; }
+:root[data-layout='wide'] .dom-vstrip.n6 { --count: 6; }
+:root[data-layout='wide'] .dom-vstrip.n7 { --count: 7; }
+:root[data-layout='wide'] .dom-vstrip.n8 { --count: 8; }
+@media (max-height: 340px) { :root[data-layout='wide'] .dom-vstrip { grid-auto-rows: 72px; } }
+.app.dominoes.tv-mode .dom-vstrip { --cols: var(--count, 4); grid-auto-rows: 190px; }
+.app.dominoes.tv-mode .dom-vstrip.n2 { --count: 2; }
+.app.dominoes.tv-mode .dom-vstrip.n3 { --count: 3; }
+.app.dominoes.tv-mode .dom-vstrip.n4 { --count: 4; }
+.app.dominoes.tv-mode .dom-vstrip.n5 { --count: 5; }
+.app.dominoes.tv-mode .dom-vstrip.n6 { --count: 6; }
+.app.dominoes.tv-mode .dom-vstrip.n7 { --count: 7; }
+.app.dominoes.tv-mode .dom-vstrip.n8 { --count: 8; }
+.dom-vtile { position: relative; min-width: 0; border-radius: 12px; overflow: hidden; background: rgba(0, 0, 0, 0.55); border: 2px solid var(--team, rgba(255, 255, 255, 0.14)); color: #fff; }
+.dom-vtile.turn { border-color: var(--turn, #34d399); box-shadow: 0 0 12px rgba(52, 211, 153, 0.6); }
+.dom-vmedia { position: absolute; inset: 0; display: grid; place-items: center; }
+.dom-vmedia .vtile { position: absolute; inset: 0; }
+.dom-vmedia .vtile video { width: 100%; height: 100%; object-fit: cover; }
+.dom-vmedia .seat-icon { position: relative; width: min(64%, 76px); height: auto; aspect-ratio: 1; font-size: 20px; }
+.dom-vbar { position: absolute; left: 0; right: 0; bottom: 0; display: flex; align-items: center; gap: 4px; padding: 2px 6px; background: linear-gradient(transparent, rgba(0, 0, 0, 0.78)); font-size: 12px; font-weight: 800; }
+.dom-vname { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dom-vbar b { flex: none; font-size: 13px; font-weight: 900; }
+.dom-vscore { position: absolute; left: 4px; top: 4px; padding: 1px 6px; border-radius: 999px; background: rgba(0, 0, 0, 0.6); font-size: 11px; font-weight: 800; }
+.dom-vcall { position: absolute; right: 2px; top: 2px; z-index: 3; }
+.dom-vcall .my-call { position: static; }
+.dom-vtile .dom-said { top: 4px; bottom: auto; }
+.dom-vtile .dp-away { position: absolute; left: 50%; top: 40%; translate: -50% 0; font-size: 10px; background: rgba(0, 0, 0, 0.7); padding: 1px 6px; border-radius: 6px; }
+.app.dominoes.tv-mode .dom-vbar { font-size: 19px; padding: 4px 10px; }
+.app.dominoes.tv-mode .dom-vbar b { font-size: 21px; }
+.app.dominoes.tv-mode .dom-vscore { font-size: 16px; }
+
+/* ---------- Hand mode: just your dominoes, the edges light up, swipe toward a colour ---------- */
+.dom-handview { position: fixed; inset: 0; z-index: 45; display: flex; flex-direction: column; color: #fff; touch-action: none; user-select: none; -webkit-user-select: none; overflow: hidden;
+  background: radial-gradient(120% 90% at 50% 35%, #2b3a33, #111a16 75%);
+  padding: calc(env(safe-area-inset-top) + 58px) calc(env(safe-area-inset-right) + 54px) calc(env(safe-area-inset-bottom) + 58px) calc(env(safe-area-inset-left) + 54px); }
+.dh-edge { position: absolute; z-index: 1; display: grid; place-items: center; padding: 0; border: 0; background: transparent; color: #fff; font-weight: 900; font-size: 15px; opacity: 0; pointer-events: none; transition: opacity 0.15s, filter 0.15s; }
+.dh-edge.lit { opacity: 1; pointer-events: auto; background: var(--aim); box-shadow: 0 0 34px 8px var(--aim); animation: dh-pulse 1.1s ease-in-out infinite alternate; }
+.dh-edge.hot { filter: brightness(1.35); animation: none; }
+@keyframes dh-pulse { from { filter: brightness(0.86); } to { filter: brightness(1.12); } }
+.dh-edge.up { left: 0; right: 0; top: 0; height: calc(env(safe-area-inset-top) + 50px); padding-top: env(safe-area-inset-top); }
+.dh-edge.down { left: 0; right: 0; bottom: 0; height: calc(env(safe-area-inset-bottom) + 50px); padding-bottom: env(safe-area-inset-bottom); }
+.dh-edge.left { left: 0; top: 0; bottom: 0; width: calc(env(safe-area-inset-left) + 46px); padding-left: env(safe-area-inset-left); }
+.dh-edge.right { right: 0; top: 0; bottom: 0; width: calc(env(safe-area-inset-right) + 46px); padding-right: env(safe-area-inset-right); }
+.dh-edge.left span, .dh-edge.right span { writing-mode: vertical-rl; }
+.dh-edge.left span { transform: rotate(180deg); }
+.dh-edge i { font-style: normal; }
+.dh-top { position: absolute; z-index: 2; left: calc(env(safe-area-inset-left) + 8px); right: calc(env(safe-area-inset-right) + 8px); top: calc(env(safe-area-inset-top) + 8px); display: flex; align-items: center; justify-content: space-between; gap: 8px; pointer-events: none; }
+.dh-top > * { pointer-events: auto; }
+.dh-top .my-call { position: static; }
+.dh-exit { display: inline-flex; align-items: center; gap: 4px; min-height: 36px; padding: 4px 12px 4px 8px; border: 0; border-radius: 999px; background: rgba(0, 0, 0, 0.55); color: #fff; font-weight: 800; font-size: 14px; }
+.dh-count { padding: 3px 10px; border-radius: 999px; background: rgba(0, 0, 0, 0.45); font-size: 13px; font-weight: 800; white-space: nowrap; }
+.dh-status { flex: none; margin: 0 0 8px; text-align: center; font-size: 18px; font-weight: 800; opacity: 0.85; min-height: 24px; }
+.dh-status.turn { color: #6ee7b7; opacity: 1; }
+.dh-tiles { flex: 1; min-height: 0; display: grid; place-items: center; }
+.dh-grid { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+.dh-grid .dh-tile { width: var(--w); flex: none; }
+.dh-tile { padding: 0; border: 0; background: none; border-radius: 8px; touch-action: none; transition: transform 0.15s, opacity 0.15s; filter: drop-shadow(0 6px 8px rgba(0, 0, 0, 0.5)); }
+.dh-tile .domino { display: block; width: 100%; height: auto; pointer-events: none; }
+.dh-tile.dim { opacity: 0.4; }
+.dh-tile.sel { position: relative; z-index: 3; transform: scale(1.06); filter: drop-shadow(0 0 10px #fff) drop-shadow(0 8px 10px rgba(0, 0, 0, 0.5)); }
+.dh-actions { flex: none; display: flex; flex-direction: column; align-items: center; gap: 6px; min-height: 0; }
+.dh-actions:not(:empty) { padding-top: 8px; }
+.dh-actions .big { width: min(320px, 100%); }
+
+/* On the TV: the same colours on the spots the picked tile can go */
+.dom-aim { position: absolute; z-index: 4; translate: -50% -50%; display: grid; place-items: center; border-radius: 12px; background: var(--aim); color: #fff; font-weight: 900; box-shadow: 0 0 0 3px #fff, 0 0 22px 8px var(--aim); animation: dh-pulse 0.9s ease-in-out infinite alternate; }
+.dom-row-aim { margin-left: auto; flex: none; width: 28px; height: 22px; border-radius: 8px; display: grid; place-items: center; color: #fff; font-size: 13px; font-weight: 900; }
+.app.dominoes.tv-mode .dom-row-aim { width: 56px; height: 44px; font-size: 26px; }
+/* your mic / camera / more buttons, small enough to fit on your video tile */
+.dom-vcall { left: 2px; right: 2px; display: flex; justify-content: flex-end; }
+.dom-vcall .my-call { display: flex; gap: 2px; }
+.dom-vcall .my-call button { width: 24px; height: 24px; min-width: 0; min-height: 0; padding: 0; display: grid; place-items: center; }
+.dom-vcall .my-call button svg { width: 13px; height: 13px; }
+.dh-count.hide { visibility: hidden; }
+.dh-edge > span { max-width: calc(100% - 10px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.55); }
+.dh-edge.up > span, .dh-edge.down > span { max-width: calc(100% - 230px); min-width: 120px; }
+.dh-edge.left i, .dh-edge.right i { display: none; } /* (sideways text would turn the arrow the wrong way; the bar's own side says which way) */
+.dom-vtile:has(.dom-vcall) .dom-vscore { top: 30px; }

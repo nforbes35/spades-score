@@ -72,7 +72,7 @@ export function boardLayout(layout, { reach = 8 } = {}) {
     box = { x0: Math.min(box.x0, t.cx - w), y0: Math.min(box.y0, t.cy - h), x1: Math.max(box.x1, t.cx + w), y1: Math.max(box.y1, t.cy + h) };
   }
   for (const e of Object.values(ends)) {
-    box = { x0: Math.min(box.x0, e.x - 0.6), y0: Math.min(box.y0, e.y - 0.6), x1: Math.max(box.x1, e.x + 0.6), y1: Math.max(box.y1, e.y + 0.6) };
+    box = { x0: Math.min(box.x0, e.x - 1.05), y0: Math.min(box.y0, e.y - 1.05), x1: Math.max(box.x1, e.x + 1.05), y1: Math.max(box.y1, e.y + 1.05) };
   }
   return { tiles, ends, box };
 }
