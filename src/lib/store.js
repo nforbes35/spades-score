@@ -84,6 +84,8 @@ export function useGame() {
     },
     /** Close the game (back to the home screen). Its hands are already in the stats. */
     end: () => commit('Close game', () => null),
+    /** Pick a saved game back up. */
+    resume: (saved) => commit('Resume game', () => normalizeGame(saved)),
     addHand: (hand) => commit('New hand', (g) => ({ ...g, hands: [...g.hands, hand] })),
     /** Replace a hand with an edited copy. */
     saveHand: (hand) => commit('Edit hand', (g) => ({ ...g, hands: g.hands.map((h) => (h.id === hand.id ? hand : h)) })),

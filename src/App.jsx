@@ -8,6 +8,7 @@ import { useDevice } from './lib/device.js';
 import { useCall } from './lib/call.js';
 import { useWakeLock, chime, buzz } from './lib/fx.js';
 import { recordGame, useStatsSync } from './lib/stats.js';
+import { saveGame, savedGames, forgetSaved, savedSummary } from './lib/saved.js';
 import Stats from './Stats.jsx';
 import { Sheet, RulesFields, NumberField, Icon, useToast, Confetti, StatusDot, CardText } from './components.jsx';
 import { BidsPanel, PlayPanel } from './LiveHand.jsx';
@@ -75,11 +76,21 @@ function lastOnlineGame() {
 
 function HostApp({ onJoin, onPlayOnline, onRejoin }) {
   const [lastOnline, setLastOnline] = useState(lastOnlineGame);
+  const [saved, setSaved] = useState(savedGames);
+  // Pick a saved game back up: an online game is hosted again under its code; a table game opens here.
+  const resume = (entry) => {
+    forgetSaved(entry.id);
+    setSaved(savedGames());
+    if (entry.kind === 'online') onRejoin({ code: entry.code, host: true });
+    else store.resume(entry.game);
+  };
   const store = useGame();
   const [newGameOpen, setNewGameOpen] = useState(false);
   const [setup, setSetup] = useState(false);
   const [statsOpen, setStatsOpen] = useState(false);
   const toast = useToast();
+  // A game started or closed: next time it's the home screen (with the saved games list up to date).
+  useEffect(() => { setSetup(false); if (!store.game) setSaved(savedGames()); }, [Boolean(store.game)]);
 
   if (!store.game) {
     return (
@@ -87,7 +98,10 @@ function HostApp({ onJoin, onPlayOnline, onRejoin }) {
         {setup
           ? <NewGame lastSetup={store.lastSetup} onStart={store.start} onBack={() => setSetup(false)} />
           : <Home onPlayOnline={onPlayOnline} onTable={() => setSetup(true)} onJoin={onJoin} onStats={() => setStatsOpen(true)}
-              rejoin={lastOnline} onRejoin={() => onRejoin(lastOnline)} onForget={() => { write(LAST_ONLINE_KEY, null); setLastOnline(null); }} />}
+              rejoin={lastOnline && !saved.some((e) => e.code === lastOnline.code) ? lastOnline : null}
+              onRejoin={() => onRejoin(lastOnline)} onForget={() => { write(LAST_ONLINE_KEY, null); setLastOnline(null); }}
+              saved={saved} onResume={resume}
+              onForgetSaved={(e) => { if (confirm('Delete this saved game?')) { forgetSaved(e.id); if (e.kind === 'online') write(`spades-online-table-${e.code}`, null); setSaved(savedGames()); } }} />}
         {statsOpen && <Stats onClose={() => setStatsOpen(false)} />}
         {toast.node}
       </>
@@ -344,6 +358,14 @@ function GameScreen({ store, toast, onNewGame, onJoin, onPlayOnline }) {
               if (clean?.length === 4) onJoin(clean);
             }}>
               <Icon name="phone" /> Join someone else's game
+            </button>
+            <button type="button" onClick={() => {
+              setSheet(null);
+              saveGame({ id: `table-${game.id ?? Date.now()}`, kind: 'table', game, ...savedSummary(game) });
+              store.end();
+              toast.show('Saved for later: it’s on the home screen');
+            }}>
+              <Icon name="home" /> Save for later
             </button>
             <button type="button" onClick={() => {
               if (!confirm('Close this game and go back to the home screen? Finished hands stay in your stats.')) return;

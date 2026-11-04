@@ -2089,3 +2089,10 @@ button.choice:active { transform: scale(0.98); }
 .moving-emoji { display: block; width: 1.15em; height: 1.15em; object-fit: contain; }
 .react-person.me { gap: 6px; padding-left: 10px; }
 .react-me { font-size: 18px; }
+
+/* ---------- Saved games (home screen) ---------- */
+.saved-games { display: flex; flex-direction: column; gap: 8px; }
+.saved-title { font-size: 12px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: rgba(255, 255, 255, 0.75); margin: 2px 4px 0; }
+.saved-choice .choice-text b { font-variant-numeric: tabular-nums; }
+.saved-players { font-size: 12px !important; opacity: 0.7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.saved-choice { padding: 0; gap: 0; }

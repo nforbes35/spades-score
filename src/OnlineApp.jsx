@@ -3,6 +3,7 @@ import QRCode from 'qrcode';
 import { read, write, tabRead, tabWrite } from './lib/store.js';
 import { bigLayout, gridLayout } from './lib/bigLayout.js';
 import { useTurnAlerts, sendTurnAlert } from './lib/push.js';
+import { saveGame, savedSummary } from './lib/saved.js';
 import { standings, winner, signed, scoreTeam, isNil, nilLabel, STANDARD_RULES } from './lib/scoring.js';
 import { SEATS, teamOf, seatEntry } from './lib/table.js';
 import { sortHand, cardLabel } from './lib/cards.js';
@@ -220,7 +221,7 @@ function OnlineRoom({ code, isHost = false, tv = false, name, avatar, onLeave, o
     } else if (m.type === 'o-error') toast.show(m.text);
     else if (m.type === 'o-ping') { chime(true); buzz([200, 100, 200]); }
     else if (m.type === 'o-closed' && from?.role === 'ohost') {
-      setClosed({ by: m.by || from.name });
+      setClosed({ by: m.by || from.name, saved: Boolean(m.saved) });
       forgetGame(code);
       call.leave();
     }
@@ -422,7 +423,7 @@ function OnlineRoom({ code, isHost = false, tv = false, name, avatar, onLeave, o
     ...room.peers.filter((p) => p.role === 'ohost' || p.role === 'oplayer').map((p) => ({ ...p, here: true })),
   ];
 
-  if (closed) return <GameEnded by={closed.by} game={shown?.game} onHome={onLeave} />;
+  if (closed) return <GameEnded by={closed.by} saved={closed.saved} code={code} game={shown?.game} onHome={onLeave} />;
 
   if (!shown) {
     return (
@@ -456,6 +457,18 @@ function OnlineRoom({ code, isHost = false, tv = false, name, avatar, onLeave, o
     forgetGame(code);
     room.send({ type: 'o-closed', by: name });
     setTimeout(() => room.send({ type: 'o-closed', by: name }), 250);
+    setTimeout(onLeave, 600);
+  };
+  // Host: save the game for later. It stays on this phone (under its code) and goes on the home screen's
+  // Saved games list; starting it again from there, everyone rejoins with the same code.
+  const saveForLater = () => {
+    if (!confirm(`Save this game for later? Everyone goes back to the home screen. Start it again from Saved games on this phone, and everyone can rejoin with code ${code}.`)) return;
+    const players = [0, 1].map((t) => shown.seats.map((x, s) => (teamOf(s) === t ? x?.name : null)));
+    saveGame({ id: `online-${code}`, kind: 'online', code, ...savedSummary(shown.game, players) });
+    call.leave();
+    forgetGame(code);
+    room.send({ type: 'o-closed', by: name, saved: true });
+    setTimeout(() => room.send({ type: 'o-closed', by: name, saved: true }), 250);
     setTimeout(onLeave, 600);
   };
 
@@ -493,7 +506,7 @@ function OnlineRoom({ code, isHost = false, tv = false, name, avatar, onLeave, o
             }} />
         : <OnlineTable code={code} table={shown} mySeat={mySeat} cards={cards} me={me} isHost={isHost} call={call} room={room} icons={icons}
             present={present} send={send} toast={toast} waiting={Boolean(pending)} reactions={reactions} react={react} teases={teases} tease={tease} alerts={alerts}
-            hostActions={isHost ? hostGameActions(act) : null} onLeave={leave} />}
+            hostActions={isHost ? hostGameActions(act) : null} onLeave={leave} onSave={isHost ? saveForLater : null} />}
       <ConnectionBanner room={room} isHost={isHost} hostPeer={hostPeer} onLeave={leave} />
       {toast.node}
     </div>
@@ -508,7 +521,7 @@ function forgetGame(code) {
 }
 
 /** The host ended the game: the score so far, and back home. */
-function GameEnded({ by, game, onHome }) {
+function GameEnded({ by, saved, code, game, onHome }) {
   const st = game ? standings(game) : null;
   const played = game ? game.hands.filter((h) => !h.inPlay).length : 0;
   return (
@@ -516,7 +529,8 @@ function GameEnded({ by, game, onHome }) {
       <main className="wrap">
         <div className="card waiting-card ended-card">
           <span className="brand-mark">♠</span>
-          <h2>{by ? `${by} closed the game` : 'The game has ended'}</h2>
+          <h2>{saved ? `${by ?? 'The host'} saved the game for later` : by ? `${by} closed the game` : 'The game has ended'}</h2>
+          {saved && <p className="muted">When they start it again, join with code <b>{code}</b> and you’ll get your seat back.</p>}
           {game && (
             <div className="ended-scores">
               {[0, 1].map((t) => (
@@ -794,7 +808,7 @@ function RulesSheetOnline({ rules, onSave, onClose }) {
 // ---------------------------------------------------------------------------------------------
 // The card table.
 
-function OnlineTable({ reactions = [], react, teases = {}, tease, alerts = null, code, table, mySeat, cards, me, isHost, call, room, icons, present, send, toast, waiting, hostActions, onLeave, tv = false, tvView = 'table', tvGrid = null }) {
+function OnlineTable({ reactions = [], react, teases = {}, tease, alerts = null, code, table, mySeat, cards, me, isHost, call, room, icons, present, send, toast, waiting, hostActions, onLeave, onSave = null, tv = false, tvView = 'table', tvGrid = null }) {
   const r = table.round;
   const game = table.game;
   const hand = currentHand(table);
@@ -1011,6 +1025,7 @@ function OnlineTable({ reactions = [], react, teases = {}, tease, alerts = null,
               },
               { icon: sound.effects ? 'speaker' : 'speakerOff', label: 'Sound effects', on: sound.effects, onClick: () => setSoundSetting('effects', !sound.effects) },
               { icon: sound.glass ? 'speaker' : 'speakerOff', label: 'Glass break sound', note: 'When spades are broken', on: sound.glass, onClick: () => setSoundSetting('glass', !sound.glass) },
+              onSave && { icon: 'home', label: 'Save for later', note: 'Pick it up again from the home screen', onClick: onSave },
               { icon: 'close', label: isHost ? 'End game' : 'Leave game', danger: true, onClick: onLeave },
             ]} />
           )}

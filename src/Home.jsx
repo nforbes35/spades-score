@@ -5,8 +5,17 @@ import { useDeck } from './lib/decks.js';
 
 const SHOWCASE = ['10S', 'JD', 'QC', 'KH', 'AS'];
 
+/** "Today 7:42 PM", "Yesterday", or a date. */
+function savedWhen(at) {
+  const d = new Date(at), now = new Date();
+  const days = Math.round((new Date(now.toDateString()) - new Date(d.toDateString())) / 86400000);
+  if (days === 0) return `Today ${d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;
+  if (days === 1) return 'Yesterday';
+  return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+}
+
 /** The first screen: pick how you're playing tonight. */
-export default function Home({ onPlayOnline, onTable, onJoin, onStats, rejoin, onRejoin, onForget }) {
+export default function Home({ onPlayOnline, onTable, onJoin, onStats, rejoin, onRejoin, onForget, saved = [], onResume, onForgetSaved }) {
   const [joining, setJoining] = useState(false);
   const [decksOpen, setDecksOpen] = useState(false);
   const [code, setCode] = useState('');
@@ -38,6 +47,27 @@ export default function Home({ onPlayOnline, onTable, onJoin, onStats, rejoin, o
               </span>
             </button>
             <button type="button" className="rejoin-forget" aria-label="Forget this game" onClick={onForget}><Icon name="close" size={18} /></button>
+          </div>
+        )}
+        {saved.length > 0 && (
+          <div className="saved-games">
+            <div className="saved-title">Saved games</div>
+            {saved.map((e) => (
+              <div key={e.id} className="choice saved-choice">
+                <button type="button" className="rejoin-go" onClick={() => onResume(e)}>
+                  <span className="choice-icon"><Icon name={e.kind === 'online' ? 'users' : 'cards'} size={24} /></span>
+                  <span className="choice-text">
+                    <b>{e.teams.map((t) => `${t.name} ${t.score}`).join(' · ')}</b>
+                    <span>
+                      {e.kind === 'online' ? `Online · code ${e.code}` : 'At the table'}
+                      {` · ${e.hands} hand${e.hands === 1 ? '' : 's'} · ${savedWhen(e.at)}`}
+                    </span>
+                    {e.teams.some((t) => t.players?.length && t.players.join(' & ') !== t.name) && <span className="saved-players">{e.teams.map((t) => t.players.join(' & ')).join('  vs  ')}</span>}
+                  </span>
+                </button>
+                <button type="button" className="rejoin-forget" aria-label="Delete this saved game" onClick={() => onForgetSaved(e)}><Icon name="close" size={18} /></button>
+              </div>
+            ))}
           </div>
         )}
         <button type="button" className="choice primary-choice" onClick={onPlayOnline}>
