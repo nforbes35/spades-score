@@ -1,14 +1,22 @@
 {
-  "name": "Family Spades",
-  "short_name": "Family Spades",
-  "description": "Score keeper for our family spades game.",
+  "name": "Family Games",
+  "short_name": "Family Games",
+  "description": "Family Games: Spades and Dominoes, online or at the table.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "background_color": "#f3f5f2",
   "theme_color": "#14532d",
   "icons": [
-    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png" }
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
   ]
 }

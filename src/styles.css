@@ -2103,3 +2103,26 @@ button.choice:active { transform: scale(0.98); }
 }
 .table-menu-list button { flex: none; }
 .table-menu-list { min-width: 268px; }
+
+/* ---------- Family Games: the game picker, and the way back to it ---------- */
+.hub-showcase { position: relative; height: 150px; display: flex; align-items: center; justify-content: center; margin: 0 auto 14px; }
+.hub-showcase .hub-card { --w: 84px; position: relative; rotate: -14deg; translate: 18px 6px; box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35); }
+.hub-showcase .hub-card.two { rotate: 14deg; translate: -18px 6px; }
+.hub-showcase .hub-domino { position: relative; z-index: 1; filter: drop-shadow(0 10px 18px rgba(0, 0, 0, 0.45)); }
+.hub-showcase .hub-domino.two { rotate: 12deg; margin-left: -18px; }
+.game-icon { font-size: 30px; font-weight: 900; color: #fff; }
+.game-choice .choice-text b { font-size: 22px; }
+.all-games {
+  position: absolute; z-index: 5; top: calc(10px + env(safe-area-inset-top)); left: max(12px, env(safe-area-inset-left));
+  display: inline-flex; align-items: center; gap: 4px; padding: 8px 14px 8px 8px; border: 0; border-radius: 999px;
+  background: rgba(0, 0, 0, 0.35); color: #fff; font-weight: 800; font-size: 15px; backdrop-filter: blur(6px);
+}
+.all-games .icon { rotate: 180deg; }
+.home { position: relative; }
+
+/* Domino tiles */
+.domino { display: block; overflow: visible; }
+.domino-body { fill: #fbfaf5; stroke: rgba(0, 0, 0, 0.22); stroke-width: 0.025; }
+.domino-bar { stroke: rgba(0, 0, 0, 0.35); stroke-width: 0.03; stroke-linecap: round; }
+.domino-spinner { fill: #b08d3c; }
+.domino.face-down .domino-body { fill: #1f2a37; stroke: rgba(255, 255, 255, 0.25); }

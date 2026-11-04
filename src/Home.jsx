@@ -15,7 +15,7 @@ function savedWhen(at) {
 }
 
 /** The first screen: pick how you're playing tonight. */
-export default function Home({ onPlayOnline, onTable, onJoin, onStats, rejoin, onRejoin, onForget, saved = [], onResume, onForgetSaved }) {
+export default function Home({ onAllGames, onPlayOnline, onTable, onJoin, onStats, rejoin, onRejoin, onForget, saved = [], onResume, onForgetSaved }) {
   const [joining, setJoining] = useState(false);
   const [decksOpen, setDecksOpen] = useState(false);
   const [code, setCode] = useState('');
@@ -24,6 +24,7 @@ export default function Home({ onPlayOnline, onTable, onJoin, onStats, rejoin, o
 
   return (
     <div className="home">
+      {onAllGames && <button type="button" className="all-games" onClick={onAllGames}><Icon name="chevron" size={18} /> All games</button>}
       <div className="home-hero">
         <div className="home-fan" aria-hidden="true">
           {SHOWCASE.map((c, i) => (

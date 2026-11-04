@@ -14,6 +14,8 @@ import { Sheet, RulesFields, NumberField, Icon, useToast, Confetti, StatusDot, C
 import { BidsPanel, PlayPanel } from './LiveHand.jsx';
 import NewGame from './NewGame.jsx';
 import Home from './Home.jsx';
+import GameHub from './GameHub.jsx';
+import DominoesApp from './dominoes/DominoesApp.jsx';
 import HandSheet from './HandSheet.jsx';
 import ScanCards from './ScanCards.jsx';
 import Invite from './Invite.jsx';
@@ -52,8 +54,14 @@ function initialJoin() {
 }
 const clearJoinParam = () => window.history.replaceState(null, '', location.pathname);
 
+// Family Games: which game this device is in ('spades', 'dominoes'), or null for the game picker.
+const GAME_PICK_KEY = 'family-game';
+
 export default function App() {
   const [join, setJoin] = useState(initialJoin);
+  const [picked, setPicked] = useState(() => read(GAME_PICK_KEY) ?? null);
+  const pick = (g) => { write(GAME_PICK_KEY, g); setPicked(g); };
+  const [hubStats, setHubStats] = useState(false);
   const update = (next) => { write(JOIN_KEY, next); setJoin(next); };
   const leave = () => update(null);
   if (join?.as === 'player' && join.seat != null) return <RemoteApp code={join.code} seat={join.seat} onLeave={leave} />;
@@ -63,7 +71,16 @@ export default function App() {
   if (join?.as === 'otv') return <OnlineApp code={join.code} tv onLeave={leave} onPlayHere={() => update({ code: join.code, as: 'online' })} />;
   if (join?.as === 'online') return <OnlineApp code={join.code} isHost={Boolean(join.host)} onLeave={leave} onUseAsTv={() => update({ code: join.code, as: 'otv' })} />;
   if (join?.code) return <JoinAs code={join.code} onChoose={(as, seat) => update({ code: join.code, as, seat })} onLeave={leave} />;
-  return <HostApp onJoin={(code) => update({ code })} onPlayOnline={() => update({ code: makeCode(), as: 'online', host: true })}
+  if (!picked) {
+    return (
+      <>
+        <GameHub onPick={pick} onStats={() => setHubStats(true)} />
+        {hubStats && <Stats onClose={() => setHubStats(false)} />}
+      </>
+    );
+  }
+  if (picked === 'dominoes') return <DominoesApp onAllGames={() => pick(null)} />;
+  return <HostApp onAllGames={() => pick(null)} onJoin={(code) => update({ code })} onPlayOnline={() => update({ code: makeCode(), as: 'online', host: true })}
     onRejoin={(last) => update({ code: last.code, as: 'online', host: last.host })} />;
 }
 
@@ -74,7 +91,7 @@ function lastOnlineGame() {
   return last?.code && Date.now() - last.at < REJOIN_WINDOW_MS ? last : null;
 }
 
-function HostApp({ onJoin, onPlayOnline, onRejoin }) {
+function HostApp({ onJoin, onPlayOnline, onRejoin, onAllGames }) {
   const [lastOnline, setLastOnline] = useState(lastOnlineGame);
   const [saved, setSaved] = useState(savedGames);
   // Pick a saved game back up: an online game is hosted again under its code; a table game opens here.
@@ -97,7 +114,7 @@ function HostApp({ onJoin, onPlayOnline, onRejoin }) {
       <>
         {setup
           ? <NewGame lastSetup={store.lastSetup} onStart={store.start} onBack={() => setSetup(false)} />
-          : <Home onPlayOnline={onPlayOnline} onTable={() => setSetup(true)} onJoin={onJoin} onStats={() => setStatsOpen(true)}
+          : <Home onAllGames={onAllGames} onPlayOnline={onPlayOnline} onTable={() => setSetup(true)} onJoin={onJoin} onStats={() => setStatsOpen(true)}
               rejoin={lastOnline && !saved.some((e) => e.code === lastOnline.code) ? lastOnline : null}
               onRejoin={() => onRejoin(lastOnline)} onForget={() => { write(LAST_ONLINE_KEY, null); setLastOnline(null); }}
               saved={saved} onResume={resume}
