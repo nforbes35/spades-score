@@ -1441,6 +1441,23 @@ function HandView({ reactions, onReact, mySeat, table, st, myTurn, left, hurry, 
 /** Everything that used to sit in the top right, in one drop-down: tap ••• and pick. */
 function TableMenu({ items }) {
   const [open, setOpen] = useState(false);
+  const list = useRef(null);
+  // Fit the list to the space below it on screen (the table can be drawn enlarged on computers, so measure
+  // in screen pixels and convert back); it scrolls when there are more items than room.
+  useLayoutEffect(() => {
+    const el = list.current;
+    if (!open || !el) return undefined;
+    const fit = () => {
+      el.style.maxHeight = 'none';
+      const r = el.getBoundingClientRect();
+      const k = el.offsetHeight / (r.height || 1);
+      const room = (window.innerHeight - r.top - 12) * k;
+      el.style.maxHeight = `${Math.max(160, room)}px`;
+    };
+    fit();
+    window.addEventListener('resize', fit);
+    return () => window.removeEventListener('resize', fit);
+  }, [open]);
   useEffect(() => {
     if (!open) return undefined;
     const key = (e) => { if (e.key === 'Escape') setOpen(false); };
@@ -1454,7 +1471,7 @@ function TableMenu({ items }) {
       {open && (
         <>
           <div className="table-menu-shade" onClick={() => setOpen(false)} />
-          <div className="table-menu-list" role="menu">
+          <div className="table-menu-list" role="menu" ref={list}>
             {items.filter(Boolean).map((it) => (
               <button key={it.label} type="button" role={it.on != null ? 'menuitemcheckbox' : 'menuitem'} aria-checked={it.on ?? undefined}
                 className={`${it.danger ? 'danger-item' : ''}${it.on ? ' on' : ''}`} onClick={() => { setOpen(false); it.onClick(); }}>
