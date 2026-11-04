@@ -2197,3 +2197,11 @@ button.choice:active { transform: scale(0.98); }
 :root[data-layout='tall'] .dom-board { inset: 120px 8px 92px; }
 :root[data-layout='wide'] .dom-board { inset: 64px 120px 56px; }
 .dom-end { z-index: 3; }
+/* Sideways: your tiles on the left, the buttons (or hint) on the right */
+:root[data-layout='wide'] .online-dock.dom-dock .dom-hand { grid-column: 1; grid-row: 1 / span 2; align-self: center; }
+:root[data-layout='wide'] .online-dock.dom-dock .dom-actions { grid-column: 2; grid-row: 1 / span 2; align-self: center; flex-direction: column; }
+:root[data-layout='wide'] .online-dock.dom-dock .dom-actions .big { flex: none; width: 100%; }
+:root[data-layout='wide'] .online-dock.dom-dock:has(.dock-action:empty) .dom-hand { justify-content: center; }
+:root[data-layout='wide'] .app.dominoes .hand-dock.online-dock.dom-dock { grid-template-columns: minmax(0, 1fr) 240px; }
+:root[data-layout='wide'] .app.dominoes .hand-dock.online-dock.dom-dock:has(.dock-action:empty) { grid-template-columns: minmax(0, 1fr); }
+:root[data-layout='wide'] .app.dominoes .online-dock.dom-dock .dock-action:not(:empty) { position: static; translate: none; width: auto; grid-column: 2; grid-row: 1 / span 2; }
