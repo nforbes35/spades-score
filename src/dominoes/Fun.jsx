@@ -7,7 +7,7 @@ import { tileClack, tileRattle } from '../lib/fx.js';
 import Domino from './Domino.jsx';
 import { halves } from './engine.js';
 import { getLang, tr, tMsg } from '../lib/i18n.js';
-import { TALK_LINES, loadTalk, saveTalk, MAX_CLIP_CHARS, validClip, domStats, headToHead, loadDomLog } from './fun.js';
+import { TALK_LINES, loadTalk, saveTalk, MAX_CLIP_CHARS, validClip, clipType, domStats, headToHead, loadDomLog } from './fun.js';
 import { loadPhotos, deletePhoto } from './album.js';
 
 /** The tiles face down in a pile; everyone drags a finger to stir them (others' fingers arrive through `bus`). */
@@ -194,22 +194,26 @@ export function TalkSheet({ onSay, onClose }) {
     if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') { setProblem(tr('This device can’t record here.')); return; }
     let stream;
     try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); } catch { setProblem(tr('Allow the microphone to record your voice.')); return; }
-    const type = ['audio/webm;codecs=opus', 'audio/mp4'].find((t) => MediaRecorder.isTypeSupported(t));
+    // mp4 first: every phone can play it back, while older iPhones can't play webm
+    const type = ['audio/mp4', 'audio/webm;codecs=opus'].find((t) => MediaRecorder.isTypeSupported(t));
     const rec = new MediaRecorder(stream, { ...(type ? { mimeType: type } : {}), audioBitsPerSecond: 24000 });
     const parts = [];
-    rec.ondataavailable = (e) => parts.push(e.data);
+    rec.ondataavailable = (e) => { if (e.data?.size) parts.push(e.data); };
     rec.onstop = () => {
       stream.getTracks().forEach((t) => t.stop());
       recorder.current = null;
       setRecording(null);
+      if (!parts.length) { setProblem(tr('The microphone didn’t pick anything up. Try again.')); return; }
       const reader = new FileReader();
+      reader.onerror = () => setProblem(tr('That recording didn’t work. Try again.'));
       reader.onload = () => {
         const clip = reader.result;
-        if (!validClip(clip) || clip.length > MAX_CLIP_CHARS) { setProblem(tr('That recording didn’t work. Try a shorter one.')); return; }
+        if (typeof clip === 'string' && clip.length > MAX_CLIP_CHARS) { setProblem(tr('That recording is too big to send.')); return; }
+        if (!validClip(clip)) { setProblem(tr('That recording didn’t work. Try again.')); return; }
         const now = loadTalk();
         change({ ...now, clips: { ...now.clips, [id]: clip } });
       };
-      reader.readAsDataURL(new Blob(parts, { type: rec.mimeType }));
+      reader.readAsDataURL(new Blob(parts, { type: clipType(rec.mimeType || type) }));
     };
     recorder.current = rec;
     setRecording(id);

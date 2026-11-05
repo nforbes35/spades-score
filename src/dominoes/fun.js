@@ -153,7 +153,9 @@ export function talkFor(said, myLang, guess) {
   return { text: said.text, original: null, needs: from === myLang ? null : from };
 }
 const TALK_KEY = 'dominoes-talk';
-export const MAX_CLIP_CHARS = 80000;
+export const MAX_CLIP_CHARS = 160000; // about 120 KB, well under what a room message can carry
+/** A recorder's type without its details: iPhones say things like audio/mp4; codecs="mp4a.40.2", which doesn't survive in a data: URL. */
+export const clipType = (mime) => { const base = String(mime ?? '').split(';')[0].trim().toLowerCase(); return /^audio\/[\w.+-]+$/.test(base) ? base : 'audio/mp4'; };
 export const validClip = (c) => typeof c === 'string' && c.length <= MAX_CLIP_CHARS && /^data:audio\/[\w.+-]+(;[\w=.+-]+)*;base64,[A-Za-z0-9+/=]+$/.test(c);
 export const loadTalk = () => { const t = read(TALK_KEY); return { custom: Array.isArray(t?.custom) ? t.custom : [], clips: t?.clips && typeof t.clips === 'object' ? t.clips : {} }; };
 export const saveTalk = (t) => write(TALK_KEY, t);

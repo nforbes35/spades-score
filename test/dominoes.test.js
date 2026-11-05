@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import { tMsg } from '../src/lib/i18n.js';
-import { calloutFor, momentFor, toDomRecord, mergeDomLog, domStats, headToHead, rivalryLines, validClip } from '../src/dominoes/fun.js';
+import { calloutFor, momentFor, toDomRecord, mergeDomLog, domStats, headToHead, rivalryLines, validClip, clipType } from '../src/dominoes/fun.js';
 import assert from 'node:assert/strict';
 import {
   fullSet, handSize, newDominoTable, startMatch, legalMoves, playTile, drawTile, pass, openEnds, endsTotal,
@@ -515,6 +515,11 @@ test('only real audio recordings are played from other devices', () => {
   assert.ok(validClip('data:audio/mp4;base64,AAAA'));
   assert.ok(!validClip('data:text/html;base64,AAAA'));
   assert.ok(!validClip('https://example.com/a.mp3'));
-  assert.ok(!validClip(`data:audio/mp4;base64,${'A'.repeat(90000)}`));
+  // an iPhone's recorder type, with details a data: URL can't hold, comes out plain
+  assert.equal(clipType('audio/mp4; codecs="mp4a.40.2"'), 'audio/mp4');
+  assert.equal(clipType('audio/webm;codecs=opus'), 'audio/webm');
+  assert.equal(clipType(''), 'audio/mp4');
+  assert.ok(validClip(`data:${clipType('audio/mp4; codecs="mp4a.40.2"')};base64,AAAA`));
+  assert.ok(!validClip(`data:audio/mp4;base64,${'A'.repeat(170000)}`));
 });
 

@@ -1,5 +1,8 @@
 // Dominoes: the Spanish wording, keyed by the exact English (see "Languages" in CLAUDE.md).
 export default {
+  'The microphone didn’t pick anything up. Try again.': 'El micrófono no captó nada. Inténtalo otra vez.',
+  'That recording didn’t work. Try again.': 'Esa grabación no funcionó. Inténtalo otra vez.',
+  'That recording is too big to send.': 'Esa grabación es muy grande para enviarla.',
   // Games, rules and tile styles (kept in English in their constants, translated where they're drawn)
   'Draw': 'Robar',
   'Block': 'Bloqueo',
