@@ -1,4 +1,5 @@
 import { signed, contractBid, totalBooks, isNil, nilLabel } from './lib/scoring.js';
+import { tr } from './lib/i18n.js';
 import { useCountUp, BagMeter } from './components.jsx';
 
 export function ScoreCard({ t, team, standing, target, showBags, bagLimit = 10, isWinner, compact }) {
@@ -18,16 +19,16 @@ export function ScoreCard({ t, team, standing, target, showBags, bagLimit = 10, 
   );
 }
 
-function handSummary(tr, team) {
-  const parts = [`Bid ${contractBid(tr)}, took ${totalBooks(tr)}`];
-  tr.players.forEach((p, i) => { if (isNil(p.call)) parts.push(`${team.players[i]}: ${nilLabel(p.call)}${p.books === 0 ? ' ✓' : ' ✗'}`); });
+function handSummary(round, team) {
+  const parts = [tr('Bid {bid}, took {took}', { bid: contractBid(round), took: totalBooks(round) })];
+  round.players.forEach((p, i) => { if (isNil(p.call)) parts.push(`${team.players[i]}: ${nilLabel(p.call)}${p.books === 0 ? ' ✓' : ' ✗'}`); });
   return parts.join(' · ');
 }
 
 export function HandRow({ hand, number, standing, game, onOpen }) {
   const body = (
     <>
-      <div className="hand-num">Hand {number}</div>
+      <div className="hand-num">{tr('Hand {n}', { n: number })}</div>
       <div className="hand-cols">
         {[0, 1].map((t) => (
           <div key={t} className={`hand-col t${t}`}>
@@ -36,7 +37,7 @@ export function HandRow({ hand, number, standing, game, onOpen }) {
               <span className={`points ${standing[t].points < 0 ? 'neg' : 'pos'}`}>{signed(standing[t].points)}</span>
               <span className="running">→ {standing[t].score}</span>
             </div>
-            {standing[t].penalty > 0 && <div className="tiny neg bold">Bag penalty −{standing[t].penalty}</div>}
+            {standing[t].penalty > 0 && <div className="tiny neg bold">{tr('Bag penalty −{n}', { n: standing[t].penalty })}</div>}
           </div>
         ))}
       </div>

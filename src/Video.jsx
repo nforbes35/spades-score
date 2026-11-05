@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Icon } from './components.jsx';
 import { unlockSound } from './lib/fx.js';
+import { tr } from './lib/i18n.js';
 
 export const ROLE_LABEL = { host: 'Table', player: 'Player', guest: 'Video', tv: 'TV' };
 
@@ -26,7 +27,7 @@ export function VideoTile({ stream, muted, mirrored, label, note, micOff, classN
       {note && <span className="vtile-note">{note}</span>}
       {blocked && (
         <button type="button" className="tap-sound" onClick={() => ref.current?.play().then(() => setBlocked(false)).catch(() => {})}>
-          Tap for sound
+          {tr('Tap for sound')}
         </button>
       )}
     </div>
@@ -39,24 +40,24 @@ export function CallButtons({ call, showFlip = true, size = 20 }) {
     <div className="call-buttons">
       {call.local && (
         <button type="button" className={call.micOn ? '' : 'off'} onClick={call.toggleMic}
-          aria-label={call.micOn ? 'Mute microphone' : 'Unmute microphone'}>
+          aria-label={call.micOn ? tr('Mute microphone') : tr('Unmute microphone')}>
           <Icon name={call.micOn ? 'mic' : 'micOff'} size={size} />
         </button>
       )}
       <button type="button" className={call.speakerOn ? '' : 'off'} onClick={call.toggleSpeaker}
-        aria-label={call.speakerOn ? 'Turn sound off' : 'Turn sound on'}>
+        aria-label={call.speakerOn ? tr('Turn sound off') : tr('Turn sound on')}>
         <Icon name={call.speakerOn ? 'speaker' : 'speakerOff'} size={size} />
       </button>
       {call.local && (
         <button type="button" className={call.camOn ? '' : 'off'} onClick={call.toggleCam}
-          aria-label={call.camOn ? 'Turn camera off' : 'Turn camera on'}>
+          aria-label={call.camOn ? tr('Turn camera off') : tr('Turn camera on')}>
           <Icon name={call.camOn ? 'video' : 'videoOff'} size={size} />
         </button>
       )}
       {call.local && showFlip && (
-        <button type="button" onClick={call.flip} aria-label="Switch camera"><Icon name="flip" size={size} /></button>
+        <button type="button" onClick={call.flip} aria-label={tr('Switch camera')}><Icon name="flip" size={size} /></button>
       )}
-      <button type="button" className="end" onClick={call.leave} aria-label="Leave video"><Icon name="close" size={size} /></button>
+      <button type="button" className="end" onClick={call.leave} aria-label={tr('Leave video')}><Icon name="close" size={size} /></button>
     </div>
   );
 }
@@ -64,12 +65,11 @@ export function CallButtons({ call, showFlip = true, size = 20 }) {
 export function SoundNote({ call }) {
   if (!call.soundBy) return null;
   if (call.soundBy.role === 'otv') {
-    return <p className="sound-note"><Icon name="tv" size={15} /> Everyone’s sound plays on the TV. Your camera and microphone still go out from this phone.</p>;
+    return <p className="sound-note"><Icon name="tv" size={15} /> {tr('Everyone’s sound plays on the TV. Your camera and microphone still go out from this phone.')}</p>;
   }
   return (
     <p className="sound-note">
-      <Icon name="speakerOff" size={15} /> {call.soundBy.name || 'Another device'} handles sound here, so this one starts
-      muted (no squealing). Tap the buttons to change it.
+      <Icon name="speakerOff" size={15} /> {tr('{name} handles sound here, so this one starts muted (no squealing). Tap the buttons to change it.', { name: call.soundBy.name || tr('Another device') })}
     </p>
   );
 }
@@ -115,7 +115,7 @@ export function CallBox({ call, videos, emptyText = 'Waiting for others to turn 
       onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp}>
       {first
         ? <VideoTile stream={first.stream} muted={!call.speakerOn} label={small ? '' : first.peer.name} micOff={!first.peer.mic} className="vc-main" />
-        : <div className="vc-waiting">{emptyText}</div>}
+        : <div className="vc-waiting">{tr(emptyText)}</div>}
       {!small && rest.length > 0 && (
         <div className="vc-more">
           {rest.map((v) => <VideoTile key={v.peer.id} stream={v.stream} muted={!call.speakerOn} className="vc-more-tile" />)}
@@ -125,7 +125,7 @@ export function CallBox({ call, videos, emptyText = 'Waiting for others to turn 
       {!small && (
         <div className="vc-controls">
           <CallButtons call={call} size={18} />
-          <button type="button" onClick={() => setSmall(true)} aria-label="Make smaller"><Icon name="shrink" size={18} /></button>
+          <button type="button" onClick={() => setSmall(true)} aria-label={tr('Make smaller')}><Icon name="shrink" size={18} /></button>
         </div>
       )}
     </div>
@@ -154,4 +154,4 @@ export function useTvStart(call) {
   return needsPress;
 }
 
-export const SoundPrompt = () => <div className="tv-sound-prompt"><Icon name="speaker" size={18} /> Press OK or click for sound</div>;
+export const SoundPrompt = () => <div className="tv-sound-prompt"><Icon name="speaker" size={18} /> {tr('Press OK or click for sound')}</div>;

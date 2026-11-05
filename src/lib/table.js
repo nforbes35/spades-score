@@ -1,6 +1,7 @@
 // Seats around the table and book-by-book play. Partners sit across from each other, so going
 // clockwise the seats are Team 1 player 1, Team 2 player 1, Team 1 player 2, Team 2 player 2.
 import { isNil } from './scoring.js';
+import { tr } from './i18n.js';
 
 export const SEATS = [[0, 0], [1, 0], [0, 1], [1, 1]];
 export const teamOf = (s) => SEATS[s][0];
@@ -89,8 +90,8 @@ export function updateSeat(hand, s, change) {
   const [t, p] = SEATS[s];
   return {
     ...hand,
-    teams: hand.teams.map((tr, ti) => (ti !== t ? tr : {
-      ...tr, players: tr.players.map((pl, pi) => (pi === p ? { ...pl, ...change } : pl)),
+    teams: hand.teams.map((round, ti) => (ti !== t ? round : {
+      ...round, players: round.players.map((pl, pi) => (pi === p ? { ...pl, ...change } : pl)),
     })),
   };
 }
@@ -106,8 +107,8 @@ export function awardBook(hand, s) {
 /** Short status for a seat: "2 of 4", "Nil ✓", "Nil set". */
 export function seatProgress(hand, s) {
   const p = seatEntry(hand, s);
-  if (isNil(p.call)) return { text: p.books === 0 ? 'clean' : 'set!', bad: p.books > 0 };
-  return { text: `of ${p.bid}`, good: p.books >= p.bid && p.bid > 0 };
+  if (isNil(p.call)) return { text: p.books === 0 ? tr('clean') : tr('set!'), bad: p.books > 0 };
+  return { text: tr('of {n}', { n: p.bid }), good: p.books >= p.bid && p.bid > 0 };
 }
 
 export const nextDealer = (game) => {

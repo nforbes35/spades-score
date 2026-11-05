@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { CHARACTERS, BACKDROPS, parseAvatar, characterAvatar, nameColors, initials, robotLook, photoAvatar, loadImage } from './lib/profile.js';
 import { Icon } from './components.jsx';
+import { tr } from './lib/i18n.js';
 
 /** Someone's icon: their photo, their character, a robot for a computer player, or their initials. */
 export function Avatar({ value, name = '', bot, className = '' }) {
@@ -65,20 +66,20 @@ export function ProfileEditor({ name, avatar, onName, onAvatar, autoFocus }) {
       <div className="profile-preview">
         <Avatar value={avatar} name={name || '?'} className="xl" />
         <input className="code-input name-input" value={name} onChange={(e) => onName(e.target.value)}
-          placeholder="Your name" maxLength={14} autoFocus={autoFocus} aria-label="Your name" />
+          placeholder={tr('Your name')} maxLength={14} autoFocus={autoFocus} aria-label={tr('Your name')} />
       </div>
 
       <div className="profile-actions">
-        <button type="button" className="soft" onClick={() => fileRef.current?.click()}><Icon name="camera" size={18} /> {current?.kind === 'photo' ? 'New photo' : 'Use a photo'}</button>
-        {avatar && <button type="button" className="text-btn" onClick={() => onAvatar(null)}>Just my initials</button>}
+        <button type="button" className="soft" onClick={() => fileRef.current?.click()}><Icon name="camera" size={18} /> {current?.kind === 'photo' ? tr('New photo') : tr('Use a photo')}</button>
+        {avatar && <button type="button" className="text-btn" onClick={() => onAvatar(null)}>{tr('Just my initials')}</button>}
         <input ref={fileRef} type="file" accept="image/*" hidden onChange={pickFile} />
       </div>
       {error && <p className="scan-msg">{error}</p>}
 
-      <div className="section-title">Or pick a character</div>
-      <div className="backdrops" role="radiogroup" aria-label="Colour">
+      <div className="section-title">{tr('Or pick a character')}</div>
+      <div className="backdrops" role="radiogroup" aria-label={tr('Colour')}>
         {BACKDROPS.map((c, i) => (
-          <button key={i} type="button" role="radio" aria-checked={backdrop === i} aria-label={`Colour ${i + 1}`}
+          <button key={i} type="button" role="radio" aria-checked={backdrop === i} aria-label={tr('Colour {n}', { n: i + 1 })}
             className={`backdrop${backdrop === i ? ' on' : ''}`} style={{ '--av-a': c[0], '--av-b': c[1] }}
             onClick={() => { setBackdrop(i); if (current?.kind === 'emoji') onAvatar(characterAvatar(current.emoji, i)); }} />
         ))}
@@ -87,7 +88,7 @@ export function ProfileEditor({ name, avatar, onName, onAvatar, autoFocus }) {
         {CHARACTERS.map((emoji) => {
           const value = characterAvatar(emoji, backdrop);
           return (
-            <button key={emoji} type="button" className={`character${avatar === value ? ' on' : ''}`} onClick={() => onAvatar(value)} aria-label={`Character ${emoji}`}>
+            <button key={emoji} type="button" className={`character${avatar === value ? ' on' : ''}`} onClick={() => onAvatar(value)} aria-label={tr('Character {emoji}', { emoji })}>
               <Avatar value={value} />
             </button>
           );
@@ -133,18 +134,18 @@ function PhotoCrop({ image, onCancel, onDone }) {
 
   return (
     <div className="photo-crop">
-      <p className="muted center">Drag to move. Slide to zoom.</p>
+      <p className="muted center">{tr('Drag to move. Slide to zoom.')}</p>
       <div className="crop-frame" style={{ width: CROP_PX, height: CROP_PX }}
         onPointerDown={(e) => { e.currentTarget.setPointerCapture(e.pointerId); drag.current = { x: e.clientX - pos.x, y: e.clientY - pos.y }; }}
         onPointerMove={(e) => { if (drag.current) setPos(clamp({ x: e.clientX - drag.current.x, y: e.clientY - drag.current.y })); }}
         onPointerUp={() => { drag.current = null; }} onPointerCancel={() => { drag.current = null; }}>
         <img src={image.src} alt="" draggable="false" style={{ width: w * scale, height: h * scale, transform: `translate(${pos.x}px, ${pos.y}px)` }} />
       </div>
-      <input type="range" className="crop-zoom" min="1" max={MAX_ZOOM} step="0.01" value={zoom} aria-label="Zoom"
+      <input type="range" className="crop-zoom" min="1" max={MAX_ZOOM} step="0.01" value={zoom} aria-label={tr('Zoom')}
         onChange={(e) => zoomTo(Number(e.target.value))} />
       <div className="row" style={{ justifyContent: 'center' }}>
-        <button type="button" className="secondary" onClick={onCancel}>Cancel</button>
-        <button type="button" className="primary go" disabled={busy} onClick={done}>Use this photo</button>
+        <button type="button" className="secondary" onClick={onCancel}>{tr('Cancel')}</button>
+        <button type="button" className="primary go" disabled={busy} onClick={done}>{tr('Use this photo')}</button>
       </div>
     </div>
   );

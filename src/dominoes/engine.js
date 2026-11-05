@@ -25,6 +25,8 @@
 // Train and Chicken Foot use { root, lines: [{ id, start, tiles, owner?, closed?, on? }] } instead: each line
 // starts from `start` (the middle double's number, or a chicken foot's double) and `arm` is the line's id.
 
+import { tr, langMsg } from '../lib/i18n.js';
+
 export const VARIANTS = {
   draw: { name: 'Draw', kind: 'line', draws: true, spinner: false, fives: false, target: 100 },
   block: { name: 'Block', kind: 'line', draws: false, spinner: false, fives: false, target: 100 },
@@ -188,11 +190,12 @@ export function lineName(table, arm, seat) {
   const line = table.round?.layout?.lines?.find((l) => l.id === arm);
   if (!line) return '';
   if (kindOf(table) === 'train') {
-    if (line.owner == null) return 'Mexican Train';
-    if (line.owner === seat) return 'Your train';
-    return `${table.seats[line.owner]?.name ?? 'Their'}’s train`;
+    if (line.owner == null) return tr('Mexican Train');
+    if (line.owner === seat) return tr('Your train');
+    const name = table.seats[line.owner]?.name;
+    return name ? tr('{name}’s train', { name }) : tr('Their’s train');
   }
-  return line.on === table.round.layout.root ? 'Middle' : 'Chicken foot';
+  return line.on === table.round.layout.root ? tr('Middle') : tr('Chicken foot');
 }
 
 /** The open arms and the number each needs. */
@@ -259,7 +262,9 @@ export function playTile(table, seat, tile, arm, style = null, thrown = false) {
   if (table.phase !== 'playing') throw new Error('The hand is over.');
   if (r.turn !== seat) throw new Error('It’s not your turn.');
   const moves = legalMoves(table, seat).filter((m) => m.tile === tile);
-  if (!moves.length) throw new Error(r.layout ? 'That tile doesn’t match an open end.' : `Start with the ${tile.replace('-', '|')}.`);
+  if (!moves.length && r.layout) throw new Error('That tile doesn’t match an open end.');
+  // (these reasons go to the player who tried it: plain English, translated where they're shown; this one has a blank)
+  if (!moves.length) throw Object.assign(new Error(`Start with the ${tile.replace('-', '|')}.`), { lang: langMsg('Start with the {tile}.', { tile: tile.replace('-', '|') }) });
   const move = arm === undefined ? moves[0] : moves.find((m) => m.arm === arm);
   if (!move) throw new Error('That tile doesn’t fit there.');
 

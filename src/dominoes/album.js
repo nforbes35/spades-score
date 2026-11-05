@@ -1,5 +1,7 @@
 // Reaction photos: when a hand ends in a video chat, a picture of everyone's faces, kept in this device's own
 // album (never uploaded; people share one themselves if they want to).
+import { getLang } from '../lib/i18n.js';
+
 const DB = 'family-games-album';
 const STORE = 'photos';
 const MOST = 200;
@@ -64,6 +66,6 @@ export function snapReactions(table, title) {
   c.fillText(title, 24, rows * cellH + 42);
   c.font = '500 24px system-ui, sans-serif';
   c.fillStyle = 'rgba(255, 255, 255, 0.75)';
-  c.fillText(new Date().toLocaleDateString(undefined, { dateStyle: 'long' }), 24, rows * cellH + 76);
+  c.fillText(new Date().toLocaleDateString(getLang(), { dateStyle: 'long' }), 24, rows * cellH + 76);
   return new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.82));
 }

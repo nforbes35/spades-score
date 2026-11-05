@@ -3,6 +3,7 @@ import { useGame, read, write } from './lib/store.js';
 import { history, standings, winner, newHand, signed, tableBid, totalBooks, scoreTeam, NIL_CALLS, STANDARD_RULES } from './lib/scoring.js';
 import { playerName, stageOf, liveOf, booksPlayed, updateSeat, awardBook, remainingCards, nextDealer, remoteSeats, gameFor, playedBy } from './lib/table.js';
 import { cardLabel } from './lib/cards.js';
+import { tr, tx, langMsg, tMsg } from './lib/i18n.js';
 import { useRoom } from './lib/room.js';
 import { useDevice } from './lib/device.js';
 import { useCall } from './lib/call.js';
@@ -127,7 +128,7 @@ function HostApp({ onJoin, onPlayOnline, onRejoin, onAllGames }) {
               rejoin={lastOnline && !saved.some((e) => e.code === lastOnline.code) ? lastOnline : null}
               onRejoin={() => onRejoin(lastOnline)} onForget={() => { write(LAST_ONLINE_KEY, null); setLastOnline(null); }}
               saved={saved} onResume={resume}
-              onForgetSaved={(e) => { if (confirm('Delete this saved game?')) { forgetSaved(e.id); if (e.kind === 'online') write(`spades-online-table-${e.code}`, null); setSaved(savedGames()); } }} />}
+              onForgetSaved={(e) => { if (confirm(tr('Delete this saved game?'))) { forgetSaved(e.id); if (e.kind === 'online') write(`spades-online-table-${e.code}`, null); setSaved(savedGames()); } }} />}
         {statsOpen && <Stats onClose={() => setStatsOpen(false)} />}
         {toast.node}
       </>
@@ -138,7 +139,7 @@ function HostApp({ onJoin, onPlayOnline, onRejoin, onAllGames }) {
       <GameScreen store={store} toast={toast} onJoin={onJoin} onPlayOnline={onPlayOnline} onNewGame={() => setNewGameOpen(true)} />
       {newGameOpen && (
         <NewGame asSheet lastSetup={store.lastSetup}
-          onStart={(g) => { store.start(g); setNewGameOpen(false); toast.show('New game started', { onUndo: store.undo }); }}
+          onStart={(g) => { store.start(g); setNewGameOpen(false); toast.show(tr('New game started'), { onUndo: store.undo }); }}
           onCancel={() => setNewGameOpen(false)} />
       )}
     </>
@@ -190,15 +191,15 @@ function GameScreen({ store, toast, onNewGame, onJoin, onPlayOnline }) {
     if (m.type === 'bid' && hand && stageOf(hand) === 'bids') {
       const bid = Math.max(0, Math.min(13, Math.trunc(Number(m.bid)) || 0));
       const nil = NIL_CALLS.some((c) => c.id === m.call) ? m.call : 'none';
-      store.updateHand(hand.id, `${name}'s bid`, (h) => updateSeat(h, seat, { bid, call: nil }));
+      store.updateHand(hand.id, langMsg("{name}'s bid", { name }), (h) => updateSeat(h, seat, { bid, call: nil }));
     } else if (m.type === 'play' && hand && stageOf(hand) === 'play') {
       const live = liveOf(hand);
       if (live.played[seat] || live.tricks.length !== m.book || !remainingCards(hand, seat)?.includes(m.card)) return;
-      store.updateHand(hand.id, `${name} played ${cardLabel(m.card)}`,
+      store.updateHand(hand.id, langMsg('{name} played {card}', { name, card: cardLabel(m.card) }),
         (h) => ({ ...h, live: { ...liveOf(h), played: { ...liveOf(h).played, [seat]: m.card } } }));
       chime(true);
       buzz([80, 60, 80]);
-      toast.show(<>{name} played <CardText code={m.card} /></>, { onUndo: store.undo, ms: 6000 });
+      toast.show(tx('{name} played {card}', { name, card: <CardText code={m.card} /> }), { onUndo: store.undo, ms: 6000 });
     }
   }
 
@@ -224,30 +225,30 @@ function GameScreen({ store, toast, onNewGame, onJoin, onPlayOnline }) {
   const undo = () => {
     const label = store.undoLabel;
     store.undo();
-    toast.show(`Undid: ${label}`);
+    toast.show(tr('Undid: {what}', { what: tMsg(label) }));
   };
   const award = (s) => {
     const n = booksPlayed(inPlay) + 1;
-    change(`Book ${n}`, (h) => awardBook(h, s));
+    change(langMsg('Book {n}', { n }), (h) => awardBook(h, s));
     buzz(30);
-    toast.show(`Book ${n} → ${playerName(game, s)}`, { onUndo: store.undo });
+    toast.show(tr('Book {n} → {name}', { n, name: playerName(game, s) }), { onUndo: store.undo });
   };
   const newHandNow = () => store.addHand(newHand(nextDealer(game)));
   const startPlay = () => {
-    if (tableBid(inPlay) === 0 && !confirm('Nobody has bid yet. Start playing anyway?')) return;
+    if (tableBid(inPlay) === 0 && !confirm(tr('Nobody has bid yet. Start playing anyway?'))) return;
     change('Start playing', (h) => ({ ...h, stage: 'play' }));
   };
   const scoreHand = () => {
     const played = booksPlayed(inPlay);
     const books = inPlay.teams.reduce((n, t) => n + totalBooks(t), 0);
-    if (played < 13 && books !== 13 && !confirm(`Only ${books} of 13 books are counted. Score the hand anyway?`)) return;
+    if (played < 13 && books !== 13 && !confirm(tr('Only {n} of 13 books are counted. Score the hand anyway?', { n: books }))) return;
     change('Score hand', (h) => ({ ...h, inPlay: false, stage: 'done', live: { ...liveOf(h), played: {} } }));
     const pts = [0, 1].map((t) => `${game.teams[t].name} ${signed(scoreTeam(inPlay.teams[t], game.rules).total)}`).join(' · ');
-    toast.show(`Scored: ${pts}`, { onUndo: store.undo, ms: 5000 });
+    toast.show(tr('Scored: {pts}', { pts }), { onUndo: store.undo, ms: 5000 });
   };
   const ping = (seat) => {
     for (const p of players.filter((x) => x.seat === seat)) room.send({ type: 'ping' }, p.id);
-    toast.show(`Told ${playerName(game, seat)} it's their turn`);
+    toast.show(tr("Told {name} it's their turn", { name: playerName(game, seat) }));
   };
   const [scanSeat, setScanSeat] = useState(null);
   const openScan = (seat) => { setScanSeat(seat); setSheet('scan'); };
@@ -263,11 +264,11 @@ function GameScreen({ store, toast, onNewGame, onJoin, onPlayOnline }) {
         <div className="wrap hero-row">
           <div className="brand"><span className="brand-mark">♠</span><h1>Family Spades</h1></div>
           <div className="row">
-            <button type="button" className="icon-btn" aria-label={store.undoLabel ? `Undo ${store.undoLabel}` : 'Nothing to undo'}
+            <button type="button" className="icon-btn" aria-label={store.undoLabel ? tr('Undo {what}', { what: tMsg(store.undoLabel) }) : tr('Nothing to undo')}
               disabled={!store.undoLabel} onClick={undo}>
-              <Icon name="undo" /> <span className="icon-label">Undo</span>
+              <Icon name="undo" /> <span className="icon-label">{tr('Undo')}</span>
             </button>
-            <button type="button" className="icon-btn round" aria-label="Menu" onClick={() => setSheet('menu')}><Icon name="more" /></button>
+            <button type="button" className="icon-btn round" aria-label={tr('Menu')} onClick={() => setSheet('menu')}><Icon name="more" /></button>
           </div>
         </div>
         <div className="wrap">
@@ -277,13 +278,13 @@ function GameScreen({ store, toast, onNewGame, onJoin, onPlayOnline }) {
                 showBags={game.rules.bagsEnabled} bagLimit={game.rules.bagsLimit} isWinner={win === t} />
             ))}
           </div>
-          <p className="target">Playing to {game.target}</p>
+          <p className="target">{tr('Playing to {n}', { n: game.target })}</p>
         </div>
       </header>
 
       <main className="wrap">
         {win != null && (
-          <div className="winner"><Icon name="trophy" size={26} /> {game.teams[win].name} wins!</div>
+          <div className="winner"><Icon name="trophy" size={26} /> {tr('{name} wins!', { name: game.teams[win].name })}</div>
         )}
 
         {remote && (
@@ -292,18 +293,18 @@ function GameScreen({ store, toast, onNewGame, onJoin, onPlayOnline }) {
               <Icon name="users" size={18} />
               <div className="who-list">
                 {seats.map((s) => <StatusDot key={s} on={online(s)} label={playerName(game, s)} />)}
-                {guests.length > 0 && <StatusDot on label={`${guests.length} on video`} />}
-                {tvs.length > 0 && <StatusDot on label={`${tvs.length} TV${tvs.length > 1 ? 's' : ''}`} />}
-                {cardShows.length > 0 && <StatusDot on label={`${cardShows.length} card display${cardShows.length > 1 ? 's' : ''}`} />}
-                {!seats.length && !guests.length && !tvs.length && <span className="muted small">Nobody has joined yet</span>}
-                {room.status === 'error' && <span className="neg small">Connection problem</span>}
+                {guests.length > 0 && <StatusDot on label={tr('{n} on video', { n: guests.length })} />}
+                {tvs.length > 0 && <StatusDot on label={tvs.length > 1 ? tr('{n} TVs', { n: tvs.length }) : tr('{n} TV', { n: tvs.length })} />}
+                {cardShows.length > 0 && <StatusDot on label={cardShows.length > 1 ? tr('{n} card displays', { n: cardShows.length }) : tr('{n} card display', { n: cardShows.length })} />}
+                {!seats.length && !guests.length && !tvs.length && <span className="muted small">{tr('Nobody has joined yet')}</span>}
+                {room.status === 'error' && <span className="neg small">{tr('Connection problem')}</span>}
               </div>
             </div>
             <div className="row">
-              {!call.joined && <button type="button" className="soft" onClick={call.join}><Icon name="video" size={18} /> Table camera</button>}
-              <button type="button" className="soft" onClick={() => setSheet('invite')}>Invite</button>
+              {!call.joined && <button type="button" className="soft" onClick={call.join}><Icon name="video" size={18} /> {tr('Table camera')}</button>}
+              <button type="button" className="soft" onClick={() => setSheet('invite')}>{tr('Invite')}</button>
             </div>
-            {call.joined && <p className="hint">Point this phone’s back camera at the table: it’s the big picture on everyone’s TV.</p>}
+            {call.joined && <p className="hint">{tr('Point this phone’s back camera at the table: it’s the big picture on everyone’s TV.')}</p>}
             <SoundNote call={call} />
           </div>
         )}
@@ -318,9 +319,9 @@ function GameScreen({ store, toast, onNewGame, onJoin, onPlayOnline }) {
               const name = playerName(game, s);
               return (
                 <div key={s} className="remote-strip standalone card">
-                  <span>{cards ? `${name}'s ${cards.length} cards are on their phone.` : `Deal, then scan ${name}'s cards.`}</span>
+                  <span>{cards ? tr("{name}'s {n} cards are on their phone.", { name, n: cards.length }) : tr("Deal, then scan {name}'s cards.", { name })}</span>
                   <button type="button" className="soft" onClick={() => openScan(s)}>
-                    <Icon name="camera" size={18} /> {cards ? 'Rescan' : 'Scan cards'}
+                    <Icon name="camera" size={18} /> {cards ? tr('Rescan') : tr('Scan cards')}
                   </button>
                 </div>
               );
@@ -333,15 +334,15 @@ function GameScreen({ store, toast, onNewGame, onJoin, onPlayOnline }) {
         )}
         {inPlay && (
           <button type="button" className="text-btn" onClick={() => setEditing(inPlay)}>
-            <Icon name="edit" size={16} /> Fix bids or books by hand
+            <Icon name="edit" size={16} /> {tr('Fix bids or books by hand')}
           </button>
         )}
 
-        {game.hands.some((h) => !h.inPlay) && <div className="section-title">Hands</div>}
+        {game.hands.some((h) => !h.inPlay) && <div className="section-title">{tr('Hands')}</div>}
         {!game.hands.length && (
           <>
-            <div className="section-title">No hands yet</div>
-            <p className="empty">Tap <b>New Hand</b> after the deal. Enter everyone's bids, then tap who wins each book.</p>
+            <div className="section-title">{tr('No hands yet')}</div>
+            <p className="empty">{tx("Tap {button} after the deal. Enter everyone's bids, then tap who wins each book.", { button: <b>{tr('New Hand')}</b> })}</p>
           </>
         )}
         <div className="stack">
@@ -353,56 +354,56 @@ function GameScreen({ store, toast, onNewGame, onJoin, onPlayOnline }) {
       </main>
 
       <div className="bottom-bar">
-        {!inPlay && <button type="button" className="primary big" onClick={newHandNow}>+ New Hand</button>}
-        {stage === 'bids' && <button type="button" className="primary big" onClick={startPlay}>Bids are in · Start playing</button>}
+        {!inPlay && <button type="button" className="primary big" onClick={newHandNow}>+ {tr('New Hand')}</button>}
+        {stage === 'bids' && <button type="button" className="primary big" onClick={startPlay}>{tr('Bids are in · Start playing')}</button>}
         {stage === 'play' && (
           <button type="button" className={`primary big${booksPlayed(inPlay) >= 13 ? ' go' : ''}`} onClick={scoreHand}>
-            ✓ Score Hand
+            ✓ {tr('Score Hand')}
           </button>
         )}
       </div>
 
       {editing && (
         <HandSheet game={game} hand={editing}
-          onSave={(h) => { store.saveHand(h); setEditing(null); toast.show('Hand saved', { onUndo: store.undo }); }}
-          onDelete={() => { store.deleteHand(editing.id); setEditing(null); toast.show('Hand deleted', { onUndo: store.undo }); }}
+          onSave={(h) => { store.saveHand(h); setEditing(null); toast.show(tr('Hand saved'), { onUndo: store.undo }); }}
+          onDelete={() => { store.deleteHand(editing.id); setEditing(null); toast.show(tr('Hand deleted'), { onUndo: store.undo }); }}
           onClose={() => setEditing(null)} />
       )}
       {sheet === 'menu' && (
-        <Sheet title="Menu" onClose={() => setSheet(null)} closeLabel="Close" short>
+        <Sheet title={tr('Menu')} onClose={() => setSheet(null)} closeLabel={tr('Close')} short>
           <div className="menu-list card group">
-            <button type="button" onClick={() => setSheet('invite')}><Icon name="users" /> Remote players, video &amp; TV</button>
-            <button type="button" onClick={() => { setSheet(null); onPlayOnline(); }}><Icon name="cards" /> Play Online</button>
-            <button type="button" onClick={() => setSheet('stats')}><Icon name="trophy" /> Stats &amp; records</button>
-            <button type="button" onClick={() => setSheet('rules')}><Icon name="edit" /> Scoring rules</button>
-            <button type="button" onClick={() => { setSheet(null); if (confirm('Start a new game? You can undo this.')) onNewGame(); }}>
-              <Icon name="flip" /> New game
+            <button type="button" onClick={() => setSheet('invite')}><Icon name="users" /> {tr('Remote players, video & TV')}</button>
+            <button type="button" onClick={() => { setSheet(null); onPlayOnline(); }}><Icon name="cards" /> {tr('Play Online')}</button>
+            <button type="button" onClick={() => setSheet('stats')}><Icon name="trophy" /> {tr('Stats & records')}</button>
+            <button type="button" onClick={() => setSheet('rules')}><Icon name="edit" /> {tr('Scoring rules')}</button>
+            <button type="button" onClick={() => { setSheet(null); if (confirm(tr('Start a new game? You can undo this.'))) onNewGame(); }}>
+              <Icon name="flip" /> {tr('New game')}
             </button>
             <button type="button" onClick={() => {
-              const code = prompt('Joining someone else\'s game? Type the 4-letter code they sent you.');
+              const code = prompt(tr("Joining someone else's game? Type the 4-letter code they sent you."));
               const clean = code?.toUpperCase().replace(/[^A-Z]/g, '');
               if (clean?.length === 4) onJoin(clean);
             }}>
-              <Icon name="phone" /> Join someone else's game
+              <Icon name="phone" /> {tr("Join someone else's game")}
             </button>
             <button type="button" onClick={() => {
               setSheet(null);
               saveGame({ id: `table-${game.id ?? Date.now()}`, kind: 'table', game, ...savedSummary(game) });
               store.end();
-              toast.show('Saved for later: it’s on the home screen');
+              toast.show(tr('Saved for later: it’s on the home screen'));
             }}>
-              <Icon name="home" /> Save for later
+              <Icon name="home" /> {tr('Save for later')}
             </button>
             <button type="button" onClick={() => {
-              if (!confirm('Close this game and go back to the home screen? Finished hands stay in your stats.')) return;
+              if (!confirm(tr('Close this game and go back to the home screen? Finished hands stay in your stats.'))) return;
               setSheet(null);
               store.end();
-              toast.show('Game closed', { onUndo: store.undo });
+              toast.show(tr('Game closed'), { onUndo: store.undo });
             }}>
-              <Icon name="home" /> Close game &amp; go home
+              <Icon name="home" /> {tr('Close game & go home')}
             </button>
             <a href="https://github.com/nforbes35/spades-score" target="_blank" rel="noreferrer">
-              <Icon name="share" /> Source code &amp; licenses
+              <Icon name="share" /> {tr('Source code & licenses')}
             </a>
           </div>
         </Sheet>
@@ -421,13 +422,13 @@ function GameScreen({ store, toast, onNewGame, onJoin, onPlayOnline }) {
           onClose={() => setSheet(null)}
           onSend={(cards) => {
             const name = playerName(game, scanSeat);
-            change(`Scanned ${name}'s cards`, (h) => ({ ...h, live: { ...liveOf(h), hands: { ...liveOf(h).hands, [scanSeat]: cards } } }));
+            change(langMsg("Scanned {name}'s cards", { name }), (h) => ({ ...h, live: { ...liveOf(h), hands: { ...liveOf(h).hands, [scanSeat]: cards } } }));
             setSheet(null);
-            toast.show(online(scanSeat) ? `Sent ${cards.length} cards to ${name}` : `Saved. ${name} sees them when they join.`);
+            toast.show(online(scanSeat) ? tr('Sent {n} cards to {name}', { n: cards.length, name }) : tr('Saved. {name} sees them when they join.', { name }));
           }} />
       )}
 
-      {remote && <CallBox call={call} videos={call.videos} emptyText="Waiting for others to turn on video…" />}
+      {remote && <CallBox call={call} videos={call.videos} emptyText={tr('Waiting for others to turn on video…')} />}
       {party && <Confetti />}
       {toast.node}
     </div>
@@ -438,9 +439,9 @@ function RulesSheet({ game, onSave, onClose }) {
   const [rules, setRules] = useState({ ...STANDARD_RULES, ...game.rules });
   const [target, setTarget] = useState(game.target);
   return (
-    <Sheet title="Scoring Rules" onClose={onClose} action={{ label: 'Save', onClick: () => onSave(rules, Math.max(1, target)) }}>
-      <div className="section-title">Final score</div>
-      <div className="card group"><NumberField label="Play to" value={target} onChange={setTarget} width={100} /></div>
+    <Sheet title={tr('Scoring Rules')} onClose={onClose} action={{ label: tr('Save'), onClick: () => onSave(rules, Math.max(1, target)) }}>
+      <div className="section-title">{tr('Final score')}</div>
+      <div className="card group"><NumberField label={tr('Play to')} value={target} onChange={setTarget} width={100} /></div>
       <RulesFields rules={rules} onChange={setRules} />
     </Sheet>
   );

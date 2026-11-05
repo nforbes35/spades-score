@@ -3,6 +3,7 @@
 // the connection details ("perfect negotiation", the device with the larger id being polite).
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { soundDevice } from './place.js';
+import { tr } from './i18n.js';
 
 const ICE = [{ urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] }];
 // Optional relay for networks that block direct connections (some cellular carriers).
@@ -138,7 +139,7 @@ export function useCall({ room, me, setMe, facing = 'user', receiveOnly = false 
         setLocal(stream);
         setCamOn(!audioOnly);
       } catch {
-        setError('The camera or microphone was blocked. Allow them in this browser’s settings, then try again.');
+        setError(tr('The camera or microphone was blocked. Allow them in this browser’s settings, then try again.'));
         return;
       }
     }

@@ -45,9 +45,11 @@ export function useGame() {
 
   /** Change the game, remembering the previous version under `label` so it can be undone. */
   const commit = useCallback((label, update) => {
+    // A label is English wording, or langMsg(...) when it has blanks; it's only put into words (tMsg) when shown.
     const now = Date.now();
-    const merge = last.current.label === label && now - last.current.at < MERGE_MS;
-    last.current = { label, at: now };
+    const tag = typeof label === 'string' ? label : JSON.stringify(label);
+    const merge = last.current.label === tag && now - last.current.at < MERGE_MS;
+    last.current = { label: tag, at: now };
     setState(({ game, past }) => {
       const next = update(game);
       if (next === game) return { game, past };

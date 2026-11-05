@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { contractBid, totalBooks, tableBid, isNil, nilLabel, scoreTeam, signed } from './lib/scoring.js';
 import { stageOf } from './lib/table.js';
+import { tr, tx } from './lib/i18n.js';
 import { NumberControl, NilPicker, Segmented, Sheet } from './components.jsx';
 
 const PHASES = [{ id: 'bids', label: 'Bids' }, { id: 'books', label: 'Books' }];
@@ -18,8 +19,8 @@ export default function HandSheet({ game, hand: initial, onSave, onDelete, onClo
 
   const setPlayer = (t, p, change) => setHand((h) => ({
     ...h,
-    teams: h.teams.map((tr, ti) => (ti !== t ? tr : {
-      ...tr, players: tr.players.map((pl, pi) => (pi === p ? { ...pl, ...change } : pl)),
+    teams: h.teams.map((round, ti) => (ti !== t ? round : {
+      ...round, players: round.players.map((pl, pi) => (pi === p ? { ...pl, ...change } : pl)),
     })),
   }));
 
@@ -28,23 +29,23 @@ export default function HandSheet({ game, hand: initial, onSave, onDelete, onClo
   const tableBooks = hand.teams.reduce((s, t) => s + totalBooks(t), 0);
 
   return (
-    <Sheet title={`Hand ${number}`} onClose={onClose} action={{ label: 'Save', onClick: () => onSave(hand) }}>
+    <Sheet title={tr('Hand {n}', { n: number })} onClose={onClose} action={{ label: tr('Save'), onClick: () => onSave(hand) }}>
       <div className="hand-banner">
-        <Segmented options={PHASES} value={phase} onChange={setPhase} label="Step" />
+        <Segmented options={PHASES.map((x) => ({ ...x, label: tr(x.label) }))} value={phase} onChange={setPhase} label={tr('Step')} />
         {phase === 'bids' ? (
           <>
             <div className={`big-count${left < 0 ? ' neg' : ''}`}>
-              <strong>{Math.abs(left)}</strong> {left >= 0 ? 'left on the table' : 'over — overbid!'}
+              <strong>{Math.abs(left)}</strong> {left >= 0 ? tr('left on the table') : tr('over — overbid!')}
             </div>
-            <TeamTotals game={game} text={(t) => `bid ${contractBid(hand.teams[t])}`} />
+            <TeamTotals game={game} text={(t) => tr('bid {n}', { n: contractBid(hand.teams[t]) })} />
           </>
         ) : (
           <>
             <div className="big-count">
-              <strong>{tableBooks}</strong> of 13 books
+              {tx('{n} of 13 books', { n: <strong>{tableBooks}</strong> })}
               <span className={`check ${tableBooks === 13 ? 'ok' : 'warn'}`}>{tableBooks === 13 ? '✓' : '!'}</span>
             </div>
-            <TeamTotals game={game} text={(t) => `bid ${contractBid(hand.teams[t])}, took ${totalBooks(hand.teams[t])}`} />
+            <TeamTotals game={game} text={(t) => tr('bid {bid}, took {took}', { bid: contractBid(hand.teams[t]), took: totalBooks(hand.teams[t]) })} />
           </>
         )}
       </div>
@@ -54,8 +55,8 @@ export default function HandSheet({ game, hand: initial, onSave, onDelete, onClo
         : <BooksSection key={t} team={game.teams[t]} entry={hand.teams[t]} rules={game.rules} setPlayer={(p, c) => setPlayer(t, p, c)} />)}
 
       {onDelete && (
-        <button type="button" className="danger-link" onClick={() => { if (confirm(`Delete hand ${number}?`)) onDelete(); }}>
-          Delete this hand
+        <button type="button" className="danger-link" onClick={() => { if (confirm(tr('Delete hand {n}?', { n: number }))) onDelete(); }}>
+          {tr('Delete this hand')}
         </button>
       )}
     </Sheet>
@@ -73,7 +74,7 @@ function TeamTotals({ game, text }) {
 function BidsSection({ team, entry, setPlayer }) {
   return (
     <>
-      <div className="section-title">{team.name} — bid {contractBid(entry)}</div>
+      <div className="section-title">{team.name} — {tr('bid {n}', { n: contractBid(entry) })}</div>
       <div className="card group">
         {entry.players.map((pl, p) => (
           <div key={p} className="player">
@@ -81,9 +82,9 @@ function BidsSection({ team, entry, setPlayer }) {
               <span className="player-name">{team.players[p]}</span>
               {isNil(pl.call)
                 ? <span className="nil-tag">{nilLabel(pl.call)}</span>
-                : <NumberControl label={`${team.players[p]} bid`} value={pl.bid} onChange={(bid) => setPlayer(p, { bid })} />}
+                : <NumberControl label={tr('{name} bid', { name: team.players[p] })} value={pl.bid} onChange={(bid) => setPlayer(p, { bid })} />}
             </div>
-            <NilPicker label={`${team.players[p]} nil`} value={pl.call} onChange={(call) => setPlayer(p, { call })} />
+            <NilPicker label={tr('{name} nil', { name: team.players[p] })} value={pl.call} onChange={(call) => setPlayer(p, { call })} />
           </div>
         ))}
       </div>
@@ -102,15 +103,15 @@ function BooksSection({ team, entry, rules, setPlayer }) {
             <div>
               <div className="player-name">{team.players[p]}</div>
               <div className={`small bold ${isNil(pl.call) ? 'nil-text' : 'muted'}`}>
-                {isNil(pl.call) ? nilLabel(pl.call) : `Bid ${pl.bid}`}
+                {isNil(pl.call) ? nilLabel(pl.call) : tr('Bid {n}', { n: pl.bid })}
               </div>
             </div>
-            <NumberControl label={`${team.players[p]} books`} value={pl.books} onChange={(books) => setPlayer(p, { books })} />
+            <NumberControl label={tr('{name} books', { name: team.players[p] })} value={pl.books} onChange={(books) => setPlayer(p, { books })} />
           </div>
         ))}
         <div className="player">
           <div className="row between">
-            <span className="bold">Team: bid {result.contractBid}, took {result.contractBooks}</span>
+            <span className="bold">{tr('Team: bid {bid}, took {took}', { bid: result.contractBid, took: result.contractBooks })}</span>
             <span className={`team-total ${result.total < 0 ? 'neg' : 'pos'}`}>{signed(result.total)}</span>
           </div>
           {result.lines.map((line) => <div key={line} className="small muted">{line}</div>)}

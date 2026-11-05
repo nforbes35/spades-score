@@ -7,6 +7,7 @@ import { useCall } from './lib/call.js';
 import { useWakeLock } from './lib/fx.js';
 import { Icon, PlayingCard, BagMeter } from './components.jsx';
 import { VideoTile, useTvStart, SoundPrompt } from './Video.jsx';
+import { tr, getLang, setLang } from './lib/i18n.js';
 
 /**
  * TV view: open on a smart TV's browser, a laptop on HDMI, or an iPad mirrored to an Apple TV.
@@ -41,8 +42,8 @@ export default function TvApp({ code, onLeave }) {
         </div>
         <div className="tv-center">
           {table
-            ? <VideoTile stream={table.stream} muted={!call.speakerOn} fit="contain" label="The table" className="tv-table" />
-            : <div className="tv-waiting">{host ? 'Waiting for the table’s camera…' : `Waiting for the table to open game ${code}…`}</div>}
+            ? <VideoTile stream={table.stream} muted={!call.speakerOn} fit="contain" label={tr('The table')} className="tv-table" />
+            : <div className="tv-waiting">{host ? tr('Waiting for the table’s camera…') : tr('Waiting for the table to open game {code}…', { code })}</div>}
         </div>
         <div className="tv-side">
           {right.map((v) => <Face key={v.peer.id} v={v} muted={!call.speakerOn} />)}
@@ -50,14 +51,15 @@ export default function TvApp({ code, onLeave }) {
       </div>
       <div className="tv-corner">
         <span className={`tv-dot${host ? ' on' : ''}`} />
-        {call.soundBy ? `Sound: ${call.soundBy.name || 'phone'}` : 'Sound on this screen'}
-        <button type="button" onClick={call.toggleSpeaker} aria-label={call.speakerOn ? 'Turn sound off' : 'Turn sound on'}>
+        {call.soundBy ? tr('Sound: {name}', { name: call.soundBy.name || tr('phone') }) : tr('Sound on this screen')}
+        <button type="button" onClick={() => setLang(getLang() === 'es' ? 'en' : 'es')} aria-label="Language / Idioma">{getLang() === 'es' ? 'EN' : 'ES'}</button>
+        <button type="button" onClick={call.toggleSpeaker} aria-label={call.speakerOn ? tr('Turn sound off') : tr('Turn sound on')}>
           <Icon name={call.speakerOn ? 'speaker' : 'speakerOff'} size={18} />
         </button>
-        <button type="button" onClick={() => document.documentElement.requestFullscreen?.().catch(() => {})} aria-label="Full screen">
+        <button type="button" onClick={() => document.documentElement.requestFullscreen?.().catch(() => {})} aria-label={tr('Full screen')}>
           <Icon name="expand" size={18} />
         </button>
-        <button type="button" onClick={() => { if (confirm('Close the TV view?')) onLeave(); }} aria-label="Close TV view">
+        <button type="button" onClick={() => { if (confirm(tr('Close the TV view?'))) onLeave(); }} aria-label={tr('Close TV view')}>
           <Icon name="close" size={18} />
         </button>
       </div>
@@ -67,7 +69,7 @@ export default function TvApp({ code, onLeave }) {
 }
 
 function Face({ v, muted }) {
-  const seatName = v.peer.role === 'player' ? v.peer.name : v.peer.name || 'Guest';
+  const seatName = v.peer.role === 'player' ? v.peer.name : v.peer.name || tr('Guest');
   return <VideoTile stream={v.stream} muted={muted} label={seatName} micOff={!v.peer.mic} className="tv-face" />;
 }
 
@@ -116,15 +118,15 @@ function TvScoreboard({ game }) {
                 <span className="tv-seat-name">{playerName(game, s)}</span>
                 <span className="tv-seat-num">
                   {stage === 'bids'
-                    ? (isNil(p.call) ? nilLabel(p.call) : `bid ${p.bid}`)
-                    : <>{p.books}<small>/{isNil(p.call) ? nilLabel(p.call) : p.bid}</small></>}
+                    ? (isNil(p.call) ? tr(nilLabel(p.call)) : tr('bid {n}', { n: p.bid }))
+                    : <>{p.books}<small>/{isNil(p.call) ? tr(nilLabel(p.call)) : p.bid}</small></>}
                 </span>
-                {leader === s && <span className="tv-lead">leads</span>}
+                {leader === s && <span className="tv-lead">{tr('leads')}</span>}
               </div>
             );
           })}
           <div className="tv-book">
-            {stage === 'bids' ? 'Bidding' : booksPlayed(hand) >= 13 ? 'All 13 played' : `Book ${booksPlayed(hand) + 1} of 13`}
+            {stage === 'bids' ? tr('Bidding') : booksPlayed(hand) >= 13 ? tr('All 13 played') : tr('Book {n} of 13', { n: booksPlayed(hand) + 1 })}
             {played.length > 0 && (
               <span className="tv-played">
                 {played.map(([seat, card]) => (
@@ -135,7 +137,7 @@ function TvScoreboard({ game }) {
           </div>
         </div>
       ) : (
-        <div className="tv-book">{win != null ? `${game.teams[win].name} win!` : `Playing to ${game.target}`}</div>
+        <div className="tv-book">{win != null ? tr('{name} win!', { name: game.teams[win].name }) : tr('Playing to {target}', { target: game.target })}</div>
       )}
     </div>
   );

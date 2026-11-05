@@ -1,3 +1,4 @@
+import { LANGS, setLang, useLang, tr, tx } from './lib/i18n.js';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { NIL_CALLS } from './lib/scoring.js';
 import { parseCard, cardName } from './lib/cards.js';
@@ -11,13 +12,13 @@ export function NumberControl({ label, value, onChange, min = 0, max = 13, compa
   for (let n = min; n <= max; n++) options.push(n);
   return (
     <div className={`number-control${compact ? ' compact' : ''}`}>
-      <button type="button" className="step minus" aria-label={`${label} minus`}
+      <button type="button" className="step minus" aria-label={tr('{label} minus', { label })}
         disabled={value <= min} onClick={() => onChange(Math.max(min, value - 1))}>−</button>
       <select className="number" aria-label={label} value={value}
         onChange={(e) => onChange(Number(e.target.value))}>
         {options.map((n) => <option key={n} value={n}>{n}</option>)}
       </select>
-      <button type="button" className="step plus" aria-label={`${label} plus`}
+      <button type="button" className="step plus" aria-label={tr('{label} plus', { label })}
         disabled={value >= max} onClick={() => onChange(Math.min(max, value + 1))}>+</button>
     </div>
   );
@@ -35,11 +36,11 @@ export function Segmented({ options, value, onChange, label, small }) {
 }
 
 export const NilPicker = ({ value, onChange, label, small }) => (
-  <Segmented options={NIL_CALLS} value={value} onChange={onChange} label={label} small={small} />
+  <Segmented options={NIL_CALLS.map((c) => ({ ...c, label: tr(c.label) }))} value={value} onChange={onChange} label={label} small={small} />
 );
 
 /** Full-screen sheet that slides up, with Cancel / action buttons on top. */
-export function Sheet({ title, onClose, action, children, closeLabel = 'Cancel', short = false }) {
+export function Sheet({ title, onClose, action, children, closeLabel = tr('Cancel'), short = false }) {
   useEffect(() => {
     document.body.classList.add('sheet-open');
     return () => document.body.classList.remove('sheet-open');
@@ -84,28 +85,28 @@ export function RulesFields({ rules, onChange }) {
   const set = (key) => (v) => onChange({ ...rules, [key]: v });
   return (
     <>
-      <div className="section-title">Scoring</div>
+      <div className="section-title">{tr('Scoring')}</div>
       <div className="card group">
-        <NumberField label="Nil worth" value={rules.nilValue} onChange={set('nilValue')} />
-        <NumberField label="Blind nil worth" value={rules.blindNilValue} onChange={set('blindNilValue')} />
-        <NumberField label="Big bid bonus" value={rules.bigBidBonus} onChange={set('bigBidBonus')} />
-        <NumberField label="Big bid is this many books or more" value={rules.bigBidThreshold} onChange={set('bigBidThreshold')} width={70} />
-        <Toggle label="Nil player's books help partner's bid" checked={rules.nilBooksCountTowardBid} onChange={set('nilBooksCountTowardBid')} />
-        <Toggle label="Lose at a negative score" checked={Boolean(rules.loseEnabled)} onChange={set('loseEnabled')} />
+        <NumberField label={tr('Nil worth')} value={rules.nilValue} onChange={set('nilValue')} />
+        <NumberField label={tr('Blind nil worth')} value={rules.blindNilValue} onChange={set('blindNilValue')} />
+        <NumberField label={tr('Big bid bonus')} value={rules.bigBidBonus} onChange={set('bigBidBonus')} />
+        <NumberField label={tr('Big bid is this many books or more')} value={rules.bigBidThreshold} onChange={set('bigBidThreshold')} width={70} />
+        <Toggle label={tr("Nil player's books help partner's bid")} checked={rules.nilBooksCountTowardBid} onChange={set('nilBooksCountTowardBid')} />
+        <Toggle label={tr('Lose at a negative score')} checked={Boolean(rules.loseEnabled)} onChange={set('loseEnabled')} />
         {rules.loseEnabled && (
-          <NumberField label="A team loses at" value={rules.loseScore ?? -200}
+          <NumberField label={tr('A team loses at')} value={rules.loseScore ?? -200}
             onChange={(v) => set('loseScore')(-Math.abs(v))} />
         )}
       </div>
-      <p className="footnote">Missing a nil or blind nil costs the same amount. A made bid is 10 per book bid plus 1 per extra book.{rules.loseEnabled ? ` A team that falls to ${-Math.abs(rules.loseScore ?? 200)} or below loses.` : ''}</p>
+      <p className="footnote">{tr('Missing a nil or blind nil costs the same amount. A made bid is 10 per book bid plus 1 per extra book.')}{rules.loseEnabled ? ` ${tr('A team that falls to {score} or below loses.', { score: -Math.abs(rules.loseScore ?? 200) })}` : ''}</p>
 
-      <div className="section-title">Bags (extra books)</div>
+      <div className="section-title">{tr('Bags (extra books)')}</div>
       <div className="card group">
-        <Toggle label="Bag penalty" checked={rules.bagsEnabled} onChange={set('bagsEnabled')} />
+        <Toggle label={tr('Bag penalty')} checked={rules.bagsEnabled} onChange={set('bagsEnabled')} />
         {rules.bagsEnabled && (
           <>
-            <NumberField label="Every this many bags" value={rules.bagsLimit} onChange={set('bagsLimit')} width={70} />
-            <NumberField label="Penalty" value={rules.bagsPenalty} onChange={set('bagsPenalty')} />
+            <NumberField label={tr('Every this many bags')} value={rules.bagsLimit} onChange={set('bagsLimit')} width={70} />
+            <NumberField label={tr('Penalty')} value={rules.bagsPenalty} onChange={set('bagsPenalty')} />
           </>
         )}
       </div>
@@ -140,6 +141,16 @@ const ICONS = {
   users: <><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></>,
   expand: <><path d="M8 3H5a2 2 0 0 0-2 2v3" /><path d="M21 8V5a2 2 0 0 0-2-2h-3" /><path d="M3 16v3a2 2 0 0 0 2 2h3" /><path d="M16 21h3a2 2 0 0 0 2-2v-3" /></>,
 };
+
+/** English / Español, for this device. */
+export function LangToggle() {
+  const lang = useLang();
+  return (
+    <div className="lang-toggle" role="group" aria-label="Language / Idioma">
+      {LANGS.map((l) => <button key={l.id} type="button" className={lang === l.id ? 'on' : ''} aria-pressed={lang === l.id} onClick={() => setLang(l.id)}>{l.label}</button>)}
+    </div>
+  );
+}
 
 export function Icon({ name, size = 22 }) {
   return (
@@ -411,7 +422,7 @@ export function FannedHand({ cards, selected, onSelect, disabled, dim = [], deal
       }}>
       {swipeable && touch?.swiping && (
         <div className={`play-line${pastLine ? ' ready' : ''}`} style={{ top: 18 - playDist + cardH * 0.25 }}>
-          {pastLine ? (canPlay(touch.card) ? 'Let go to play' : 'Can’t play that card') : 'Swipe up to play'}
+          {pastLine ? (canPlay(touch.card) ? tr('Let go to play') : tr('Can’t play that card')) : tr('Swipe up to play')}
         </div>
       )}
       {cards.map((c, i) => {
@@ -482,7 +493,7 @@ export function useToast() {
       <span>{toast.text}</span>
       {toast.onUndo && (
         <button type="button" onClick={() => { toast.onUndo(); setToast(null); }}>
-          <Icon name="undo" size={18} /> Undo
+          <Icon name="undo" size={18} /> {tr('Undo')}
         </button>
       )}
     </div>
@@ -518,7 +529,7 @@ export function BagMeter({ bags, limit = 10 }) {
   const n = Math.max(1, Math.min(limit || 10, 15));
   const level = bags >= n - 1 ? ' bags-danger' : bags >= n - 3 ? ' bags-warn' : '';
   return (
-    <span className={`bag-meter${level}`} aria-label={`${bags} of ${n} bags`}>
+    <span className={`bag-meter${level}`} aria-label={tr('{bags} of {n} bags', { bags, n })}>
       <span className="bag-dots" aria-hidden="true">{Array.from({ length: n }, (_, i) => <i key={i} className={i < bags ? 'on' : ''} />)}</span>
     </span>
   );

@@ -1,5 +1,6 @@
 // Season and holiday themes, picked by the date like Sunday Table does: a real photo on the table, the
 // card backs and the home screen, a matching felt colour, an ornament and a well-known verse that changes daily (KJV, public domain).
+// Names and verses stay English here: tr() shows them in Spanish where they're drawn (Reina-Valera 1909 in src/i18n/es-home.js).
 // Photos are from Unsplash (Unsplash License), saved in public/decks so they work offline.
 
 const pad = (n) => String(n).padStart(2, '0');

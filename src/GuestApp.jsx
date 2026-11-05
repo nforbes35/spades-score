@@ -5,6 +5,7 @@ import { useRoom } from './lib/room.js';
 import { useDevice } from './lib/device.js';
 import { useCall } from './lib/call.js';
 import { useWakeLock } from './lib/fx.js';
+import { tr } from './lib/i18n.js';
 import { Icon, StatusDot } from './components.jsx';
 import { VideoTile, CallButtons, SoundNote } from './Video.jsx';
 import { ScoreCard } from './Scoreboard.jsx';
@@ -39,9 +40,9 @@ export default function GuestApp({ code, onLeave }) {
           <div className="brand">
             <span className="brand-mark">♠</span>
             <h1>Family Spades</h1>
-            <span className="mode-chip"><Icon name="video" size={13} /> Video</span>
+            <span className="mode-chip"><Icon name="video" size={13} /> {tr('Video')}</span>
           </div>
-          <button type="button" className="icon-btn" onClick={() => { if (confirm('Leave this game?')) { call.leave(); onLeave(); } }}>Leave</button>
+          <button type="button" className="icon-btn" onClick={() => { if (confirm(tr('Leave this game?'))) { call.leave(); onLeave(); } }}>{tr('Leave')}</button>
         </div>
         <div className="wrap">
           {game && (
@@ -53,7 +54,7 @@ export default function GuestApp({ code, onLeave }) {
             </div>
           )}
           <div className="target">
-            <StatusDot on={Boolean(host)} label={host ? 'Connected to the table' : room.status === 'error' ? 'Connection problem' : 'Connecting…'} />
+            <StatusDot on={Boolean(host)} label={host ? tr('Connected to the table') : room.status === 'error' ? tr('Connection problem') : tr('Connecting…')} />
           </div>
         </div>
       </header>
@@ -61,27 +62,26 @@ export default function GuestApp({ code, onLeave }) {
       <main className="wrap">
         {!named ? (
           <form className="card waiting-card" onSubmit={(e) => { e.preventDefault(); if (name.trim()) { write(NAME_KEY, name.trim()); setNamed(true); } }}>
-            <h2>What’s your name?</h2>
-            <p className="muted">It shows under your video.</p>
-            <input className="code-input name-input" value={name} onChange={(e) => setName(e.target.value)} placeholder="Name" autoFocus />
-            <button type="submit" className="primary big" disabled={!name.trim()}>Continue</button>
+            <h2>{tr('What’s your name?')}</h2>
+            <p className="muted">{tr('It shows under your video.')}</p>
+            <input className="code-input name-input" value={name} onChange={(e) => setName(e.target.value)} placeholder={tr('Name')} autoFocus />
+            <button type="submit" className="primary big" disabled={!name.trim()}>{tr('Continue')}</button>
           </form>
         ) : !call.joined ? (
           <div className="card waiting-card">
             <Icon name="video" size={34} />
-            <h2>Join the video</h2>
+            <h2>{tr('Join the video')}</h2>
             <p className="muted">
-              Point this camera at your face. At the table, it adds you around the table picture on the remote
-              player’s TV.
+              {tr('Point this camera at your face. At the table, it adds you around the table picture on the remote player’s TV.')}
             </p>
-            <button type="button" className="primary big" onClick={call.join}>Turn on camera</button>
+            <button type="button" className="primary big" onClick={call.join}>{tr('Turn on camera')}</button>
             {call.error && <p className="scan-msg">{call.error}</p>}
           </div>
         ) : (
           <>
             <div className="guest-grid">
-              <VideoTile stream={call.local} muted mirrored={call.mirrored} label={`${device.name} (you)`} micOff={!call.micOn} className="guest-self" />
-              {table && <VideoTile stream={table.stream} muted={!call.speakerOn} label="The table" className="guest-tile" />}
+              <VideoTile stream={call.local} muted mirrored={call.mirrored} label={tr('{name} (you)', { name: device.name })} micOff={!call.micOn} className="guest-self" />
+              {table && <VideoTile stream={table.stream} muted={!call.speakerOn} label={tr('The table')} className="guest-tile" />}
               {others.map((v) => (
                 <VideoTile key={v.peer.id} stream={v.stream} muted={!call.speakerOn} label={v.peer.name} micOff={!v.peer.mic} className="guest-tile" />
               ))}

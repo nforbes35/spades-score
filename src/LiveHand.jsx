@@ -1,4 +1,5 @@
 import { contractBid, isNil, nilLabel, tableBid } from './lib/scoring.js';
+import { tr, tx, langMsg } from './lib/i18n.js';
 import { SEATS, teamOf, playerName, seatEntry, liveOf, leaderOf, booksPlayed, updateSeat, seatProgress, remainingCards } from './lib/table.js';
 import { NumberControl, NilPicker, PlayingCard, Icon, CardText } from './components.jsx';
 
@@ -10,7 +11,7 @@ export function LeftOnTable({ hand }) {
   return (
     <div className={`left-count${left < 0 ? ' neg' : ''}`}>
       <strong>{Math.abs(left)}</strong>
-      <span>{left >= 0 ? 'left on the table' : 'over — overbid!'}</span>
+      <span>{left >= 0 ? tr('left on the table') : tr('over — overbid!')}</span>
     </div>
   );
 }
@@ -18,8 +19,8 @@ export function LeftOnTable({ hand }) {
 function SeatBadges({ hand, s, remote }) {
   return (
     <>
-      {hand.dealer === s && <span className="tag">deals</span>}
-      {remote && <span className="tag remote"><Icon name="phone" size={12} /> remote</span>}
+      {hand.dealer === s && <span className="tag">{tr('deals')}</span>}
+      {remote && <span className="tag remote"><Icon name="phone" size={12} /> {tr('remote')}</span>}
     </>
   );
 }
@@ -31,16 +32,16 @@ export function BidsPanel({ game, hand, number, onChange, remoteSeats = [], onli
     <section className="live card">
       <div className="live-head">
         <div>
-          <div className="eyebrow">Hand {number} · Bidding</div>
+          <div className="eyebrow">{tr('Hand {n} · Bidding', { n: number })}</div>
           <LeftOnTable hand={hand} />
         </div>
-        <button type="button" className="chip" onClick={cycleDealer} title="Change who deals">
-          {playerName(game, hand.dealer ?? 0)} deals
+        <button type="button" className="chip" onClick={cycleDealer} title={tr('Change who deals')}>
+          {tr('{name} deals', { name: playerName(game, hand.dealer ?? 0) })}
         </button>
       </div>
       <div className="team-bids">
         {[0, 1].map((t) => (
-          <span key={t} className={`team-pill t${t}`}>{game.teams[t].name}: bid {contractBid(hand.teams[t])}</span>
+          <span key={t} className={`team-pill t${t}`}>{game.teams[t].name}: {tr('bid {n}', { n: contractBid(hand.teams[t]) })}</span>
         ))}
       </div>
       <div className="bid-rows">
@@ -56,13 +57,13 @@ export function BidsPanel({ game, hand, number, onChange, remoteSeats = [], onli
                 </div>
                 {isNil(p.call)
                   ? <span className="nil-tag">{nilLabel(p.call)}</span>
-                  : <NumberControl compact label={`${name} bid`} value={p.bid}
-                      onChange={(bid) => onChange(`${name}'s bid`, (h) => updateSeat(h, s, { bid }))} />}
+                  : <NumberControl compact label={tr('{name} bid', { name })} value={p.bid}
+                      onChange={(bid) => onChange(langMsg("{name}'s bid", { name }), (h) => updateSeat(h, s, { bid }))} />}
               </div>
-              <NilPicker small label={`${name} nil`} value={p.call}
-                onChange={(call) => onChange(`${name}'s nil`, (h) => updateSeat(h, s, { call }))} />
+              <NilPicker small label={tr('{name} nil', { name })} value={p.call}
+                onChange={(call) => onChange(langMsg("{name}'s nil", { name }), (h) => updateSeat(h, s, { call }))} />
               {remoteSeats.includes(s) && (
-                <div className="hint">{online(s) ? `${name} can bid from their phone too.` : `Waiting for ${name} to connect.`}</div>
+                <div className="hint">{online(s) ? tr('{name} can bid from their phone too.', { name }) : tr('Waiting for {name} to connect.', { name })}</div>
               )}
             </div>
           );
@@ -88,7 +89,7 @@ export function TableView({ game, hand, onAward, remoteSeats = [], mySeat, cente
       {SEATS.map((_, s) => {
         const p = seatEntry(hand, s);
         const prog = seatProgress(hand, s);
-        const name = s === mySeat ? 'You' : playerName(game, s);
+        const name = s === mySeat ? tr('You') : playerName(game, s);
         const content = (
           <>
             <div className="tile-name">
@@ -99,23 +100,23 @@ export function TableView({ game, hand, onAward, remoteSeats = [], mySeat, cente
             <div className={`tile-sub${prog.good ? ' good' : ''}${prog.bad ? ' bad' : ''}`}>
               {isNil(p.call) ? `${nilLabel(p.call)} · ${prog.text}` : prog.text}{prog.good ? ' ✓' : ''}
             </div>
-            {!done && leader === s && <span className="lead-tag">leads</span>}
+            {!done && leader === s && <span className="lead-tag">{tr('leads')}</span>}
           </>
         );
         const cls = `seat-tile t${teamOf(s)} ${AREAS[s]}${!done && leader === s ? ' leading' : ''}${s === mySeat ? ' me' : ''}`;
         return onAward
           ? <button key={s} type="button" className={cls} disabled={done} onClick={() => onAward(s)}
-              aria-label={`Give book to ${playerName(game, s)}`}>{content}</button>
+              aria-label={tr('Give book to {name}', { name: playerName(game, s) })}>{content}</button>
           : <div key={s} className={cls}>{content}</div>;
       })}
       <div className="table-center">
-        <div className="book-count">{done ? 'All 13 books' : `Book ${played + 1}`}<small>{done ? 'played' : 'of 13'}</small></div>
+        <div className="book-count">{done ? tr('All 13 books') : tr('Book {n}', { n: played + 1 })}<small>{done ? tr('played') : tr('of 13')}</small></div>
         {shown.length > 0 && (
           <div className="played-cards">
             {shown.map(([seat, card]) => (
               <div key={seat} className="played-card">
                 <PlayingCard code={card} size="sm" />
-                <span>{Number(seat) === mySeat ? 'You' : playerName(game, Number(seat))}</span>
+                <span>{Number(seat) === mySeat ? tr('You') : playerName(game, Number(seat))}</span>
               </div>
             ))}
           </div>
@@ -133,10 +134,10 @@ export function PlayPanel({ game, hand, number, onAward, remoteSeats = [], onlin
     <section className="live card">
       <div className="live-head">
         <div>
-          <div className="eyebrow">Hand {number} · Playing</div>
-          <div className="live-title">Tap who won each book</div>
+          <div className="eyebrow">{tr('Hand {n} · Playing', { n: number })}</div>
+          <div className="live-title">{tr('Tap who won each book')}</div>
         </div>
-        <span className="chip quiet">{playerName(game, hand.dealer ?? 0)} dealt</span>
+        <span className="chip quiet">{tr('{name} dealt', { name: playerName(game, hand.dealer ?? 0) })}</span>
       </div>
       <TableView game={game} hand={hand} onAward={onAward} remoteSeats={remoteSeats} />
       {remoteSeats.map((seat) => {
@@ -146,11 +147,13 @@ export function PlayPanel({ game, hand, number, onAward, remoteSeats = [], onlin
         return (
           <div key={seat} className="remote-strip">
             {card
-              ? <span className="remote-played"><b>{name}</b> played <span className="big-card-text"><CardText code={card} /></span>. Play it for them.</span>
-              : <span>{left ? `${name} has ${left.length} card${left.length === 1 ? '' : 's'} left.` : `${name}'s cards aren't scanned yet.`}</span>}
+              ? <span className="remote-played">{tx('{name} played {card}. Play it for them.', { name: <b>{name}</b>, card: <span className="big-card-text"><CardText code={card} /></span> })}</span>
+              : <span>{left
+                ? (left.length === 1 ? tr('{name} has {n} card left.', { name, n: left.length }) : tr('{name} has {n} cards left.', { name, n: left.length }))
+                : tr("{name}'s cards aren't scanned yet.", { name })}</span>}
             <div className="row">
-              {!left && <button type="button" className="soft" onClick={() => onScan(seat)}><Icon name="camera" size={18} /> Scan cards</button>}
-              <button type="button" className="soft" disabled={!online(seat)} onClick={() => onPing(seat)}><Icon name="bell" size={18} /> Your turn</button>
+              {!left && <button type="button" className="soft" onClick={() => onScan(seat)}><Icon name="camera" size={18} /> {tr('Scan cards')}</button>}
+              <button type="button" className="soft" disabled={!online(seat)} onClick={() => onPing(seat)}><Icon name="bell" size={18} /> {tr('Your turn')}</button>
             </div>
           </div>
         );

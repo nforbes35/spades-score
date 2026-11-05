@@ -7,6 +7,8 @@ import { read, write, tabRead, tabWrite } from '../lib/store.js';
 import { useRoom, joinLink } from '../lib/room.js';
 import { useDevice } from '../lib/device.js';
 import { useKeys, seal, unseal } from '../lib/secret.js';
+import { tr, tx, tMsg, langMsg, getLang, setLang, LANGS } from '../lib/i18n.js';
+import { guessLang, translateText } from '../lib/translate.js';
 import { useWakeLock, buzz, chime, tileClack, tileRattle, knockSound, porchSounds, sayLine, setSoundSetting, useSoundSettings } from '../lib/fx.js';
 import { useCall } from '../lib/call.js';
 import { useTurnAlerts, sendTurnAlert, alertPermission } from '../lib/push.js';
@@ -14,6 +16,7 @@ import { saveGame, forgetSaved } from '../lib/saved.js';
 import { nameKey } from '../lib/stats.js';
 import { VideoTile, CallButtons, SoundNote } from '../Video.jsx';
 import DeckPicker from '../DeckPicker.jsx';
+import { RulesSheet } from '../learn/Learn.jsx';
 import { ConnectionBanner, ReactSheet, ReactionsLayer, TableMenu, SpeakingRings, MyCallButtons, useTvFit, TvControls, TvInviteCard } from '../OnlineApp.jsx';
 import { useDeck } from '../lib/decks.js';
 import { pickBotNames } from '../lib/bots.js';
@@ -23,7 +26,7 @@ import { Icon, Segmented, Toggle, useToast, Confetti, Sheet, useTableLayout } fr
 import Domino from './Domino.jsx';
 import { fitBoard } from './board.js';
 import { AIM, aimPages, swipeDirection, handTileWidth } from './handmode.js';
-import { calloutFor, momentFor, recordDomGame, loadDomLog, mergeIntoDomLog, rivalryLines, validClip } from './fun.js';
+import { calloutFor, momentFor, recordDomGame, loadDomLog, mergeIntoDomLog, rivalryLines, validClip, talkFor } from './fun.js';
 import { snapReactions, savePhoto } from './album.js';
 import { DomWash, DomMoment, DomCallout, DomTalk, TalkSheet, AlbumSheet } from './Fun.jsx';
 import {
@@ -62,14 +65,14 @@ export default function DominoOnline({ code, isHost, tv = false, onLeave }) {
   if (!named) {
     return (
       <div className="app">
-        <header className="hero"><div className="wrap hero-row"><div className="brand"><span className="brand-mark">🁫</span><h1>Dominoes</h1></div></div></header>
+        <header className="hero"><div className="wrap hero-row"><div className="brand"><span className="brand-mark">🁫</span><h1>{tr('Dominoes')}</h1></div></div></header>
         <main className="wrap">
           <form className="card waiting-card profile-card" onSubmit={(e) => { e.preventDefault(); if (name.trim()) { saveName(name.trim()); setNamed(true); } }}>
-            <h2>Who’s playing?</h2>
-            <p className="muted">Everyone at the table sees your name and icon.</p>
+            <h2>{tr('Who’s playing?')}</h2>
+            <p className="muted">{tr('Everyone at the table sees your name and icon.')}</p>
             <ProfileEditor name={name} avatar={avatar} onName={setName} onAvatar={(v) => { setAvatar(v); saveAvatar(v); }} autoFocus={!name} />
-            <button type="submit" className="primary big go" disabled={!name.trim()}>Continue</button>
-            <button type="button" className="text-btn" onClick={onLeave}>Cancel</button>
+            <button type="submit" className="primary big go" disabled={!name.trim()}>{tr('Continue')}</button>
+            <button type="button" className="text-btn" onClick={onLeave}>{tr('Cancel')}</button>
           </form>
         </main>
       </div>
@@ -114,17 +117,28 @@ function DominoRoom({ code, isHost = false, tv = false, name, avatar, onLeave, o
   const [talk, setTalk] = useState(null);
   const talkTimer = useRef(null);
   const lastTalk = useRef(0);
-  const showTalk = (x) => {
-    setTalk(x);
-    sayLine(x.text, x.clip);
-    clearTimeout(talkTimer.current);
-    talkTimer.current = setTimeout(() => setTalk(null), TALK_MS);
+  const talkSeq = useRef(0);
+  const showTalk = async (x) => {
+    const seq = ++talkSeq.current;
+    const myLang = getLang();
+    const shown = talkFor(x, myLang, guessLang);
+    const hold = () => { clearTimeout(talkTimer.current); talkTimer.current = setTimeout(() => setTalk(null), TALK_MS); };
+    setTalk({ name: x.name, text: shown.text, original: shown.original });
+    hold();
+    if (x.clip) sayLine(shown.text, x.clip);
+    if (shown.needs) {
+      const translated = await translateText(x.text, shown.needs, myLang);
+      if (seq !== talkSeq.current) return;
+      if (translated) { setTalk({ name: x.name, text: translated, original: x.text }); hold(); }
+      if (!x.clip) sayLine(translated ?? x.text, null, translated ? myLang : shown.needs);
+    } else if (!x.clip) sayLine(shown.text, null, myLang);
   };
-  const say = (text, clip) => {
+  const say = (text, clip, line) => {
     if (Date.now() - lastTalk.current < 2500 || mySeatRef.current < 0) return false;
     lastTalk.current = Date.now();
-    room.send({ type: 'd-talk', text, ...(clip ? { clip } : {}) });
-    showTalk({ name: 'You', text, clip });
+    const lang = getLang();
+    room.send({ type: 'd-talk', text, lang, ...(line ? { line } : {}), ...(clip ? { clip } : {}) });
+    showTalk({ name: tr('You'), text, lang, line, clip });
     return true;
   };
   const react = (to, item, gift) => {
@@ -148,7 +162,7 @@ function DominoRoom({ code, isHost = false, tv = false, name, avatar, onLeave, o
       setTable(next);
       return null;
     } catch (err) {
-      return err.message;
+      return err.lang ?? err.message; // (English, or { k, p }: whoever sees it shows it in their own language)
     }
   }, []);
 
@@ -178,7 +192,7 @@ function DominoRoom({ code, isHost = false, tv = false, name, avatar, onLeave, o
     if (m.type === 'd-talk') {
       const t = tableRef.current ?? viewRef.current;
       const seatFrom = from && t ? seatOf(t, from.id) : -1;
-      if (seatFrom >= 0) showTalk({ name: t.seats[seatFrom].name, text: String(m.text ?? '').slice(0, 60), clip: validClip(m.clip) ? m.clip : null });
+      if (seatFrom >= 0) showTalk({ name: t.seats[seatFrom].name, text: String(m.text ?? '').slice(0, 60), lang: m.lang, line: typeof m.line === 'string' ? m.line : null, clip: validClip(m.clip) ? m.clip : null });
       return;
     }
     if (isHost) {
@@ -208,7 +222,7 @@ function DominoRoom({ code, isHost = false, tv = false, name, avatar, onLeave, o
     if (from?.role !== 'dhost') return;
     if (m.type === 'd-table') { viewRef.current = m.table; setView(m.table); }
     else if (m.type === 'd-hand' && keys && hostRef.current?.pub) unseal(keys, hostRef.current.pub, m.box).then((tiles) => setMyTiles({ hand: m.hand, tiles })).catch(() => {});
-    else if (m.type === 'd-error') toast.show(m.text);
+    else if (m.type === 'd-error') toast.show(tMsg(m.text));
     else if (m.type === 'd-closed') { setClosed({ by: m.by, saved: Boolean(m.saved) }); call.leave(); }
   }
 
@@ -255,7 +269,7 @@ function DominoRoom({ code, isHost = false, tv = false, name, avatar, onLeave, o
   const awayIds = useRef(new Set());
   useEffect(() => {
     if (!isHost && !tv && hostPeer) room.send({ type: 'd-alerts', sub: alerts.on ? alerts.sub : null }, hostPeer.id);
-  }, [isHost, tv, hostPeer?.id, alerts.on, alerts.sub?.endpoint]);
+  }, [isHost, tv, hostPeer?.id, alerts.on, alerts.sub?.endpoint, alerts.sub?.lang]);
   useEffect(() => {
     if (isHost || tv) return undefined;
     const tell = () => { if (hostRef.current) room.send({ type: 'd-vis', visible: document.visibilityState === 'visible' }, hostRef.current.id); };
@@ -272,7 +286,8 @@ function DominoRoom({ code, isHost = false, tv = false, name, avatar, onLeave, o
       if (now.phase !== 'playing' || `${handNo(now)}:${now.round.moves}:${now.round.turn}` !== alertKey) return;
       const away = awayIds.current.has(who.id) || !room.peers.some((p) => p.id === who.id);
       if (!away) return;
-      sendTurnAlert(pushSubs.current[who.id], { title: 'Family Games', body: `${who.name}, it’s your turn in Dominoes`, tag: `turn-${code}` })
+      // (worded by sendTurnAlert in the language of the phone it's going to)
+      sendTurnAlert(pushSubs.current[who.id], { title: 'Family Games', body: langMsg('{name}, it’s your turn in Dominoes', { name: who.name }), tag: `turn-${code}` })
         .then((res) => { if (res.gone) delete pushSubs.current[who.id]; });
     }, TURN_ALERT_AFTER_MS);
     return () => clearTimeout(timer);
@@ -321,11 +336,11 @@ function DominoRoom({ code, isHost = false, tv = false, name, avatar, onLeave, o
   }, [room.send]);
   const editProfile = tv || !onProfile ? null : () => setEditingProfile({ name, avatar });
   const profileSheet = editingProfile && (
-    <Sheet title="You" onClose={() => setEditingProfile(null)}
-      action={{ label: 'Done', onClick: () => { if (editingProfile.name.trim()) onProfile({ ...editingProfile, name: editingProfile.name.trim() }); setEditingProfile(null); } }}>
+    <Sheet title={tr('You')} onClose={() => setEditingProfile(null)}
+      action={{ label: tr('Done'), onClick: () => { if (editingProfile.name.trim()) onProfile({ ...editingProfile, name: editingProfile.name.trim() }); setEditingProfile(null); } }}>
       <ProfileEditor name={editingProfile.name} avatar={editingProfile.avatar}
         onName={(n) => setEditingProfile((x) => ({ ...x, name: n }))} onAvatar={(a) => setEditingProfile((x) => ({ ...x, avatar: a }))} />
-      <p className="footnote center">Everyone at the table sees the change straight away.</p>
+      <p className="footnote center">{tr('Everyone at the table sees the change straight away.')}</p>
     </Sheet>
   );
   const tiles = isHost ? (mySeat >= 0 ? table?.round?.hands?.[mySeat] ?? null : null) : (myTiles && shown?.round && myTiles.hand === handNo(shown) ? myTiles.tiles : null);
@@ -338,14 +353,14 @@ function DominoRoom({ code, isHost = false, tv = false, name, avatar, onLeave, o
     if (isHost) {
       const fn = { 'd-play': (x) => playTile(x, mySeat, body.tile, body.arm, body.style, Boolean(body.thrown)), 'd-draw': (x) => drawTile(x, mySeat), 'd-pass': (x) => pass(x, mySeat) }[type];
       const err = act(fn);
-      if (err) toast.show(err);
+      if (err) toast.show(tMsg(err));
       return;
     }
     room.send({ type, ...body, hand: handNo(shown) }, hostPeer?.id);
   };
 
   const leave = () => {
-    if (isHost && !confirm(shown?.phase === 'lobby' ? 'Close this game for everyone?' : 'End this game for everyone?')) return;
+    if (isHost && !confirm(shown?.phase === 'lobby' ? tr('Close this game for everyone?') : tr('End this game for everyone?'))) return;
     call.leave();
     if (!isHost) { room.send({ type: 'd-stand' }, hostPeer?.id); onLeave(); return; }
     write(tableKey, null);
@@ -357,7 +372,7 @@ function DominoRoom({ code, isHost = false, tv = false, name, avatar, onLeave, o
   };
   // Host: save for later. The game stays on this phone and goes on the Dominoes home screen's Saved games list.
   const saveForLater = () => {
-    if (!confirm(`Save this game for later? Everyone goes back to the home screen. Start it again from Saved games on this phone, and everyone can rejoin with code ${code}.`)) return;
+    if (!confirm(tr('Save this game for later? Everyone goes back to the home screen. Start it again from Saved games on this phone, and everyone can rejoin with code {code}.', { code }))) return;
     const t = tableRef.current;
     saveGame({
       id: `dominoes-${code}`, kind: 'dominoes', code,
@@ -374,18 +389,18 @@ function DominoRoom({ code, isHost = false, tv = false, name, avatar, onLeave, o
   if (closed) {
     return (
       <div className="app game-ended"><main className="wrap"><div className="card waiting-card ended-card">
-        <span className="brand-mark">🁫</span><h2>{closed.saved ? `${closed.by ?? 'The host'} saved the game for later` : closed.by ? `${closed.by} closed the game` : 'The game has ended'}</h2>
-        {closed.saved && <p className="muted">When they start it again, join with code <b>{code}</b> and you’ll get your seat back.</p>}
-        <button type="button" className="primary big go" onClick={onLeave}>Back to home</button>
+        <span className="brand-mark">🁫</span><h2>{closed.saved ? tr('{name} saved the game for later', { name: closed.by ?? tr('The host') }) : closed.by ? tr('{name} closed the game', { name: closed.by }) : tr('The game has ended')}</h2>
+        {closed.saved && <p className="muted">{tx('When they start it again, join with code {code} and you’ll get your seat back.', { code: <b>{code}</b> })}</p>}
+        <button type="button" className="primary big go" onClick={onLeave}>{tr('Back to home')}</button>
       </div></main></div>
     );
   }
   if (!shown) {
     return (
       <div className="app"><main className="wrap"><div className="card waiting-card">
-        <h2>Joining game {code}…</h2>
-        <p className="muted">Waiting for the host’s phone.</p>
-        <button type="button" className="text-btn" onClick={onLeave}>Cancel</button>
+        <h2>{tr('Joining game {code}…', { code })}</h2>
+        <p className="muted">{tr('Waiting for the host’s phone.')}</p>
+        <button type="button" className="text-btn" onClick={onLeave}>{tr('Cancel')}</button>
       </div></main></div>
     );
   }
@@ -394,7 +409,7 @@ function DominoRoom({ code, isHost = false, tv = false, name, avatar, onLeave, o
     return (
       <div className={`app online dominoes tv-mode${shown.phase === 'lobby' ? '' : ' at-table'}`} style={tvFit}>
         {shown.phase === 'lobby'
-          ? <div className="dom-tv-wait"><h1>Dominoes · game {code}</h1><p>Waiting for the host to start…</p></div>
+          ? <div className="dom-tv-wait"><h1>{tr('Dominoes · game {code}', { code })}</h1><p>{tr('Waiting for the host to start…')}</p></div>
           : <DominoTable table={shown} mySeat={-1} tiles={null} icons={icons} isHost={false} send={() => {}} act={act} onLeave={onLeave}
               call={call} me={me} reactions={reactions} tv aim={aim} talk={talk} washBus={washBus} />}
         <TvControls call={call} onLeave={() => { call.leave(); onLeave(); }} view={null} onView={() => {}} />
@@ -409,9 +424,9 @@ function DominoRoom({ code, isHost = false, tv = false, name, avatar, onLeave, o
     <div className={`app online dominoes${shown.phase === 'lobby' ? '' : ' at-table'}`} style={deskFit}>
       {shown.phase === 'lobby'
         ? <DominoLobby code={code} table={shown} isHost={isHost} me={me} icons={icons} act={act}
-            onSit={(s) => { if (!isHost) { room.send({ type: 'd-sit', seat: s, name }, hostPeer?.id); return; } const e = act((x) => sit(x, s, { id: me.id, name })); if (e) toast.show(e); }}
+            onSit={(s) => { if (!isHost) { room.send({ type: 'd-sit', seat: s, name }, hostPeer?.id); return; } const e = act((x) => sit(x, s, { id: me.id, name })); if (e) toast.show(tMsg(e)); }}
             onStand={() => (isHost ? act((x) => ({ ...x, seats: x.seats.map((s) => (s?.id === me.id ? null : s)) })) : room.send({ type: 'd-stand' }, hostPeer?.id))}
-            onStart={() => { const e = act((x) => startMatch(x)); if (e) toast.show(e); }} onLeave={leave}
+            onStart={() => { const e = act((x) => startMatch(x)); if (e) toast.show(tMsg(e)); }} onLeave={leave}
             profile={{ name, avatar }} onEditProfile={editProfile} />
         : <DominoTable table={shown} mySeat={mySeat} tiles={tiles} icons={icons} isHost={isHost} send={send} act={act} onLeave={leave}
             call={call} me={me} code={code} reactions={reactions} react={react} alerts={alerts} toast={toast} onSave={isHost ? saveForLater : null}
@@ -486,105 +501,105 @@ function DominoLobby({ code, table, isHost, me, icons, act, onSit, onStand, onSt
     <>
       <header className="hero">
         <div className="wrap hero-row">
-          <div className="brand"><span className="brand-mark">🁫</span><h1>Dominoes</h1></div>
-          <button type="button" className="icon-btn round" aria-label="Leave" onClick={onLeave}><Icon name="close" /></button>
+          <div className="brand"><span className="brand-mark">🁫</span><h1>{tr('Dominoes')}</h1></div>
+          <button type="button" className="icon-btn round" aria-label={tr('Leave')} onClick={onLeave}><Icon name="close" /></button>
         </div>
         {onEditProfile && (
           <div className="wrap lobby-me">
-            <button type="button" className="profile-chip" onClick={onEditProfile} aria-label="Change your name and picture">
+            <button type="button" className="profile-chip" onClick={onEditProfile} aria-label={tr('Change your name and picture')}>
               <Avatar value={profile.avatar} name={profile.name} /> {profile.name} <Icon name="edit" size={14} />
             </button>
           </div>
         )}
-        <p className="wrap muted-light">Game {code}{isHost ? ' · You’re the host' : ''}</p>
+        <p className="wrap muted-light">{tr('Game {code}', { code })}{isHost ? ` · ${tr('You’re the host')}` : ''}</p>
       </header>
       <main className="wrap dom-lobby">
-        <div className="section-title">Game</div>
+        <div className="section-title">{tr('Game')}</div>
         <div className="card group">
           {isHost ? (
             <>
-              <div className="field-block"><span>Rules</span>
+              <div className="field-block"><span>{tr('Rules')}</span>
                 <div className="dom-variants">
                   {Object.entries(VARIANTS).map(([id, v]) => (
                     <button key={id} type="button" className={`dom-variant${settings.variant === id ? ' on' : ''}`} aria-pressed={settings.variant === id}
-                      onClick={() => act((t) => setRules(t, { variant: id }))}>{v.name}</button>
+                      onClick={() => act((t) => setRules(t, { variant: id }))}>{tr(v.name)}</button>
                   ))}
                 </div>
               </div>
-              <div className="field-block"><span>Set</span>
-                <Segmented value={settings.setMax} onChange={(v) => act((t) => setRules(t, { setMax: v }))} options={SETS.map((m) => ({ id: m, label: `Double ${m}` }))} />
+              <div className="field-block"><span>{tr('Set')}</span>
+                <Segmented value={settings.setMax} onChange={(v) => act((t) => setRules(t, { setMax: v }))} options={SETS.map((m) => ({ id: m, label: tr('Double {n}', { n: m }) }))} />
               </div>
               {settings.setMax === 6 && kindOf(table) === 'line' && VARIANTS[settings.variant].draws && (
-                <div className="field-block"><span>Start with</span>
+                <div className="field-block"><span>{tr('Start with')}</span>
                   <Segmented value={startingTiles(table)} onChange={(v) => set({ startTiles: v })}
-                    options={[{ id: 7, label: '7 tiles' }, { id: 5, label: '5 + boneyard' }]} />
-                  <small className="dom-teams-note">{startingTiles(table) * table.seats.length >= 28 ? 'Every tile is dealt, so there’s nothing to draw.' : `${28 - startingTiles(table) * table.seats.length} tiles left in the boneyard to draw from.`}</small>
+                    options={[{ id: 7, label: tr('7 tiles') }, { id: 5, label: tr('5 + boneyard') }]} />
+                  <small className="dom-teams-note">{startingTiles(table) * table.seats.length >= 28 ? tr('Every tile is dealt, so there’s nothing to draw.') : tr('{n} tiles left in the boneyard to draw from.', { n: 28 - startingTiles(table) * table.seats.length })}</small>
                 </div>
               )}
-              <div className="field-block"><span>Players</span>
+              <div className="field-block"><span>{tr('Players')}</span>
                 <Segmented value={table.seats.length} onChange={(n) => act((t) => setPlayers(t, n))} options={Array.from({ length: maxPlayers(settings.variant, settings.setMax) - 1 }, (_, i) => i + 2).map((n) => ({ id: n, label: String(n) }))} />
               </div>
               {teamsPossible(table.seats.length) && (
-                <div className="field-block"><span>Play as</span>
+                <div className="field-block"><span>{tr('Play as')}</span>
                   <Segmented value={settings.teams ? 'teams' : 'solo'} onChange={(v) => set({ teams: v === 'teams' })}
-                    options={[{ id: 'solo', label: 'Individuals' }, { id: 'teams', label: `${table.seats.length / 2} teams of 2` }]} />
-                  {settings.teams && <small className="dom-teams-note">Partners sit across the table from each other and score together.</small>}
+                    options={[{ id: 'solo', label: tr('Individuals') }, { id: 'teams', label: tr('{n} teams of 2', { n: table.seats.length / 2 }) }]} />
+                  {settings.teams && <small className="dom-teams-note">{tr('Partners sit across the table from each other and score together.')}</small>}
                 </div>
               )}
-              <div className="field-block"><span>Scoring</span>
+              <div className="field-block"><span>{tr('Scoring')}</span>
                 <Segmented value={settings.scoring ?? 'points'} onChange={(v) => set({ scoring: v })}
-                  options={[{ id: 'points', label: VARIANTS[settings.variant].lowWins ? 'Lowest total' : 'Points' }, { id: 'rounds', label: 'Rounds won' }]} />
+                  options={[{ id: 'points', label: VARIANTS[settings.variant].lowWins ? tr('Lowest total') : tr('Points') }, { id: 'rounds', label: tr('Rounds won') }]} />
               </div>
               {byRounds(table) ? (
-                <div className="field-block"><span>Match</span>
+                <div className="field-block"><span>{tr('Match')}</span>
                   <Segmented value={settings.bestOf ?? 3} onChange={(v) => set({ bestOf: v })}
-                    options={[{ id: 3, label: 'Best of 3' }, { id: 5, label: 'Best of 5' }, { id: 0, label: 'Just count' }]} />
+                    options={[{ id: 3, label: tr('Best of {n}', { n: 3 }) }, { id: 5, label: tr('Best of {n}', { n: 5 }) }, { id: 0, label: tr('Just count') }]} />
                 </div>
               ) : kindOf(table) === 'line' ? (
-                <div className="field-block"><span>Play to</span>
+                <div className="field-block"><span>{tr('Play to')}</span>
                   <Segmented value={settings.target} onChange={(v) => set({ target: v })} options={[100, 150, 200, 250].map((n) => ({ id: n, label: String(n) }))} />
                 </div>
               ) : (
-                <div className="field-block"><span>Rounds</span>
+                <div className="field-block"><span>{tr('Rounds')}</span>
                   <Segmented value={roundsOf(table)} onChange={(v) => set({ rounds: v })}
-                    options={roundChoices(settings.setMax).map((n) => ({ id: n, label: n === settings.setMax + 1 ? `All ${n}` : String(n) }))} />
+                    options={roundChoices(settings.setMax).map((n) => ({ id: n, label: n === settings.setMax + 1 ? tr('All {n}', { n }) : String(n) }))} />
                 </div>
               )}
             </>
           ) : (
-            <p className="dom-rules-line">{VARIANTS[settings.variant].name} · Double {settings.setMax} · {startingTiles(table)} tiles each · {settings.teams ? `${table.seats.length / 2} teams of 2` : 'Each for themselves'} · {scoringText(table)}</p>
+            <p className="dom-rules-line">{tr(VARIANTS[settings.variant].name)} · {tr('Double {n}', { n: settings.setMax })} · {tr('{n} tiles each', { n: startingTiles(table) })} · {settings.teams ? tr('{n} teams of 2', { n: table.seats.length / 2 }) : tr('Each for themselves')} · {scoringText(table)}</p>
           )}
         </div>
-        <p className="footnote">{byRounds(table) ? RULES_PLAY[settings.variant] : RULES_NOTE[settings.variant]}{byRounds(table) ? ` Scoring by rounds: each hand is a round, won by whoever goes out first, or if nobody can play, by the player with the fewest dots left.${settings.bestOf ? ` First to win ${roundsToWin(table)} rounds wins the set; the app keeps count of sets won.` : ' The app counts rounds won until you end the game.'}` : ''}</p>
+        <p className="footnote">{tr(byRounds(table) ? RULES_PLAY[settings.variant] : RULES_NOTE[settings.variant])}{byRounds(table) ? ` ${tr('Scoring by rounds: each hand is a round, won by whoever goes out first, or if nobody can play, by the player with the fewest dots left.')} ${settings.bestOf ? tr('First to win {n} rounds wins the set; the app keeps count of sets won.', { n: roundsToWin(table) }) : tr('The app counts rounds won until you end the game.')}` : ''}</p>
 
-        <div className="section-title">Seats</div>
+        <div className="section-title">{tr('Seats')}</div>
         <div className={`dom-seats n${table.seats.length}`}>
           {table.seats.map((s, i) => (
             <div key={i} className={`card dom-seat${settings.teams ? ` t${sideOf(table, i)}` : ''}${s?.id === me.id ? ' mine' : ''}`}>
               {s ? <Avatar value={icons[s.id]} name={s.name} bot={s.bot} className="lobby-avatar" /> : <span className="dom-empty">+</span>}
-              <b>{s ? (s.id === me.id ? 'You' : s.name) : `Seat ${i + 1}`}</b>
-              {settings.teams && <small>Team {sideOf(table, i) + 1}</small>}
-              {!s && <button type="button" className="soft small" onClick={() => onSit(i)}>Sit here</button>}
-              {!s && isHost && <button type="button" className="text-btn small" onClick={() => addBot(i)}>Add computer</button>}
-              {s?.id === me.id && <button type="button" className="text-btn small" onClick={onStand}>Stand up</button>}
-              {s?.bot && isHost && <button type="button" className="text-btn small" onClick={() => act((t) => ({ ...t, seats: t.seats.map((x, j) => (j === i ? null : x)) }))}>Remove</button>}
+              <b>{s ? (s.id === me.id ? tr('You') : s.name) : tr('Seat {n}', { n: i + 1 })}</b>
+              {settings.teams && <small>{tr('Team {n}', { n: sideOf(table, i) + 1 })}</small>}
+              {!s && <button type="button" className="soft small" onClick={() => onSit(i)}>{tr('Sit here')}</button>}
+              {!s && isHost && <button type="button" className="text-btn small" onClick={() => addBot(i)}>{tr('Add computer')}</button>}
+              {s?.id === me.id && <button type="button" className="text-btn small" onClick={onStand}>{tr('Stand up')}</button>}
+              {s?.bot && isHost && <button type="button" className="text-btn small" onClick={() => act((t) => ({ ...t, seats: t.seats.map((x, j) => (j === i ? null : x)) }))}>{tr('Remove')}</button>}
             </div>
           ))}
         </div>
-        {mine < 0 && <p className="muted center">Tap “Sit here” to take a seat.</p>}
+        {mine < 0 && <p className="muted center">{tr('Tap “Sit here” to take a seat.')}</p>}
 
-        <div className="section-title">Invite</div>
+        <div className="section-title">{tr('Invite')}</div>
         <DomInvite code={code} />
-        <div className="section-title">Companion TV</div>
+        <div className="section-title">{tr('Companion TV')}</div>
         <TvInviteCard code={code} as="dtv" what="tiles" />
 
         {isHost && (
           <div className="dom-start">
-            {!full && <button type="button" className="secondary big" onClick={fillBots}>Fill empty seats with computer players</button>}
-            <button type="button" className="primary big go" disabled={!full} onClick={onStart}>Start game</button>
+            {!full && <button type="button" className="secondary big" onClick={fillBots}>{tr('Fill empty seats with computer players')}</button>}
+            <button type="button" className="primary big go" disabled={!full} onClick={onStart}>{tr('Start game')}</button>
           </div>
         )}
-        {!isHost && <p className="muted center">The host starts the game.</p>}
+        {!isHost && <p className="muted center">{tr('The host starts the game.')}</p>}
       </main>
     </>
   );
@@ -597,15 +612,15 @@ function DomInvite({ code }) {
   const [copied, setCopied] = useState(false);
   useEffect(() => { QRCode.toDataURL(link, { margin: 1, width: 320 }).then(setQr).catch(() => setQr(null)); }, [link]);
   const share = () => {
-    if (navigator.share) navigator.share({ title: 'Dominoes', url: link }).catch(() => {});
+    if (navigator.share) navigator.share({ title: tr('Dominoes'), url: link }).catch(() => {});
     else navigator.clipboard?.writeText(link).then(() => setCopied(true)).catch(() => {});
   };
   return (
     <div className="card dom-invite">
       <div className="dom-code">{code.split('').map((c, i) => <span key={i}>{c}</span>)}</div>
-      {qr && <img className="qr" src={qr} alt="QR code to join this game" />}
-      <p className="muted small">Point a phone’s camera at the QR code to join, or open Family Games → Dominoes → Join a game and type the letters.</p>
-      <button type="button" className="soft" onClick={share}><Icon name="share" size={18} /> {copied ? 'Link copied' : 'Share the link'}</button>
+      {qr && <img className="qr" src={qr} alt={tr('QR code to join this game')} />}
+      <p className="muted small">{tr('Point a phone’s camera at the QR code to join, or open Family Games → Dominoes → Join a game and type the letters.')}</p>
+      <button type="button" className="soft" onClick={share}><Icon name="share" size={18} /> {copied ? tr('Link copied') : tr('Share the link')}</button>
     </div>
   );
 }
@@ -615,10 +630,10 @@ function scoringText(table) {
   const st = table.settings;
   if (byRounds(table)) {
     const sets = table.match?.sets;
-    const setText = sets && sets.length === 2 && sets.some((n) => n > 0) ? ` · sets ${sets.join('–')}` : ''; // (more sides: each score box shows its own)
-    return `${st.bestOf ? `Best of ${st.bestOf}` : 'Rounds won'}${setText}`;
+    const setText = sets && sets.length === 2 && sets.some((n) => n > 0) ? ` · ${tr('sets {score}', { score: sets.join('–') })}` : ''; // (more sides: each score box shows its own)
+    return `${st.bestOf ? tr('Best of {n}', { n: st.bestOf }) : tr('Rounds won')}${setText}`;
   }
-  return kindOf(table) === 'line' ? `to ${st.target}` : `${roundsOf(table)} rounds, lowest wins`;
+  return kindOf(table) === 'line' ? tr('to {n}', { n: st.target }) : tr('{n} rounds, lowest wins', { n: roundsOf(table) });
 }
 
 /** Just how to play (no scoring), for games scored by rounds. */
@@ -649,7 +664,7 @@ const TILE_STYLE_CHOICES = [
   { id: 'spin', icon: '🌀', name: 'Spin', note: 'Twirl it in' },
   { id: 'toss', icon: '✋', name: 'Toss', note: 'Just play it' },
 ];
-const styleWord = (style) => { const c = TILE_STYLE_CHOICES.find((x) => x.id === style); return c ? `${c.icon} ${c.name}` : ''; };
+const styleWord = (style) => { const c = TILE_STYLE_CHOICES.find((x) => x.id === style); return c ? `${c.icon} ${tr(c.name)}` : ''; };
 const HOLD_MS = 480;
 // Where a thrown tile comes from, relative to where it lands
 const FLY_FROM = { bottom: ['0px', '46vh', '-24deg'], top: ['0px', '-46vh', '24deg'], left: ['-52vw', '0px', '30deg'], right: ['52vw', '0px', '-30deg'] };
@@ -657,13 +672,13 @@ const FLY_FROM = { bottom: ['0px', '46vh', '-24deg'], top: ['0px', '-46vh', '24d
 function TileStyleSheet({ tile, onPick, onClose }) {
   const [a, b] = halves(tile);
   return (
-    <Sheet title={`Play the ${a}–${b} with…`} short onClose={onClose} closeLabel="Cancel">
+    <Sheet title={tr('Play the {a}–{b} with…', { a, b })} short onClose={onClose} closeLabel={tr('Cancel')}>
       <div className="play-styles dom-play-styles">
         {TILE_STYLE_CHOICES.map((p) => (
           <button key={p.id} type="button" className={`play-style style-${p.id}`} onClick={() => onPick(p.id === 'toss' ? null : p.id)}>
             <span className="play-style-icon">{p.icon}</span>
-            <b>{p.name}</b>
-            <span>{p.note}</span>
+            <b>{tr(p.name)}</b>
+            <span>{tr(p.note)}</span>
           </button>
         ))}
       </div>
@@ -680,6 +695,7 @@ function DominoTable({ table, mySeat, tiles, icons, isHost, send, act, onLeave, 
   const [tvOpen, setTvOpen] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [decksOpen, setDecksOpen] = useState(false);
+  const [rulesOpen, setRulesOpen] = useState(false);
   const [reactTo, setReactTo] = useState(null);
   const [lastTest, setLastTest] = useState(null);
   const [talkOpen, setTalkOpen] = useState(false);
@@ -697,44 +713,47 @@ function DominoTable({ table, mySeat, tiles, icons, isHost, send, act, onLeave, 
   const hasVideo = (stream) => stream.getVideoTracks().length > 0;
   const testAlert = () => {
     const perm = alertPermission();
-    if (perm !== 'granted') { setLastTest(`notifications are ${perm}`); toast.show(`Notifications are ${perm === 'denied' ? 'blocked' : 'not allowed yet'}: allow them in Settings → Notifications.`); return; }
-    if (!alerts.sub) { alerts.retry().then((why) => { setLastTest(why ?? 'signed up: try the test again'); toast.show(why ?? 'Signed up: tap Send a test alert again.'); }); return; }
-    toast.show('Test alert on its way: lock your phone or go to the home screen');
-    setLastTest('sending…');
-    sendTurnAlert(alerts.sub, { body: 'Test: this is your turn alert', tag: 'test', delay: 6 }).then((x) => { setLastTest(x.why); toast.show(x.why); });
+    if (perm !== 'granted') { setLastTest(perm === 'denied' ? tr('notifications are denied') : perm === 'default' ? tr('notifications are default') : tr('notifications are unsupported')); toast.show(perm === 'denied' ? tr('Notifications are blocked: allow them in Settings → Notifications.') : tr('Notifications are not allowed yet: allow them in Settings → Notifications.')); return; }
+    if (!alerts.sub) { alerts.retry().then((why) => { setLastTest(why ?? tr('signed up: try the test again')); toast.show(why ?? tr('Signed up: tap Send a test alert again.')); }); return; }
+    toast.show(tr('Test alert on its way: lock your phone or go to the home screen'));
+    setLastTest(tr('sending…'));
+    sendTurnAlert(alerts.sub, { body: langMsg('Test: this is your turn alert'), tag: 'test', delay: 6 }).then((x) => { setLastTest(x.why); toast.show(x.why); });
   };
+  const languageRow = { icon: 'flip', label: 'Language / Idioma', note: LANGS.find((l) => l.id === getLang())?.label, onClick: () => setLang(getLang() === 'es' ? 'en' : 'es') };
   const menu = [
     call.joined
-      ? { icon: 'video', label: 'Video chat settings', onClick: () => setCallOpen(true) }
-      : { icon: 'video', label: 'Join A/V Chat', onClick: () => setJoinOpen(true) },
-    mySeat >= 0 && !tv && { icon: 'hand', label: 'Hand mode', note: 'Just your tiles: swipe to play on the TV', on: handMode, onClick: () => setHandMode(!handMode) },
-    onEditProfile && { icon: 'edit', label: 'My name & picture', onClick: onEditProfile },
-    { icon: 'share', label: 'Game code & QR', note: 'Rejoin on another phone', onClick: () => setInviteOpen(true) },
-    { icon: 'tv', label: 'Add a TV', onClick: () => setTvOpen(true) },
-    { icon: 'cards', label: 'Table theme', onClick: () => setDecksOpen(true) },
+      ? { icon: 'video', label: tr('Video chat settings'), onClick: () => setCallOpen(true) }
+      : { icon: 'video', label: tr('Join A/V Chat'), onClick: () => setJoinOpen(true) },
+    languageRow,
+    mySeat >= 0 && !tv && { icon: 'hand', label: tr('Hand mode'), note: tr('Just your tiles: swipe to play on the TV'), on: handMode, onClick: () => setHandMode(!handMode) },
+    onEditProfile && { icon: 'edit', label: tr('My name & picture'), onClick: onEditProfile },
+    { icon: 'share', label: tr('Game code & QR'), note: tr('Rejoin on another phone'), onClick: () => setInviteOpen(true) },
+    { icon: 'tv', label: tr('Add a TV'), onClick: () => setTvOpen(true) },
+    { icon: 'cards', label: tr('How to play'), onClick: () => setRulesOpen(true) },
+    { icon: 'cards', label: tr('Table theme'), onClick: () => setDecksOpen(true) },
     alerts && {
-      icon: 'bell', label: 'Turn alerts', on: alerts.on,
-      note: isHost ? 'Not for the host’s phone (it runs the game)'
-        : alerts.why && !alerts.on ? 'Open the app from your Home Screen first'
-        : alerts.on && !alerts.sub ? (alerts.problem ?? 'Signing this phone up…')
-        : 'Buzz when it’s your turn, even in the background',
+      icon: 'bell', label: tr('Turn alerts'), on: alerts.on,
+      note: isHost ? tr('Not for the host’s phone (it runs the game)')
+        : alerts.why && !alerts.on ? tr('Open the app from your Home Screen first')
+        : alerts.on && !alerts.sub ? (alerts.problem ?? tr('Signing this phone up…'))
+        : tr('Buzz when it’s your turn, even in the background'),
       onClick: () => {
-        if (isHost) { toast.show('The host’s phone runs the game, so it can’t get alerts. Join from another device as a player to get them.'); return; }
+        if (isHost) { toast.show(tr('The host’s phone runs the game, so it can’t get alerts. Join from another device as a player to get them.')); return; }
         alerts.toggle().then((err) => { if (err) toast.show(err); });
       },
     },
     alerts && alerts.on && !isHost && {
-      icon: 'bell', label: 'Send a test alert',
-      note: lastTest ? `Last test: ${lastTest}` : alerts.sub ? 'Arrives in about 6 seconds: lock your phone' : 'This phone isn’t signed up yet',
+      icon: 'bell', label: tr('Send a test alert'),
+      note: lastTest ? tr('Last test: {result}', { result: lastTest }) : alerts.sub ? tr('Arrives in about 6 seconds: lock your phone') : tr('This phone isn’t signed up yet'),
       onClick: testAlert,
     },
-    { icon: sound.effects ? 'speaker' : 'speakerOff', label: 'Sound effects', on: sound.effects, onClick: () => setSoundSetting('effects', !sound.effects) },
-    { icon: sound.effects ? 'speaker' : 'speakerOff', label: 'Crickets', note: 'A night out on the porch', on: porch, onClick: () => setPorch(!porch) },
-    isHost && { icon: 'cards', label: 'Mix the tiles first', note: 'Everyone stirs the pile before each hand', on: table.settings.wash !== false, onClick: () => setTableOption('wash', table.settings.wash === false) },
-    isHost && { icon: 'video', label: 'Reaction photos', note: 'In a video chat, snap everyone when a hand ends', on: table.settings.photos !== false, onClick: () => setTableOption('photos', table.settings.photos === false) },
-    { icon: 'trophy', label: 'Family album', onClick: () => setAlbumOpen(true) },
-    onSave && { icon: 'home', label: 'Save for later', note: 'Pick it up again from the Dominoes home screen', onClick: onSave },
-    { icon: 'close', label: isHost ? 'End game' : 'Leave game', danger: true, onClick: onLeave },
+    { icon: sound.effects ? 'speaker' : 'speakerOff', label: tr('Sound effects'), on: sound.effects, onClick: () => setSoundSetting('effects', !sound.effects) },
+    { icon: sound.effects ? 'speaker' : 'speakerOff', label: tr('Crickets'), note: tr('A night out on the porch'), on: porch, onClick: () => setPorch(!porch) },
+    isHost && { icon: 'cards', label: tr('Mix the tiles first'), note: tr('Everyone stirs the pile before each hand'), on: table.settings.wash !== false, onClick: () => setTableOption('wash', table.settings.wash === false) },
+    isHost && { icon: 'video', label: tr('Reaction photos'), note: tr('In a video chat, snap everyone when a hand ends'), on: table.settings.photos !== false, onClick: () => setTableOption('photos', table.settings.photos === false) },
+    { icon: 'trophy', label: tr('Family album'), onClick: () => setAlbumOpen(true) },
+    onSave && { icon: 'home', label: tr('Save for later'), note: tr('Pick it up again from the Dominoes home screen'), onClick: onSave },
+    { icon: 'close', label: isHost ? tr('End game') : tr('Leave game'), danger: true, onClick: onLeave },
   ];
   const n = table.seats.length;
   const base = mySeat >= 0 ? mySeat : 0;
@@ -872,7 +891,7 @@ function DominoTable({ table, mySeat, tiles, icons, isHost, send, act, onLeave, 
   // Hand mode on someone's phone: where their picked tile can go, in the colours lit on their screen (TV only)
   const aimSpots = tv && aim && r && aim.hand === handNo(table) && aim.moves === r.moves && table.seats[r.turn]?.id === aim.id ? aim.spots : [];
   const said = (s) => r?.last?.seat === s && (r.last.passed || r.last.drew) && Date.now() - r.last.at < 4000
-    && <span className="dom-said">{r.last.passed ? (kindOf(table) === 'train' ? '✊ Knock · train open' : '✊ Knock knock') : 'Drew'}</span>;
+    && <span className="dom-said">{r.last.passed ? (kindOf(table) === 'train' ? tr('✊ Knock · train open') : tr('✊ Knock knock')) : tr('Drew')}</span>;
   const counts = r?.counts ?? r?.hands?.map((h) => h.length) ?? [];
   const boneyard = r?.boneyardCount ?? r?.boneyard?.length ?? 0;
 
@@ -899,8 +918,8 @@ function DominoTable({ table, mySeat, tiles, icons, isHost, send, act, onLeave, 
   const holdTile = (t) => {
     stopHold();
     didHold.current = true;
-    if (!myTurn) { toast.show(`It’s ${table.seats[r?.turn]?.name ?? 'someone else'}’s turn`); return; }
-    if (!playable.has(t)) { toast.show('That one doesn’t fit anywhere yet'); return; }
+    if (!myTurn) { toast.show(tr('It’s {name}’s turn', { name: table.seats[r?.turn]?.name ?? tr('someone else') })); return; }
+    if (!playable.has(t)) { toast.show(tr('That one doesn’t fit anywhere yet')); return; }
     buzz(30);
     setSelected(t);
     setHeld(t);
@@ -952,24 +971,24 @@ function DominoTable({ table, mySeat, tiles, icons, isHost, send, act, onLeave, 
     <>
       <header className="online-top dom-top">
         <div className="dom-scores">
-          {lines && <div className="dom-round"><b>{VARIANTS[table.settings.variant].name}</b><span>{byRounds(table) ? `Round ${handNo(table) + (table.phase === 'playing' ? 1 : 0)} · ${scoringText(table)}` : `Round ${Math.min(handNo(table) + (table.phase === 'playing' ? 1 : 0), roundsOf(table))} of ${roundsOf(table)} · lowest wins`}</span></div>}
+          {lines && <div className="dom-round"><b>{tr(VARIANTS[table.settings.variant].name)}</b><span>{byRounds(table) ? tr('Round {n} · {how}', { n: handNo(table) + (table.phase === 'playing' ? 1 : 0), how: scoringText(table) }) : tr('Round {n} of {m} · lowest wins', { n: Math.min(handNo(table) + (table.phase === 'playing' ? 1 : 0), roundsOf(table)), m: roundsOf(table) })}</span></div>}
           {lines && r?.engine != null && (
-            <div className="dom-head-engine" title={kindOf(table) === 'train' ? 'The engine (middle double)' : 'The middle double'}>
+            <div className="dom-head-engine" title={kindOf(table) === 'train' ? tr('The engine (middle double)') : tr('The middle double')}>
               <Domino a={r.engine} b={r.engine} size={tv ? 64 : 40} />
-              {boneyard > 0 && <span title="Tiles left to draw"><Domino a={0} b={0} faceDown size={tv ? 40 : 26} />{boneyard}</span>}
+              {boneyard > 0 && <span title={tr('Tiles left to draw')}><Domino a={0} b={0} faceDown size={tv ? 40 : 26} />{boneyard}</span>}
             </div>
           )}
           {!lines && sides.map((s, i) => (
             <div key={i} className={`dom-score${table.settings.teams ? ` t${i}` : ''}`}>
               <span>{s.name}</span><b>{s.score}</b>
-              {setsWon(table, i) > 0 && <i className="dom-sets" title="Sets won">{setsWon(table, i)} set{setsWon(table, i) === 1 ? '' : 's'}</i>}
+              {setsWon(table, i) > 0 && <i className="dom-sets" title={tr('Sets won')}>{setCount(setsWon(table, i))}</i>}
             </div>
           ))}
-          {!lines && <span className="dom-caption">{VARIANTS[table.settings.variant].name} · {scoringText(table)}{videoMode && !lines && VARIANTS[table.settings.variant].draws && table.phase === 'playing' ? ` · ${boneyard} to draw` : ''}</span>}
+          {!lines && <span className="dom-caption">{tr(VARIANTS[table.settings.variant].name)} · {scoringText(table)}{videoMode && !lines && VARIANTS[table.settings.variant].draws && table.phase === 'playing' ? ` · ${tr('{n} to draw', { n: boneyard })}` : ''}</span>}
         </div>
         <div className="online-meta">
-          {!lines && <span>{VARIANTS[table.settings.variant].name} · {scoringText(table)}{videoMode && !lines && VARIANTS[table.settings.variant].draws && table.phase === 'playing' ? ` · ${boneyard} to draw` : ''}</span>}
-          {!tv && <TableMenu items={menu} />}
+          {!lines && <span>{tr(VARIANTS[table.settings.variant].name)} · {scoringText(table)}{videoMode && !lines && VARIANTS[table.settings.variant].draws && table.phase === 'playing' ? ` · ${tr('{n} to draw', { n: boneyard })}` : ''}</span>}
+          <TableMenu items={tv ? [languageRow] : menu} />
         </div>
       </header>
 
@@ -981,14 +1000,14 @@ function DominoTable({ table, mySeat, tiles, icons, isHost, send, act, onLeave, 
               <div key={s} className={`dom-vtile${table.settings.teams ? ` t${sideOf(table, s)}` : ''}${r?.turn === s && table.phase === 'playing' ? ' turn' : ''}${s === mySeat ? ' me' : ''}`}>
                 {seatMedia(who, s)}
                 <div className="dom-vbar">
-                  <span className="dom-vname">{s === mySeat ? 'You' : who?.name}</span>
-                  {r?.markers?.[s] && <span title="Train open to everyone">🚂</span>}
-                  <b title="Tiles in hand">{counts[s] ?? 0}</b>
+                  <span className="dom-vname">{s === mySeat ? tr('You') : who?.name}</span>
+                  {r?.markers?.[s] && <span title={tr('Train open to everyone')}>🚂</span>}
+                  <b title={tr('Tiles in hand')}>{counts[s] ?? 0}</b>
                 </div>
-                {lines && <span className="dom-vscore">{table.settings.teams ? `T${sideOf(table, s) + 1} · ` : ''}{table.match?.scores[sideOf(table, s)] ?? 0}{byRounds(table) ? ' won' : ' pts'}</span>}
+                {lines && <span className="dom-vscore">{table.settings.teams ? `${tr('T{n}', { n: sideOf(table, s) + 1 })} · ` : ''}{scoreCount(table, table.match?.scores[sideOf(table, s)] ?? 0)}</span>}
                 {tv && <Standing n={counts[s] ?? 0} />}
                 {s === mySeat && call.joined && <div className="dom-vcall"><MyCallButtons call={call} onMore={() => setCallOpen(true)} /></div>}
-                {who?.standIn && <span className="dp-away">computer</span>}
+                {who?.standIn && <span className="dp-away">{tr('computer')}</span>}
                 {said(s)}
               </div>
             ))}
@@ -1000,15 +1019,15 @@ function DominoTable({ table, mySeat, tiles, icons, isHost, send, act, onLeave, 
               {table.seats.map((who, s) => (
                 <div key={s} className={`dom-player${table.settings.teams ? ` team t${sideOf(table, s)}` : ''}${r?.turn === s && table.phase === 'playing' ? ' turn' : ''}${s === mySeat ? ' me' : ''}`}>
                   {seatAvatar(who, s)}
-                  {table.settings.teams && <span className="dp-team" title={`Team ${sideOf(table, s) + 1} (the score is the team’s)`}>T{sideOf(table, s) + 1}</span>}
-                  <span className="dp-name">{s === mySeat ? 'You' : who?.name}</span>
+                  {table.settings.teams && <span className="dp-team" title={tr('Team {n} (the score is the team’s)', { n: sideOf(table, s) + 1 })}>{tr('T{n}', { n: sideOf(table, s) + 1 })}</span>}
+                  <span className="dp-name">{s === mySeat ? tr('You') : who?.name}</span>
                   <span className="dp-info">
-                    <b title="Tiles in hand">{counts[s] ?? 0}</b>
-                    <small title={byRounds(table) ? 'Rounds won' : 'Score so far'}>{table.match?.scores[sideOf(table, s)] ?? 0} {byRounds(table) ? 'won' : 'pts'}{setsWon(table, sideOf(table, s)) > 0 ? ` · ${setsWon(table, sideOf(table, s))} set${setsWon(table, sideOf(table, s)) === 1 ? '' : 's'}` : ''}</small>
+                    <b title={tr('Tiles in hand')}>{counts[s] ?? 0}</b>
+                    <small title={byRounds(table) ? tr('Rounds won') : tr('Score so far')}>{scoreCount(table, table.match?.scores[sideOf(table, s)] ?? 0)}{setsWon(table, sideOf(table, s)) > 0 ? ` · ${setCount(setsWon(table, sideOf(table, s)))}` : ''}</small>
                   </span>
-                  {r?.markers?.[s] && <span className="dp-open" title="Train open to everyone">🚂</span>}
+                  {r?.markers?.[s] && <span className="dp-open" title={tr('Train open to everyone')}>🚂</span>}
                   {tv && <Standing n={counts[s] ?? 0} />}
-                  {who?.standIn && <span className="dp-away">computer</span>}
+                  {who?.standIn && <span className="dp-away">{tr('computer')}</span>}
                   {said(s)}
                 </div>
               ))}
@@ -1022,24 +1041,24 @@ function DominoTable({ table, mySeat, tiles, icons, isHost, send, act, onLeave, 
             {seatAvatar(who, s)}
             {tv && <Standing n={counts[s] ?? 0} />}
             <div className="nameplate">
-              <span className="spot-name">{s === mySeat ? 'You' : who?.name}</span>
-              <span className="spot-score dom-count" title="Tiles in hand">{counts[s] ?? 0}</span>
+              <span className="spot-name">{s === mySeat ? tr('You') : who?.name}</span>
+              <span className="spot-score dom-count" title={tr('Tiles in hand')}>{counts[s] ?? 0}</span>
             </div>
             {s === mySeat && call.joined && <MyCallButtons call={call} onMore={() => setCallOpen(true)} />}
-            {who && who.standIn && <div className="away">computer playing</div>}
+            {who && who.standIn && <div className="away">{tr('computer playing')}</div>}
             {said(s)}
           </div>
         ))}
         {!lines && !videoMode && VARIANTS[table.settings.variant].draws && table.phase === 'playing' && <div className="dom-boneyard"><Domino a={0} b={0} faceDown size={34} /> {boneyard}</div>}
         {r?.events?.length > 0 && <FivesPop key={r.events.length} event={r.events.at(-1)} table={table} />}
-        <ReactionsLayer reactions={reactions} names={table.seats.map((w, s) => (s === mySeat ? 'You' : w?.name))} />
+        <ReactionsLayer reactions={reactions} names={table.seats.map((w, s) => (s === mySeat ? tr('You') : w?.name))} />
       </div>
 
       {call.joined && !tv && mySeat < 0 && (
         <div className="online-call watching"><CallButtons call={call} size={18} /><SoundNote call={call} /></div>
       )}
       {callOpen && call.joined && (
-        <Sheet title="Video chat" short onClose={() => setCallOpen(false)} closeLabel="Done">
+        <Sheet title={tr('Video chat')} short onClose={() => setCallOpen(false)} closeLabel={tr('Done')}>
           <div className="call-sheet">
             <CallButtons call={{ ...call, leave: () => { setCallOpen(false); call.leave(); } }} size={22} />
             <SoundNote call={call} />
@@ -1047,15 +1066,16 @@ function DominoTable({ table, mySeat, tiles, icons, isHost, send, act, onLeave, 
         </Sheet>
       )}
       {joinOpen && !call.joined && (
-        <Sheet title="Video chat" short onClose={() => setJoinOpen(false)} closeLabel="Cancel">
+        <Sheet title={tr('Video chat')} short onClose={() => setJoinOpen(false)} closeLabel={tr('Cancel')}>
           <div className="blind-confirm">
-            <button type="button" className="primary big" onClick={() => { setJoinOpen(false); call.join(); }}><Icon name="video" /> Video and audio</button>
-            <button type="button" className="secondary big" onClick={() => { setJoinOpen(false); call.join({ audioOnly: true }); }}><Icon name="mic" /> Audio only</button>
+            <button type="button" className="primary big" onClick={() => { setJoinOpen(false); call.join(); }}><Icon name="video" /> {tr('Video and audio')}</button>
+            <button type="button" className="secondary big" onClick={() => { setJoinOpen(false); call.join({ audioOnly: true }); }}><Icon name="mic" /> {tr('Audio only')}</button>
           </div>
         </Sheet>
       )}
-      {inviteOpen && <Sheet title={`Game ${code}`} short onClose={() => setInviteOpen(false)} closeLabel="Done"><DomInvite code={code} /></Sheet>}
-      {tvOpen && <Sheet title="Companion TV" short onClose={() => setTvOpen(false)} closeLabel="Done"><TvInviteCard code={code} as="dtv" what="tiles" /></Sheet>}
+      {inviteOpen && <Sheet title={tr('Game {code}', { code })} short onClose={() => setInviteOpen(false)} closeLabel={tr('Done')}><DomInvite code={code} /></Sheet>}
+      {tvOpen && <Sheet title={tr('Companion TV')} short onClose={() => setTvOpen(false)} closeLabel={tr('Done')}><TvInviteCard code={code} as="dtv" what="tiles" /></Sheet>}
+      {rulesOpen && <RulesSheet gameId={table.settings.variant} onClose={() => setRulesOpen(false)} />}
       {decksOpen && <DeckPicker onClose={() => setDecksOpen(false)} />}
       {reactTo != null && canReact && (
         <ReactSheet table={table} mySeat={mySeat} icons={icons} to={reactTo} onTo={setReactTo}
@@ -1065,16 +1085,16 @@ function DominoTable({ table, mySeat, tiles, icons, isHost, send, act, onLeave, 
       {mySeat >= 0 && !tv && (
         <div className="hand-dock online-dock dom-dock" ref={dockRef}>
           <div className="dock-head">
-            {say && <button type="button" className="dom-talk-btn" onClick={() => setTalkOpen(true)} aria-label="Talk some trash">💬</button>}
-            <span>{table.phase === 'playing' ? (myTurn ? `Your turn${playStyle ? ` · ${styleWord(playStyle)}` : ''}` : `${table.seats[r.turn]?.name ?? '…'}’s turn`) : ''}</span>
-            <span>{tiles ? `${tiles.length} tile${tiles.length === 1 ? '' : 's'}` : ''}</span>
+            {say && <button type="button" className="dom-talk-btn" onClick={() => setTalkOpen(true)} aria-label={tr('Talk some trash')}>💬</button>}
+            <span>{table.phase === 'playing' ? (myTurn ? `${tr('Your turn')}${playStyle ? ` · ${styleWord(playStyle)}` : ''}` : tr('{name}’s turn', { name: table.seats[r.turn]?.name ?? '…' })) : ''}</span>
+            <span>{tiles ? tileCount(tiles.length) : ''}</span>
           </div>
           {/* tiles share the row (two even rows past 10), sized to the space: see .dom-hand in styles.css */}
           <div className="dom-hand" style={{ '--per': (tiles?.length ?? 0) > 10 ? Math.ceil(tiles.length / 2) : Math.max(tiles?.length ?? 1, 1) }}>
             {(tiles ?? []).map((t) => {
               const [a, b] = halves(t);
               return (
-                <button key={t} type="button" className={`dom-tile${selected === t ? ' sel' : ''}${myTurn && !playable.has(t) ? ' dim' : ''}`} onClick={() => tapTile(t)} {...holdHandlers(t)} aria-label={`${a} and ${b}`}>
+                <button key={t} type="button" className={`dom-tile${selected === t ? ' sel' : ''}${myTurn && !playable.has(t) ? ' dim' : ''}`} onClick={() => tapTile(t)} {...holdHandlers(t)} aria-label={tr('{a} and {b}', { a, b })}>
                   <Domino a={a} b={b} vertical size={86} />
                 </button>
               );
@@ -1083,15 +1103,15 @@ function DominoTable({ table, mySeat, tiles, icons, isHost, send, act, onLeave, 
           <div className="dock-action dom-actions">
             {myTurn && selected && forSelected.length > 0 && forSelected.length <= 3 && forSelected.map((m) => (
               <button key={m.arm ?? 'first'} type="button" className="primary big go" onClick={() => play(selected, m.arm)}>
-                {m.arm == null ? 'Play it' : forSelected.length === 1 ? 'Play' : lines ? lineName(table, m.arm, mySeat) : `On the ${openEnds(table).find((e) => e.arm === m.arm)?.value} ${ARM_NAMES[m.arm]}`}
+                {m.arm == null ? tr('Play it') : forSelected.length === 1 ? tr('Play') : lines ? lineName(table, m.arm, mySeat) : tr('On the {n} {side}', { n: openEnds(table).find((e) => e.arm === m.arm)?.value, side: tr(ARM_NAMES[m.arm]) })}
               </button>
             ))}
-            {myTurn && selected && forSelected.length > 3 && <p className="dock-hint">Tap the line to put it on.</p>}
-            {myTurn && !selected && lines && r?.openDouble && moves.length > 0 && <p className="dock-hint">Cover the double first.</p>}
-            {myTurn && moves.length === 0 && canDrawPublic(table) && <button type="button" className="primary big go" onClick={() => send('d-draw')}>Draw a tile</button>}
-            {myTurn && moves.length === 0 && !canDrawPublic(table) && <button type="button" className="secondary big" onClick={() => send('d-pass')}>✊ {kindOf(table) === 'train' ? 'Knock (your train opens)' : 'Knock'}</button>}
-            {canKnock && <p className="dock-hint">Nothing fits. Double-tap the table to knock.</p>}
-            {myTurn && !selected && moves.length > 0 && <p className="dock-hint">Tap a tile to play it. Hold it to slam or spin.</p>}
+            {myTurn && selected && forSelected.length > 3 && <p className="dock-hint">{tr('Tap the line to put it on.')}</p>}
+            {myTurn && !selected && lines && r?.openDouble && moves.length > 0 && <p className="dock-hint">{tr('Cover the double first.')}</p>}
+            {myTurn && moves.length === 0 && canDrawPublic(table) && <button type="button" className="primary big go" onClick={() => send('d-draw')}>{tr('Draw a tile')}</button>}
+            {myTurn && moves.length === 0 && !canDrawPublic(table) && <button type="button" className="secondary big" onClick={() => send('d-pass')}>✊ {kindOf(table) === 'train' ? tr('Knock (your train opens)') : tr('Knock')}</button>}
+            {canKnock && <p className="dock-hint">{tr('Nothing fits. Double-tap the table to knock.')}</p>}
+            {myTurn && !selected && moves.length > 0 && <p className="dock-hint">{tr('Tap a tile to play it. Hold it to slam or spin.')}</p>}
           </div>
         </div>
       )}
@@ -1104,7 +1124,7 @@ function DominoTable({ table, mySeat, tiles, icons, isHost, send, act, onLeave, 
       {callout && !washing && <DomCallout c={callout} />}
       {talk && <DomTalk talk={talk} />}
       {washing && <DomWash table={table} ms={WASH_MS} onSend={sendWash} bus={washBus} tv={tv} onSkip={() => setWashing(false)} />}
-      {talkOpen && say && <TalkSheet onClose={() => setTalkOpen(false)} onSay={(text, clip) => { if (say(text, clip)) setTalkOpen(false); else toast.show('Give it a second'); }} />}
+      {talkOpen && say && <TalkSheet onClose={() => setTalkOpen(false)} onSay={(text, clip, line) => { if (say(text, clip, line)) setTalkOpen(false); else toast.show(tr('Give it a second')); }} />}
       {albumOpen && <AlbumSheet onClose={() => setAlbumOpen(false)} />}
       {moment && !fly && (
         <DomMoment table={table} info={moment} snap={snapped} onClose={() => setMoment(null)}
@@ -1119,7 +1139,7 @@ function DominoTable({ table, mySeat, tiles, icons, isHost, send, act, onLeave, 
 /** A player's tiles standing on edge, backs out, for the TV: you can see how many they have left. */
 function Standing({ n }) {
   return (
-    <span className="dom-standing" aria-label={`${n} tiles left`}>
+    <span className="dom-standing" aria-label={tr('{n} tiles left', { n })}>
       {Array.from({ length: Math.min(n, 14) }, (_, i) => <Domino key={i} a={0} b={0} faceDown vertical size={30} />)}
       {n > 14 && <small>+{n - 14}</small>}
     </span>
@@ -1127,6 +1147,7 @@ function Standing({ n }) {
 }
 
 const ARM_NAMES = { L: '(left)', R: '(right)', U: '(top)', D: '(bottom)' };
+const SWIPE_TO_PLAY = { up: 'Swipe up to play', down: 'Swipe down to play', left: 'Swipe left to play', right: 'Swipe right to play' };
 
 /** Your legal moves, worked out from the public table plus your own tiles. */
 function movesFor(table, seat, tiles) {
@@ -1139,19 +1160,22 @@ const canDrawPublic = (table) => VARIANTS[table.settings.variant].draws && (tabl
 
 /** A side's name with first names only ("Nick & Ann"), for the small score boxes. */
 const firstNames = (table, i) => (table.settings.teams
-  ? table.seats.filter((_, s) => sideOf(table, s) === i).map((x) => x?.name?.split(' ')[0]).filter(Boolean).join(' & ') || `Team ${i + 1}`
+  ? table.seats.filter((_, s) => sideOf(table, s) === i).map((x) => x?.name?.split(' ')[0]).filter(Boolean).join(' & ') || tr('Team {n}', { n: i + 1 })
   : sideName(table, i).split(' ')[0]);
 const setsWon = (table, i) => table.match?.sets?.[i] ?? 0;
+const setCount = (n) => (n === 1 ? tr('{n} set', { n }) : tr('{n} sets', { n }));
+const tileCount = (n) => (n === 1 ? tr('{n} tile', { n }) : tr('{n} tiles', { n }));
+const scoreCount = (table, n) => (byRounds(table) ? tr('{n} won', { n }) : tr('{n} pts', { n }));
 const sideName = (table, i) => {
   if (table.settings.teams) {
     const names = table.seats.filter((_, s) => sideOf(table, s) === i).map((x) => x?.name).filter(Boolean);
-    return names.join(' & ') || `Team ${i + 1}`;
+    return names.join(' & ') || tr('Team {n}', { n: i + 1 });
   }
-  return table.seats[i]?.name ?? `Player ${i + 1}`;
+  return table.seats[i]?.name ?? tr('Player {n}', { n: i + 1 });
 };
 
 /** The line of play, scaled to fit the table, with buttons on the ends the picked tile can go. */
-function Board({ table, selectedMoves, onEnd, maxUnit = 38, aimSpots = [], flight = null }) {
+export function Board({ table, selectedMoves, onEnd, maxUnit = 38, aimSpots = [], flight = null }) {
   const box = useRef(null);
   const [size, setSize] = useState({ w: 360, h: 300 });
   useEffect(() => {
@@ -1176,7 +1200,7 @@ function Board({ table, selectedMoves, onEnd, maxUnit = 38, aimSpots = [], fligh
         </div>
       ))}
       {Object.entries(ends).filter(([arm]) => pickArms.has(arm)).map(([arm, e]) => (
-        <button key={arm} type="button" className="dom-end" style={{ left: ox + e.x * unit, top: oy + e.y * unit, width: unit * 1.6, height: unit * 1.6 }} onClick={() => onEnd(arm)} aria-label="Play here">+</button>
+        <button key={arm} type="button" className="dom-end" style={{ left: ox + e.x * unit, top: oy + e.y * unit, width: unit * 1.6, height: unit * 1.6 }} onClick={() => onEnd(arm)} aria-label={tr('Play here')}>+</button>
       ))}
       {aimSpots.map((sp) => {
         const e = sp.arm == null ? { x: 0, y: 0 } : ends[sp.arm];
@@ -1186,7 +1210,7 @@ function Board({ table, selectedMoves, onEnd, maxUnit = 38, aimSpots = [], fligh
           <span key={sp.dir} className="dom-aim" style={{ left: tiles.length ? Math.min(size.w - px / 2, Math.max(px / 2, ox + e.x * unit)) : size.w / 2, top: tiles.length ? Math.min(size.h - px / 2, Math.max(px / 2, oy + e.y * unit)) : size.h / 2, width: px, height: px, '--aim': AIM[sp.dir].color, fontSize: px * 0.5 }}>{AIM[sp.dir].arrow}</span>
         );
       })}
-      {!tiles.length && !aimSpots.length && table.phase === 'playing' && <p className="dom-board-hint">{table.round.mustPlay ? `${table.seats[table.round.turn]?.name ?? 'Someone'} starts with the ${table.round.mustPlay.replace('-', '|')}` : 'First tile: anything goes'}</p>}
+      {!tiles.length && !aimSpots.length && table.phase === 'playing' && <p className="dom-board-hint">{table.round.mustPlay ? tr('{name} starts with the {tile}', { name: table.seats[table.round.turn]?.name ?? tr('Someone'), tile: table.round.mustPlay.replace('-', '|') }) : tr('First tile: anything goes')}</p>}
     </div>
   );
 }
@@ -1195,7 +1219,7 @@ function Board({ table, selectedMoves, onEnd, maxUnit = 38, aimSpots = [], fligh
  * Mexican Train and Chicken Foot: one row per line, each starting from what it comes off (the middle double, or a
  * chicken foot's double), showing the newest tiles. When your picked tile fits a line, tap that row to play it.
  */
-function LinesBoard({ table, mySeat, icons, selectedMoves, onEnd, tv, aimSpots = [], flight = null }) {
+export function LinesBoard({ table, mySeat, icons, selectedMoves, onEnd, tv, aimSpots = [], flight = null }) {
   const box = useRef(null);
   const [size, setSize] = useState({ w: 340, h: 300 });
   useEffect(() => {
@@ -1240,19 +1264,19 @@ function LinesBoard({ table, mySeat, icons, selectedMoves, onEnd, tv, aimSpots =
             <span className="dom-row-label" style={{ width: labelW }}>
               {train
                 ? (l.owner == null
-                  ? <><span className="dom-row-icon">🚂</span><span className="dom-row-mex">Mexican<br />Train</span></>
-                  : <><Avatar value={who ? icons[who.id] : null} name={who?.name ?? '?'} bot={who?.bot} className="dom-row-avatar" /><span>{l.owner === mySeat ? 'You' : who?.name}</span>{open && <span className="dom-row-open" title="Open to everyone">🚂</span>}</>)
+                  ? <><span className="dom-row-icon">🚂</span><span className="dom-row-mex">{tx('Mexican{br}Train', { br: <br /> })}</span></>
+                  : <><Avatar value={who ? icons[who.id] : null} name={who?.name ?? '?'} bot={who?.bot} className="dom-row-avatar" /><span>{l.owner === mySeat ? tr('You') : who?.name}</span>{open && <span className="dom-row-open" title={tr('Open to everyone')}>🚂</span>}</>)
                 : (() => { const [a, b] = halves(l.on); return <Domino a={a} b={b} vertical size={rowH * 0.95} />; })()}
             </span>
             <span className="dom-row-tiles">
               {hidden > 0 && <span className="dom-row-more">+{hidden}</span>}
-              {!l.tiles.length && <span className="dom-row-empty">{mustFill ? `needs a ${l.start}` : `starts with a ${l.start}`}</span>}
+              {!l.tiles.length && <span className="dom-row-empty">{mustFill ? tr('needs a {n}', { n: l.start }) : tr('starts with a {n}', { n: l.start })}</span>}
               {shown.map((p) => (
                 <span key={p.t} className={`dom-row-tile${p.t === lastTile ? ' last' : ''}${p.inner === p.outer ? ' double' : ''}${flight?.tile === p.t ? flight.className : ''}`} style={flight?.tile === p.t ? flight.style : undefined}>
                   <Domino a={p.inner} b={p.outer} size={tileLong} />
                 </span>
               ))}
-              {can && <span className="dom-row-go" aria-label="Play here">+</span>}
+              {can && <span className="dom-row-go" aria-label={tr('Play here')}>+</span>}
               {aimed && <span className="dom-row-aim" style={{ background: aimed.color }}>{aimed.arrow}</span>}
             </span>
           </div>
@@ -1330,9 +1354,9 @@ function DomHandView({ table, mySeat, tiles, moves, myTurn, boneyard, call, send
     } else setPlayStyle(style);
   };
   const label = (sp) => {
-    if (sp.arm == null) return 'Play it here';
+    if (sp.arm == null) return tr('Play it here');
     if (lines) return lineName(table, sp.arm, mySeat);
-    return `On the ${openEnds(table).find((e) => e.arm === sp.arm)?.value} ${ARM_NAMES[sp.arm]}`;
+    return tr('On the {n} {side}', { n: openEnds(table).find((e) => e.arm === sp.arm)?.value, side: tr(ARM_NAMES[sp.arm]) });
   };
   // arrow keys on a computer
   useEffect(() => {
@@ -1353,8 +1377,8 @@ function DomHandView({ table, mySeat, tiles, moves, myTurn, boneyard, call, send
     const tile = el?.dataset.tile ?? null;
     let picked = selected;
     if (tile) {
-      if (!myTurn) { setNote(`It’s ${table.seats[r?.turn]?.name ?? 'someone else'}’s turn`); return; }
-      if (!playable.has(tile)) { setNote(moves.length ? 'That one doesn’t fit anywhere yet' : 'None of your tiles fit'); return; }
+      if (!myTurn) { setNote(tr('It’s {name}’s turn', { name: table.seats[r?.turn]?.name ?? tr('someone else') })); return; }
+      if (!playable.has(tile)) { setNote(moves.length ? tr('That one doesn’t fit anywhere yet') : tr('None of your tiles fit')); return; }
       if (tile !== selected) { buzz(15); setSelected(tile); setPage(0); }
       picked = tile;
     }
@@ -1389,15 +1413,15 @@ function DomHandView({ table, mySeat, tiles, moves, myTurn, boneyard, call, send
     setDrag(null);
     if (!s) return;
     const dir = swipeDirection(e.clientX - s.x, e.clientY - s.y);
-    if (dir) { if (!playTo(dir)) setNote('No color that way'); return; }
+    if (dir) { if (!playTo(dir)) setNote(tr('No color that way')); return; }
     if (!s.onTile) { setSelected(null); setPage(0); } // a tap off the tiles: put it back
   };
   const dragDir = drag ? swipeDirection(drag.x, drag.y, 16) : null;
 
   const { width, perRow } = handTileWidth(tiles.length, box.w, box.h);
-  const message = note ?? (!playing ? '' : !myTurn ? `${table.seats[r?.turn]?.name ?? '…'}’s turn`
-    : selected ? `${playStyle ? `${styleWord(playStyle)}: ` : ''}${spots.length > 1 ? 'Swipe toward a color' : `Swipe ${spots[0]?.dir ?? 'up'} to play`}`
-      : moves.length ? 'Your turn: pick a domino, or hold one to slam or spin' : canDrawPublic(table) ? 'Nothing fits: draw a tile' : 'Nothing fits: double-tap to knock');
+  const message = note ?? (!playing ? '' : !myTurn ? tr('{name}’s turn', { name: table.seats[r?.turn]?.name ?? '…' })
+    : selected ? `${playStyle ? `${styleWord(playStyle)}: ` : ''}${spots.length > 1 ? tr('Swipe toward a color') : tr(SWIPE_TO_PLAY[spots[0]?.dir ?? 'up'])}`
+      : moves.length ? tr('Your turn: pick a domino, or hold one to slam or spin') : canDrawPublic(table) ? tr('Nothing fits: draw a tile') : tr('Nothing fits: double-tap to knock'));
   return (
     <>
     <div className={`dom-handview${myTurn && playing ? ' my-turn' : ''}`} ref={root} onContextMenu={(e) => e.preventDefault()} onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={() => { stopHold(); start.current = null; setDrag(null); }}>
@@ -1408,9 +1432,9 @@ function DomHandView({ table, mySeat, tiles, moves, myTurn, boneyard, call, send
         </button>
       ))}
       <div className="dh-top">
-        <button type="button" className="dh-exit" onClick={onExit}><Icon name="close" size={16} /> Table</button>
-        <span className={`dh-count${byDir.up ? ' hide' : ''}`}>{tiles.length} tile{tiles.length === 1 ? '' : 's'}{VARIANTS[table.settings.variant].draws ? ` · ${boneyard} to draw` : ''}</span>
-        {onTalk && <button type="button" className="dom-talk-btn" onClick={onTalk} aria-label="Talk some trash">💬</button>}
+        <button type="button" className="dh-exit" onClick={onExit}><Icon name="close" size={16} /> {tr('Table')}</button>
+        <span className={`dh-count${byDir.up ? ' hide' : ''}`}>{tileCount(tiles.length)}{VARIANTS[table.settings.variant].draws ? ` · ${tr('{n} to draw', { n: boneyard })}` : ''}</span>
+        {onTalk && <button type="button" className="dom-talk-btn" onClick={onTalk} aria-label={tr('Talk some trash')}>💬</button>}
         {call.joined && <MyCallButtons call={call} onMore={onMore} />}
       </div>
       <p className={`dh-status${myTurn && playing ? ' turn' : ''}`} role="status">{message}</p>
@@ -1420,7 +1444,7 @@ function DomHandView({ table, mySeat, tiles, moves, myTurn, boneyard, call, send
             const [a, b] = halves(t);
             const sel = selected === t;
             return (
-              <button key={t} type="button" data-tile={t} className={`dh-tile${sel ? ' sel' : ''}${myTurn && !playable.has(t) ? ' dim' : ''}`} aria-label={`${a} and ${b}`} aria-pressed={sel}
+              <button key={t} type="button" data-tile={t} className={`dh-tile${sel ? ' sel' : ''}${myTurn && !playable.has(t) ? ' dim' : ''}`} aria-label={tr('{a} and {b}', { a, b })} aria-pressed={sel}
                 style={sel && drag ? { transform: `translate(${drag.x}px, ${drag.y}px) scale(1.06)`, transition: 'none' } : undefined}>
                 <Domino a={a} b={b} vertical size={width * 2} />
               </button>
@@ -1429,9 +1453,9 @@ function DomHandView({ table, mySeat, tiles, moves, myTurn, boneyard, call, send
         </div>
       </div>
       <div className="dh-actions">
-        {pages.length > 1 && <button type="button" className="secondary" onClick={() => setPage((p) => (p + 1) % pages.length)}>More spots ({page + 1} of {pages.length})</button>}
-        {myTurn && playing && moves.length === 0 && canDrawPublic(table) && <button type="button" className="primary big go" onClick={() => send('d-draw')}>Draw a tile</button>}
-        {myTurn && playing && moves.length === 0 && !canDrawPublic(table) && <button type="button" className="secondary big" onClick={() => send('d-pass')}>✊ {kindOf(table) === 'train' ? 'Knock (your train opens)' : 'Knock'}</button>}
+        {pages.length > 1 && <button type="button" className="secondary" onClick={() => setPage((p) => (p + 1) % pages.length)}>{tr('More spots ({n} of {m})', { n: page + 1, m: pages.length })}</button>}
+        {myTurn && playing && moves.length === 0 && canDrawPublic(table) && <button type="button" className="primary big go" onClick={() => send('d-draw')}>{tr('Draw a tile')}</button>}
+        {myTurn && playing && moves.length === 0 && !canDrawPublic(table) && <button type="button" className="secondary big" onClick={() => send('d-pass')}>✊ {kindOf(table) === 'train' ? tr('Knock (your train opens)') : tr('Knock')}</button>}
       </div>
     </div>
     {held && myTurn && <TileStyleSheet tile={held} onPick={pickStyle} onClose={() => setHeld(null)} />}
@@ -1458,7 +1482,7 @@ function HandResult({ table, isHost, act, onLeave }) {
     return () => clearInterval(t);
   }, [over]);
   const winnerName = res.winner != null ? sideName(table, res.winner) : null;
-  const plural = table.settings.teams ? '' : 's';
+  const teams = table.settings.teams;
   if (byRounds(table)) {
     const champ = table.match.winner;
     const need = roundsToWin(table);
@@ -1468,16 +1492,16 @@ function HandResult({ table, isHost, act, onLeave }) {
       <div className="dom-result">
         {over && <Confetti />}
         <div className="card dom-result-card">
-          <h2>{over ? `${sideName(table, champ)} win${plural} the set!` : res.reason === 'domino' ? `${table.seats[res.outSeat]?.name} went out!` : 'Blocked: nobody can play'}</h2>
+          <h2>{over ? (teams ? tr('{name} win the set!', { name: sideName(table, champ) }) : tr('{name} wins the set!', { name: sideName(table, champ) })) : res.reason === 'domino' ? tr('{name} went out!', { name: table.seats[res.outSeat]?.name }) : tr('Blocked: nobody can play')}</h2>
           <p className="muted">
-            {winnerName
-              ? `${winnerName} win${plural} the round${blocked ? ` with the fewest dots (${fewest})` : ''}.`
-              : 'A tie for the fewest dots: nobody wins this round.'}
-            {!over && need ? ` First to ${need} wins the set.` : ''}
+            {!winnerName ? tr('A tie for the fewest dots: nobody wins this round.')
+              : blocked ? (teams ? tr('{name} win the round with the fewest dots ({n}).', { name: winnerName, n: fewest }) : tr('{name} wins the round with the fewest dots ({n}).', { name: winnerName, n: fewest }))
+                : (teams ? tr('{name} win the round.', { name: winnerName }) : tr('{name} wins the round.', { name: winnerName }))}
+            {!over && need ? ` ${tr('First to {n} wins the set.', { n: need })}` : ''}
           </p>
           {blocked && (
             <div className="dom-dots">
-              <div className="section-title">Dots left</div>
+              <div className="section-title">{tr('Dots left')}</div>
               {res.seatPips.map((p, s) => (
                 <div key={s} className={`dom-dots-row${p === fewest ? ' best' : ''}`}><span>{table.seats[s]?.name}</span><b>{p}</b></div>
               ))}
@@ -1487,17 +1511,17 @@ function HandResult({ table, isHost, act, onLeave }) {
             {table.match.scores.map((sc, i) => (
               <div key={i} className={`dom-result-row${res.winner === i ? ' best' : ''}`}>
                 <span>{sideName(table, i)}</span>
-                <b>{sc}<small> {sc === 1 ? 'round' : 'rounds'}</small></b>
-                <small>{setsWon(table, i) ? `${setsWon(table, i)} set${setsWon(table, i) === 1 ? '' : 's'}` : ''}</small>
+                <b>{sc}<small> {sc === 1 ? tr('round') : tr('rounds')}</small></b>
+                <small>{setsWon(table, i) ? setCount(setsWon(table, i)) : ''}</small>
               </div>
             ))}
           </div>
           {over
             ? (isHost
-              ? <button type="button" className="primary big go" onClick={() => act((t) => startMatch(t))}>Next set</button>
-              : <p className="muted">The host can start the next set.</p>)
-            : <p className="muted small">Next round in {left}…</p>}
-          {over && <button type="button" className="text-btn" onClick={onLeave}>Leave</button>}
+              ? <button type="button" className="primary big go" onClick={() => act((t) => startMatch(t))}>{tr('Next set')}</button>
+              : <p className="muted">{tr('The host can start the next set.')}</p>)
+            : <p className="muted small">{tr('Next round in {n}…', { n: left })}</p>}
+          {over && <button type="button" className="text-btn" onClick={onLeave}>{tr('Leave')}</button>}
         </div>
       </div>
     );
@@ -1509,19 +1533,19 @@ function HandResult({ table, isHost, act, onLeave }) {
       <div className="dom-result">
         {over && <Confetti />}
         <div className="card dom-result-card">
-          <h2>{over ? (champ != null ? `${sideName(table, champ)} win${table.settings.teams ? '' : 's'} the game!` : 'It’s a tie!') : res.reason === 'domino' ? `${table.seats[res.outSeat]?.name} went out!` : 'Blocked: nobody can play'}</h2>
-          <p className="muted">{over ? 'Lowest total wins.' : `${res.reason === 'blocked' && winnerName ? `${winnerName} had the lowest hand. ` : ''}Round ${table.match.hands.length} of ${roundsOf(table)} done. Pips left in your hand count against you.`}</p>
+          <h2>{over ? (champ != null ? (teams ? tr('{name} win the game!', { name: sideName(table, champ) }) : tr('{name} wins the game!', { name: sideName(table, champ) })) : tr('It’s a tie!')) : res.reason === 'domino' ? tr('{name} went out!', { name: table.seats[res.outSeat]?.name }) : tr('Blocked: nobody can play')}</h2>
+          <p className="muted">{over ? tr('Lowest total wins.') : `${res.reason === 'blocked' && winnerName ? `${tr('{name} had the lowest hand.', { name: winnerName })} ` : ''}${tr('Round {n} of {m} done. Pips left in your hand count against you.', { n: table.match.hands.length, m: roundsOf(table) })}`}</p>
           <div className="dom-result-rows">
             {order.map(({ sc, i }) => (
-              <div key={i} className={`dom-result-row${over && i === champ ? ' best' : ''}`}><span>{sideName(table, i)}</span><b>{sc}</b><small>{res.points[i] > 0 ? `+${res.points[i]}` : 'out'}</small></div>
+              <div key={i} className={`dom-result-row${over && i === champ ? ' best' : ''}`}><span>{sideName(table, i)}</span><b>{sc}</b><small>{res.points[i] > 0 ? `+${res.points[i]}` : tr('out')}</small></div>
             ))}
           </div>
           {over
             ? (isHost
-              ? <button type="button" className="primary big go" onClick={() => act((t) => startMatch(t))}>Play again</button>
-              : <p className="muted">The host can start another game.</p>)
-            : <p className="muted small">Next round ({Math.max(0, table.settings.setMax - table.match.hands.length)}|{Math.max(0, table.settings.setMax - table.match.hands.length)} in the middle) in {left}…</p>}
-          {over && <button type="button" className="text-btn" onClick={onLeave}>Leave</button>}
+              ? <button type="button" className="primary big go" onClick={() => act((t) => startMatch(t))}>{tr('Play again')}</button>
+              : <p className="muted">{tr('The host can start another game.')}</p>)
+            : <p className="muted small">{tr('Next round ({n}|{n} in the middle) in {left}…', { n: Math.max(0, table.settings.setMax - table.match.hands.length), left })}</p>}
+          {over && <button type="button" className="text-btn" onClick={onLeave}>{tr('Leave')}</button>}
         </div>
       </div>
     );
@@ -1530,8 +1554,8 @@ function HandResult({ table, isHost, act, onLeave }) {
     <div className="dom-result">
       {over && <Confetti />}
       <div className="card dom-result-card">
-        <h2>{over ? `${sideName(table, table.match.winner)} win${table.settings.teams ? '' : 's'} the game!` : res.reason === 'domino' ? `${table.seats[res.outSeat]?.name} went out!` : 'Blocked: nobody can play'}</h2>
-        {!over && <p className="muted">{winnerName ? `${winnerName} score${table.settings.teams ? '' : 's'} ${res.points[res.winner]}` : 'A tie: no points this hand'}</p>}
+        <h2>{over ? (teams ? tr('{name} win the game!', { name: sideName(table, table.match.winner) }) : tr('{name} wins the game!', { name: sideName(table, table.match.winner) })) : res.reason === 'domino' ? tr('{name} went out!', { name: table.seats[res.outSeat]?.name }) : tr('Blocked: nobody can play')}</h2>
+        {!over && <p className="muted">{winnerName ? (teams ? tr('{name} score {n}', { name: winnerName, n: res.points[res.winner] }) : tr('{name} scores {n}', { name: winnerName, n: res.points[res.winner] })) : tr('A tie: no points this hand')}</p>}
         <div className="dom-result-rows">
           {table.match.scores.map((s, i) => (
             <div key={i} className="dom-result-row"><span>{sideName(table, i)}</span><b>{s}</b>{res.points[i] > 0 && <small>+{res.points[i]}</small>}</div>
@@ -1539,10 +1563,10 @@ function HandResult({ table, isHost, act, onLeave }) {
         </div>
         {over
           ? (isHost
-            ? <button type="button" className="primary big go" onClick={() => act((t) => startMatch(t))}>Play again</button>
-            : <p className="muted">The host can start another game.</p>)
-          : <p className="muted small">Next hand in {left}…</p>}
-        {over && <button type="button" className="text-btn" onClick={onLeave}>Leave</button>}
+            ? <button type="button" className="primary big go" onClick={() => act((t) => startMatch(t))}>{tr('Play again')}</button>
+            : <p className="muted">{tr('The host can start another game.')}</p>)
+          : <p className="muted small">{tr('Next hand in {n}…', { n: left })}</p>}
+        {over && <button type="button" className="text-btn" onClick={onLeave}>{tr('Leave')}</button>}
       </div>
     </div>
   );

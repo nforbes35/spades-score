@@ -3,6 +3,7 @@
 // each get their own robot. Icons are swapped between the devices in a game (useAvatars).
 import { useEffect, useRef, useState } from 'react';
 import { tabRead, tabWrite } from './store.js';
+import { tr } from './i18n.js';
 
 const NAME_KEY = 'spades-online-name';
 const AVATAR_KEY = 'spades-avatar';
@@ -71,7 +72,7 @@ export function loadImage(file) {
     const url = URL.createObjectURL(file);
     const img = new Image();
     img.onload = () => resolve(img);
-    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('That picture couldn’t be opened.')); };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error(tr('That picture couldn’t be opened.'))); };
     img.src = url;
   });
 }

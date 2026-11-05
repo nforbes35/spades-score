@@ -120,3 +120,16 @@ plain words, keep text large and buttons big, check every screen fits a 320px ph
 - Live site: https://spades-score-three.vercel.app (Vercel project `spades-score`, private repo
   nforbes35/spades-score). Pushing `main` publishes automatically; get the owner's OK first.
   Manual fallback: `npx vercel deploy --prod --yes`.
+
+## Languages (English / Spanish)
+- `src/lib/i18n.js`: per-device language (`family-games-lang`; first time, the device's language). `tr('English wording', { blanks })`,
+  `tx(...)` when a blank is JSX. English is the key; Spanish lives in `src/i18n/es-*.js`. `test/i18n.test.js` fails if a `tr('…')` has no Spanish.
+- Call `tr` while drawing, never in a module-level constant (it wouldn't follow a change of language): keep the English in the constant and call `tr(item.name)` where it's shown.
+- Text that travels to other devices (table state, room messages, push) must not be translated by the sender: send `langMsg('{a} wins', { a })` and show it with `tMsg(...)`. Saved data (game logs, undo labels already stored) stays as it was written.
+- Player names, the app name "Family Games", "Papi" and game names (Spades, Mexican Train keeps "Tren mexicano") aren't people's words to change: names stay as typed.
+- Spanish is Latin American, informal (tú): ficha = domino tile, carta = card, baza = book/trick, apuesta/apostar = bid, picas = spades, corazones, diamantes, tréboles, repartir = deal, mano = hand, pozo = boneyard, sala = room, anfitrión = host, equipo = team, marcador = score, computadora = computer player, puya = a line of trash talk.
+- Trash talk: `TALK_LINES` has both wordings; a typed line is translated by each listener whose language differs (`src/lib/translate.js`, MyMemory, free, no key), with the original shown small. A recorded voice stays as recorded; only its caption is translated.
+
+## Learn to play (`src/learn/`)
+- `rules.js`: each game's rules and strategy as { en, es } side by side; keep them matching the engines. `Learn.jsx`: the screen (hub, Home, Dominoes home) and `RulesSheet` (in-game menus).
+- `Practice.jsx`: a practice game run right on the device with the real engines, nothing sent or saved. `coach.js` (pure; test/learn.test.js plays whole games through it) picks a move and says why; `lessons.js` holds the opening lessons and the ones given the first time something happens. Lessons pause the bots.

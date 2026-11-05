@@ -1,4 +1,5 @@
 import { test } from 'node:test';
+import { tMsg } from '../src/lib/i18n.js';
 import { calloutFor, momentFor, toDomRecord, mergeDomLog, domStats, headToHead, rivalryLines, validClip } from '../src/dominoes/fun.js';
 import assert from 'node:assert/strict';
 import {
@@ -493,9 +494,9 @@ test('records: wins, streaks, head to head and the lines at the start of a game'
   assert.equal(stats[0].name, 'Papi');
   assert.deepEqual([stats[0].wins, stats[0].losses], [3, 2]);
   assert.deepEqual(headToHead(log, ['Papi', 'Nick']), [{ a: 'Papi', b: 'Nick', aw: 3, bw: 2 }]);
-  assert.deepEqual(rivalryLines(log, ['Papi', 'Nick']), ['Papi leads Nick, 3 games to 2']);
+  assert.deepEqual(rivalryLines(log, ['Papi', 'Nick']).map(tMsg), ['Papi leads Nick, 3 games to 2']);
   const moreLog = mergeDomLog(log, [game('6', 0, 'Papi', 'Nick')]);
-  assert.ok(rivalryLines(moreLog, ['Papi', 'Nick']).includes('Papi has won 2 in a row'));
+  assert.ok(rivalryLines(moreLog, ['Papi', 'Nick']).map(tMsg).includes('Papi has won 2 in a row'));
   // the same game twice counts once; junk from another device is ignored
   assert.equal(mergeDomLog(log, [game('1', 1, 'A', 'B'), { id: 7 }, null]).length, 5);
 });

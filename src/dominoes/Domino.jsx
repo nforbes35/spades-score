@@ -1,6 +1,8 @@
 // A domino tile drawn as SVG: two halves with pips for 0–12 (double-12 sets), each number in its own colour
 // like a real coloured-pip set. `a`/`b` are the halves (top/left first); `vertical` stands it up.
 
+import { tr } from '../lib/i18n.js';
+
 // Pip spots on a half that is 1 × 1, as [x, y] (0–1). Up to 9 use a 3 × 3 grid, 10–12 a 3 × 4 grid.
 const G3 = [0.22, 0.5, 0.78];
 const G4 = [0.17, 0.39, 0.61, 0.83];
@@ -41,7 +43,7 @@ export default function Domino({ a, b, vertical = false, size = 80, colored = tr
   const long = size, short = size / 2;
   return (
     <svg className={`domino${faceDown ? ' face-down' : ''} ${className}`} width={vertical ? short : long} height={vertical ? long : short}
-      viewBox={`-0.04 -0.04 ${w + 0.08} ${h + 0.08}`} role="img" aria-label={faceDown ? 'Domino, face down' : `Domino ${a}–${b}`} style={style} {...rest}>
+      viewBox={`-0.04 -0.04 ${w + 0.08} ${h + 0.08}`} role="img" aria-label={faceDown ? tr('Domino, face down') : tr('Domino {a}–{b}', { a, b })} style={style} {...rest}>
       <rect x="0" y="0" width={w} height={h} rx="0.13" className="domino-body" />
       {faceDown ? (
         <circle cx={w / 2} cy={h / 2} r="0.12" className="domino-spinner" />

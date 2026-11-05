@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { playerName, remoteSeats } from './lib/table.js';
 import { useRoom } from './lib/room.js';
 import { useDevice, isTvScreen, rememberTvScreen, rememberedAsPlayer } from './lib/device.js';
-import { Icon } from './components.jsx';
+import { Icon, LangToggle } from './components.jsx';
+import { tr } from './lib/i18n.js';
 
 /** After typing a game code: play as one of the remote seats, join the video, or be the TV. */
 export default function JoinAs({ code, onChoose: choose, onLeave }) {
@@ -51,20 +52,21 @@ export default function JoinAs({ code, onChoose: choose, onLeave }) {
       <div className="app">
         <header className="hero">
           <div className="wrap hero-row">
-            <div className="brand"><span className="brand-mark">{dom ? '🁫' : '♠'}</span><h1>Join game {code}</h1></div>
-            <button type="button" className="icon-btn" onClick={onLeave}>Cancel</button>
+            <div className="brand"><span className="brand-mark">{dom ? '🁫' : '♠'}</span><h1>{tr('Join game {code}', { code })}</h1></div>
+            <button type="button" className="icon-btn" onClick={onLeave}>{tr('Cancel')}</button>
           </div>
         </header>
         <main className="wrap">
-          <div className="section-title">How are you joining?</div>
+          <LangToggle />
+          <div className="section-title">{tr('How are you joining?')}</div>
           <div className="stack">
             <button type="button" className="card join-choice" onClick={() => onChoose(dom ? 'dominoes' : 'online', null)}>
               <Icon name="phone" />
-              <span><b>Play on this phone</b><br /><span className="muted small">{dom ? 'Your tiles' : 'Your cards, bids'} and video chat.</span></span>
+              <span><b>{tr('Play on this phone')}</b><br /><span className="muted small">{dom ? tr('Your tiles and video chat.') : tr('Your cards, bids and video chat.')}</span></span>
             </button>
             <button type="button" className="card join-choice" onClick={() => onChoose(dom ? 'dtv' : 'otv', null)}>
               <Icon name="tv" />
-              <span><b>Show the table on this TV</b><br /><span className="muted small">The table big in the middle, everyone’s video and sound. Players keep their {dom ? 'tiles' : 'cards'} on their phones.</span></span>
+              <span><b>{tr('Show the table on this TV')}</b><br /><span className="muted small">{dom ? tr('The table big in the middle, everyone’s video and sound. Players keep their tiles on their phones.') : tr('The table big in the middle, everyone’s video and sound. Players keep their cards on their phones.')}</span></span>
             </button>
           </div>
         </main>
@@ -76,47 +78,48 @@ export default function JoinAs({ code, onChoose: choose, onLeave }) {
     <div className="app">
       <header className="hero">
         <div className="wrap hero-row">
-          <div className="brand"><span className="brand-mark">♠</span><h1>Join game {code}</h1></div>
-          <button type="button" className="icon-btn" onClick={onLeave}>Cancel</button>
+          <div className="brand"><span className="brand-mark">♠</span><h1>{tr('Join game {code}', { code })}</h1></div>
+          <button type="button" className="icon-btn" onClick={onLeave}>{tr('Cancel')}</button>
         </div>
       </header>
       <main className="wrap">
+        <LangToggle />
         {!game && (
           <div className="card waiting-card">
             <span className="spinner" />
-            <h2>Finding the table…</h2>
-            <p className="muted">Make sure the scorekeeper has Spades open and invited you.</p>
+            <h2>{tr('Finding the table…')}</h2>
+            <p className="muted">{tr('Make sure the scorekeeper has Spades open and invited you.')}</p>
             {slow && (
               <>
-                <p><b>Still can’t find game {code}.</b> Check the code. The game may have ended, or the host’s phone has the app closed.</p>
-                <button type="button" className="secondary" onClick={onLeave}>Back to home</button>
+                <p><b>{tr('Still can’t find game {code}.', { code })}</b> {tr('Check the code. The game may have ended, or the host’s phone has the app closed.')}</p>
+                <button type="button" className="secondary" onClick={onLeave}>{tr('Back to home')}</button>
               </>
             )}
           </div>
         )}
         {game && (
           <>
-            <div className="section-title">How are you joining?</div>
+            <div className="section-title">{tr('How are you joining?')}</div>
             <div className="stack">
               {seats.map((s) => (
                 <button key={s} type="button" className="card join-choice" onClick={() => onChoose('player', s)}>
                   <Icon name="phone" />
-                  <span><b>I’m {playerName(game, s)}</b><br /><span className="muted small">Play from this phone: your cards, bids and books.</span></span>
+                  <span><b>{tr('I’m {name}', { name: playerName(game, s) })}</b><br /><span className="muted small">{tr('Play from this phone: your cards, bids and books.')}</span></span>
                 </button>
               ))}
               {seats.map((s) => (
                 <button key={`card${s}`} type="button" className="card join-choice" onClick={() => onChoose('card', s)}>
                   <Icon name="cards" />
-                  <span><b>Show {playerName(game, s)}’s card</b><br /><span className="muted small">Lay this device on the table in {playerName(game, s)}’s spot. Their card fills the screen.</span></span>
+                  <span><b>{tr('Show {name}’s card', { name: playerName(game, s) })}</b><br /><span className="muted small">{tr('Lay this device on the table in {name}’s spot. Their card fills the screen.', { name: playerName(game, s) })}</span></span>
                 </button>
               ))}
               <button type="button" className="card join-choice" onClick={() => onChoose('guest', null)}>
                 <Icon name="video" />
-                <span><b>Video chat</b><br /><span className="muted small">Add your face, at the table or from home. No cards.</span></span>
+                <span><b>{tr('Video chat')}</b><br /><span className="muted small">{tr('Add your face, at the table or from home. No cards.')}</span></span>
               </button>
               <button type="button" className="card join-choice" onClick={() => onChoose('tv', null)}>
                 <Icon name="tv" />
-                <span><b>TV view</b><br /><span className="muted small">On a TV browser, laptop or iPad: the table big, everyone’s faces around it.</span></span>
+                <span><b>{tr('TV view')}</b><br /><span className="muted small">{tr('On a TV browser, laptop or iPad: the table big, everyone’s faces around it.')}</span></span>
               </button>
             </div>
           </>

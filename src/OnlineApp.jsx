@@ -17,6 +17,7 @@ import { useWakeLock, chime, buzz, dealSound, thud, glassBreak, cardSound, sweep
 import { recordGame, useStatsSync, nameKey } from './lib/stats.js';
 import Stats from './Stats.jsx';
 import DeckPicker from './DeckPicker.jsx';
+import { RulesSheet } from './learn/Learn.jsx';
 import { useDeck } from './lib/decks.js';
 import { Avatar, ProfileEditor } from './Avatar.jsx';
 import { loadName, saveName, loadAvatar, saveAvatar, useAvatars } from './lib/profile.js';
@@ -24,6 +25,7 @@ import { useTableLayout, Icon, FannedHand, BagMeter, PlayingCard, CardBack, Shee
 import { VideoTile, CallButtons, SoundNote, useTvStart, SoundPrompt } from './Video.jsx';
 import { HandRow } from './Scoreboard.jsx';
 import { history } from './lib/scoring.js';
+import { tr, tx, langMsg, tMsg, getLang, setLang, LANGS } from './lib/i18n.js';
 
 const ID_KEY = 'spades-device-id';
 const TV_ID_KEY = 'spades-tv-id';
@@ -81,14 +83,14 @@ export default function OnlineApp({ code, isHost, tv, onLeave, onPlayHere, onUse
   if (!named) {
     return (
       <div className="app">
-        <header className="hero"><div className="wrap hero-row"><div className="brand"><span className="brand-mark">♠</span><h1>Play Online</h1></div></div></header>
+        <header className="hero"><div className="wrap hero-row"><div className="brand"><span className="brand-mark">♠</span><h1>{tr('Play Online')}</h1></div></div></header>
         <main className="wrap">
           <form className="card waiting-card profile-card" onSubmit={(e) => { e.preventDefault(); if (name.trim()) { saveName(name.trim()); setNamed(true); } }}>
-            <h2>Who’s playing?</h2>
-            <p className="muted">Everyone at the table sees your name and icon.</p>
+            <h2>{tr('Who’s playing?')}</h2>
+            <p className="muted">{tr('Everyone at the table sees your name and icon.')}</p>
             <ProfileEditor name={name} avatar={avatar} onName={setName} onAvatar={changeAvatar} autoFocus={!name} />
-            <button type="submit" className="primary big go" disabled={!name.trim()}>Continue</button>
-            <button type="button" className="text-btn" onClick={onLeave}>Cancel</button>
+            <button type="submit" className="primary big go" disabled={!name.trim()}>{tr('Continue')}</button>
+            <button type="button" className="text-btn" onClick={onLeave}>{tr('Cancel')}</button>
           </form>
         </main>
       </div>
@@ -218,7 +220,7 @@ function OnlineRoom({ code, isHost = false, tv = false, name, avatar, onLeave, o
     if (m.type === 'o-table') setView(m.table);
     else if (m.type === 'o-hand' && keys && hostRef.current?.pub) {
       unseal(keys, hostRef.current.pub, m.box).then((cards) => setMyHand({ hand: m.hand, cards })).catch(() => {});
-    } else if (m.type === 'o-error') toast.show(m.text);
+    } else if (m.type === 'o-error') toast.show(tMsg(m.text)); // sent in English: shown in this device's language
     else if (m.type === 'o-ping') { chime(true); buzz([200, 100, 200]); }
     else if (m.type === 'o-closed' && from?.role === 'ohost') {
       setClosed({ by: m.by || from.name, saved: Boolean(m.saved) });
@@ -262,7 +264,7 @@ function OnlineRoom({ code, isHost = false, tv = false, name, avatar, onLeave, o
   // Players tell the host how to reach this phone (if alerts are on), and when the app goes off screen.
   useEffect(() => {
     if (!isHost && !tv && hostPeer) room.send({ type: 'o-alerts', sub: alerts.on ? alerts.sub : null }, hostPeer.id);
-  }, [isHost, tv, hostPeer?.id, alerts.on, alerts.sub?.endpoint]);
+  }, [isHost, tv, hostPeer?.id, alerts.on, alerts.sub?.endpoint, alerts.sub?.lang]);
   useEffect(() => {
     if (isHost || tv) return undefined;
     const tell = () => { if (hostRef.current) room.send({ type: 'o-vis', visible: document.visibilityState === 'visible' }, hostRef.current.id); };
@@ -283,7 +285,8 @@ function OnlineRoom({ code, isHost = false, tv = false, name, avatar, onLeave, o
       const away = awayIds.current.has(who.id) || !room.peers.some((p) => p.id === who.id);
       const sub = pushSubs.current[who.id];
       if (!away || !sub) return;
-      sendTurnAlert(sub, { body: now.phase === 'bidding' ? `${who.name}, it’s your bid` : `${who.name}, it’s your turn`, tag: `turn-${code}` })
+      // Worded by sendTurnAlert in the language of the phone it's going to
+      sendTurnAlert(sub, { body: now.phase === 'bidding' ? langMsg('{name}, it’s your bid', { name: who.name }) : langMsg('{name}, it’s your turn', { name: who.name }), tag: `turn-${code}` })
         .then((r) => { if (r.gone) delete pushSubs.current[who.id]; });
     }, TURN_ALERT_AFTER_MS);
     return () => clearTimeout(timer);
@@ -320,8 +323,8 @@ function OnlineRoom({ code, isHost = false, tv = false, name, avatar, onLeave, o
       act((x) => (x.phase === 'bidding' && `${x.game.hands.length}:${x.round.turn}` === bidTurn ? placeBid(x, s, botBid(x.round.hands[s])) : x));
       if (tableRef.current !== before) {
         const who = tableRef.current.seats[s];
-        if (who?.id === me.id) toast.show('Time’s up: the computer bid for you.');
-        else if (who) room.send({ type: 'o-error', text: 'Time’s up: the computer bid for you.' }, who.id);
+        if (who?.id === me.id) toast.show(tr('Time’s up: the computer bid for you.'));
+        else if (who) room.send({ type: 'o-error', text: 'Time’s up: the computer bid for you.' }, who.id); // English: the player's device translates it
       }
     }, bidTimer * 1000 + BID_GRACE_MS + (tableRef.current.round.bidsIn === 0 ? DEAL_MS : 0));
     return () => clearTimeout(timer);
@@ -395,7 +398,7 @@ function OnlineRoom({ code, isHost = false, tv = false, name, avatar, onLeave, o
     if (isHost) {
       const err = act((x) => (type === 'o-bid' ? placeBid(x, mySeat, body) : type === 'o-play' ? playCardAsHost(x, mySeat, body.card, body.style, undefined, Boolean(body.thrown))
         : type === 'o-papi-pick' ? papiPick(x, mySeat, body.n) : type === 'o-papi-guess' ? papiGuess(x, mySeat, body.n) : x));
-      if (err) toast.show(err);
+      if (err) toast.show(tMsg(err));
       return err;
     }
     const move = { type, ...body, hand: handNo };
@@ -428,15 +431,15 @@ function OnlineRoom({ code, isHost = false, tv = false, name, avatar, onLeave, o
   if (!shown) {
     return (
       <div className="app">
-        <header className="hero"><div className="wrap hero-row"><div className="brand"><span className="brand-mark">♠</span><h1>Game {code}</h1></div>
-          <button type="button" className="icon-btn" onClick={onLeave}>Leave</button></div></header>
+        <header className="hero"><div className="wrap hero-row"><div className="brand"><span className="brand-mark">♠</span><h1>{tr('Game {code}', { code })}</h1></div>
+          <button type="button" className="icon-btn" onClick={onLeave}>{tr('Leave')}</button></div></header>
         <main className="wrap">
-          <div className="card waiting-card"><span className="spinner" /><h2>Finding the host…</h2>
-            <p className="muted">Make sure whoever sent the link has the game open.</p>
+          <div className="card waiting-card"><span className="spinner" /><h2>{tr('Finding the host…')}</h2>
+            <p className="muted">{tr('Make sure whoever sent the link has the game open.')}</p>
             {slow && (
               <>
-                <p><b>Still can’t find game {code}.</b> It may have ended, or the host’s phone has the app closed.</p>
-                <button type="button" className="secondary" onClick={() => { forgetGame(code); onLeave(); }}>Back to home</button>
+                <p><b>{tr('Still can’t find game {code}.', { code })}</b> {tr('It may have ended, or the host’s phone has the app closed.')}</p>
+                <button type="button" className="secondary" onClick={() => { forgetGame(code); onLeave(); }}>{tr('Back to home')}</button>
               </>
             )}
           </div>
@@ -448,8 +451,8 @@ function OnlineRoom({ code, isHost = false, tv = false, name, avatar, onLeave, o
   const midGame = shown.phase !== 'lobby' && mySeat >= 0;
   const leave = () => {
     if (!confirm(isHost
-      ? (shown.phase === 'lobby' ? 'Close this game for everyone?' : 'End this game for everyone? Everyone sees the score so far and goes back to the home screen.')
-      : midGame ? 'Leave this game? The computer plays your seat until you rejoin from the home screen.' : 'Leave this game?')) return;
+      ? (shown.phase === 'lobby' ? tr('Close this game for everyone?') : tr('End this game for everyone? Everyone sees the score so far and goes back to the home screen.'))
+      : midGame ? tr('Leave this game? The computer plays your seat until you rejoin from the home screen.') : tr('Leave this game?'))) return;
     call.leave();
     if (!isHost) { room.send({ type: 'o-stand' }, hostPeer?.id); onLeave(); return; }
     // Tell everyone it's over (twice, in case one goes missing), then go.
@@ -462,7 +465,7 @@ function OnlineRoom({ code, isHost = false, tv = false, name, avatar, onLeave, o
   // Host: save the game for later. It stays on this phone (under its code) and goes on the home screen's
   // Saved games list; starting it again from there, everyone rejoins with the same code.
   const saveForLater = () => {
-    if (!confirm(`Save this game for later? Everyone goes back to the home screen. Start it again from Saved games on this phone, and everyone can rejoin with code ${code}.`)) return;
+    if (!confirm(tr('Save this game for later? Everyone goes back to the home screen. Start it again from Saved games on this phone, and everyone can rejoin with code {code}.', { code }))) return;
     const players = [0, 1].map((t) => shown.seats.map((x, s) => (teamOf(s) === t ? x?.name : null)));
     saveGame({ id: `online-${code}`, kind: 'online', code, ...savedSummary(shown.game, players) });
     call.leave();
@@ -513,7 +516,7 @@ function OnlineRoom({ code, isHost = false, tv = false, name, avatar, onLeave, o
   );
 }
 
-const toastErr = (toast, err) => { if (err) toast.show(err); };
+const toastErr = (toast, err) => { if (err) toast.show(tMsg(err)); };
 
 /** Drop this game from the home screen's Rejoin button. */
 function forgetGame(code) {
@@ -529,8 +532,8 @@ function GameEnded({ by, saved, code, game, onHome }) {
       <main className="wrap">
         <div className="card waiting-card ended-card">
           <span className="brand-mark">♠</span>
-          <h2>{saved ? `${by ?? 'The host'} saved the game for later` : by ? `${by} closed the game` : 'The game has ended'}</h2>
-          {saved && <p className="muted">When they start it again, join with code <b>{code}</b> and you’ll get your seat back.</p>}
+          <h2>{saved ? tr('{by} saved the game for later', { by: by ?? tr('The host') }) : by ? tr('{by} closed the game', { by }) : tr('The game has ended')}</h2>
+          {saved && <p className="muted">{tx('When they start it again, join with code {code} and you’ll get your seat back.', { code: <b>{code}</b> })}</p>}
           {game && (
             <div className="ended-scores">
               {[0, 1].map((t) => (
@@ -541,8 +544,8 @@ function GameEnded({ by, saved, code, game, onHome }) {
               ))}
             </div>
           )}
-          {game && <p className="muted">{played ? `After ${played} hand${played === 1 ? '' : 's'}. Stats from the hands you played are saved.` : 'No hands were finished.'}</p>}
-          <button type="button" className="primary big go" onClick={onHome}>Back to home</button>
+          {game && <p className="muted">{played === 1 ? tr('After {n} hand. Stats from the hands you played are saved.', { n: played }) : played ? tr('After {n} hands. Stats from the hands you played are saved.', { n: played }) : tr('No hands were finished.')}</p>}
+          <button type="button" className="primary big go" onClick={onHome}>{tr('Back to home')}</button>
         </div>
       </main>
     </div>
@@ -575,9 +578,9 @@ export function ConnectionBanner({ room, isHost, hostPeer, onLeave }) {
   return (
     <div className="conn-banner" role="status">
       <span className="spinner small" />
-      <span>{shown === 'offline' ? 'Connection lost. Reconnecting…' : 'Waiting for the host’s phone to come back…'}</span>
-      <button type="button" onClick={room.reconnect}>Rejoin now</button>
-      {shown === 'host' && <button type="button" className="leave" onClick={onLeave}>Leave</button>}
+      <span>{shown === 'offline' ? tr('Connection lost. Reconnecting…') : tr('Waiting for the host’s phone to come back…')}</span>
+      <button type="button" onClick={room.reconnect}>{tr('Rejoin now')}</button>
+      {shown === 'host' && <button type="button" className="leave" onClick={onLeave}>{tr('Leave')}</button>}
     </div>
   );
 }
@@ -641,7 +644,7 @@ function Lobby({ code, table, isHost, me, people, call, icons, profile, onProfil
 
   async function share() {
     try {
-      if (navigator.share) await navigator.share({ title: 'Spades', text: `Play spades with us! Game ${code}.`, url: link });
+      if (navigator.share) await navigator.share({ title: 'Spades', text: tr('Play spades with us! Game {code}.', { code }), url: link });
       else { await navigator.clipboard.writeText(link); setCopied(true); }
     } catch { /* closed */ }
   }
@@ -654,18 +657,18 @@ function Lobby({ code, table, isHost, me, people, call, icons, profile, onProfil
         {who ? (
           <>
             {mine
-              ? <button type="button" className="seat-avatar-btn" aria-label="Change your name or icon" onClick={() => setEditing(profile)}><Avatar value={icons[who.id]} name={who.name} className="lobby-avatar" /><span className="edit-dot"><Icon name="edit" size={12} /></span></button>
+              ? <button type="button" className="seat-avatar-btn" aria-label={tr('Change your name or icon')} onClick={() => setEditing(profile)}><Avatar value={icons[who.id]} name={who.name} className="lobby-avatar" /><span className="edit-dot"><Icon name="edit" size={12} /></span></button>
               : <Avatar value={icons[who.id]} name={who.name} bot={who.bot} className="lobby-avatar" />}
             <b>{who.name}</b>
-            <span className="muted small">{mine ? 'You' : who.bot ? 'Computer' : 'Seated'}</span>
-            {mine && <button type="button" className="text-btn small" onClick={onStand}>Stand up</button>}
-            {isHost && !mine && <button type="button" className="text-btn small" onClick={() => hostActions.clearSeat(s)}>Remove</button>}
+            <span className="muted small">{mine ? tr('You') : who.bot ? tr('Computer') : tr('Seated')}</span>
+            {mine && <button type="button" className="text-btn small" onClick={onStand}>{tr('Stand up')}</button>}
+            {isHost && !mine && <button type="button" className="text-btn small" onClick={() => hostActions.clearSeat(s)}>{tr('Remove')}</button>}
           </>
         ) : (
           <>
             <span className="empty-seat" aria-hidden="true">+</span>
-            <button type="button" className="soft" onClick={() => onSit(s)}>Sit here</button>
-            {isHost && <button type="button" className="text-btn small" onClick={() => hostActions.addBot(s)}>Add computer</button>}
+            <button type="button" className="soft" onClick={() => onSit(s)}>{tr('Sit here')}</button>
+            {isHost && <button type="button" className="text-btn small" onClick={() => hostActions.addBot(s)}>{tr('Add computer')}</button>}
           </>
         )}
       </div>
@@ -676,66 +679,66 @@ function Lobby({ code, table, isHost, me, people, call, icons, profile, onProfil
     <>
       <header className="hero">
         <div className="wrap hero-row">
-          <div className="brand"><span className="brand-mark">♠</span><h1>{table.gamesPlayed ? 'Next game' : 'Online game'}</h1></div>
-          <button type="button" className="icon-btn" onClick={onLeave}>{isHost ? 'Close' : 'Leave'}</button>
+          <div className="brand"><span className="brand-mark">♠</span><h1>{table.gamesPlayed ? tr('Next game') : tr('Online game')}</h1></div>
+          <button type="button" className="icon-btn" onClick={onLeave}>{isHost ? tr('Close') : tr('Leave')}</button>
         </div>
         <div className="wrap lobby-me">
           <button type="button" className="profile-chip" onClick={() => setEditing(profile)}>
             <Avatar value={profile.avatar} name={profile.name} /> {profile.name} <Icon name="edit" size={14} />
           </button>
-          <button type="button" className="profile-chip" onClick={() => setDecksOpen(true)}><Icon name="cards" size={18} /> Cards &amp; table</button>
-          {onUseAsTv && <button type="button" className="profile-chip" onClick={onUseAsTv}><Icon name="tv" size={18} /> TV mode</button>}
+          <button type="button" className="profile-chip" onClick={() => setDecksOpen(true)}><Icon name="cards" size={18} /> {tr('Cards & table')}</button>
+          {onUseAsTv && <button type="button" className="profile-chip" onClick={onUseAsTv}><Icon name="tv" size={18} /> {tr('TV mode')}</button>}
         </div>
-        <div className="wrap"><p className="target">Game {code} · {isHost ? 'You’re the host' : `Host: ${host?.name ?? '…'}`}</p></div>
+        <div className="wrap"><p className="target">{tr('Game {code}', { code })} · {isHost ? tr('You’re the host') : tr('Host: {name}', { name: host?.name ?? '…' })}</p></div>
       </header>
       <main className="wrap">
         {table.game && (
           <div className="card last-game">
             <div className="row between">
-              <span className="eyebrow">Last game</span>
-              <button type="button" className="text-btn small" onClick={() => setStatsOpen(true)}><Icon name="trophy" size={15} /> Stats</button>
+              <span className="eyebrow">{tr('Last game')}</span>
+              <button type="button" className="text-btn small" onClick={() => setStatsOpen(true)}><Icon name="trophy" size={15} /> {tr('Stats')}</button>
             </div>
             {(() => {
               const st = standings(table.game);
               const w = winner(table.game);
               const wi = w ?? 0;
-              return <p><b>{table.game.teams[wi].name}</b> won, {st[wi].score} to {st[1 - wi].score}.</p>;
+              return <p>{tx('{team} won, {a} to {b}.', { team: <b>{table.game.teams[wi].name}</b>, a: st[wi].score, b: st[1 - wi].score })}</p>;
             })()}
           </div>
         )}
 
-        <div className="section-title">Seats</div>
+        <div className="section-title">{tr('Seats')}</div>
         <div className="lobby-teams">
           {[0, 1].map((t) => (
             <div key={t} className={`lobby-team t${t}`}>
-              <div className="eyebrow">Team {t + 1}</div>
+              <div className="eyebrow">{tr('Team {n}', { n: t + 1 })}</div>
               {SEATS.map((_, s) => s).filter((s) => teamOf(s) === t).map(seatCard)}
             </div>
           ))}
         </div>
-        <p className="footnote">Partners sit across from each other. {isHost && <button type="button" className="inline-link" onClick={hostActions.swapTeams}>Switch partners</button>}</p>
+        <p className="footnote">{tr('Partners sit across from each other.')} {isHost && <button type="button" className="inline-link" onClick={hostActions.swapTeams}>{tr('Switch partners')}</button>}</p>
 
         {watching.length > 0 && (
-          <p className="footnote">Not seated yet: {watching.map((p) => p.name).join(', ')}</p>
+          <p className="footnote">{tr('Not seated yet: {names}', { names: watching.map((p) => p.name).join(', ') })}</p>
         )}
 
-        <div className="section-title">Invite</div>
+        <div className="section-title">{tr('Invite')}</div>
         <div className="invite-card card">
           <div className="code">{code.split('').map((c, i) => <span key={i}>{c}</span>)}</div>
-          {qr && <img className="qr" src={qr} alt="QR code to join this game" />}
-          <button type="button" className="primary big" onClick={share}><Icon name="share" /> {copied ? 'Link copied' : 'Send invite link'}</button>
-          <p className="footnote center">Or open Spades, tap <b>Join a game</b> and type the code.</p>
+          {qr && <img className="qr" src={qr} alt={tr('QR code to join this game')} />}
+          <button type="button" className="primary big" onClick={share}><Icon name="share" /> {copied ? tr('Link copied') : tr('Send invite link')}</button>
+          <p className="footnote center">{tx('Or open Spades, tap {join} and type the code.', { join: <b>{tr('Join a game')}</b> })}</p>
         </div>
 
-        <div className="section-title">Companion TV</div>
+        <div className="section-title">{tr('Companion TV')}</div>
         <TvInviteCard code={code} />
 
-        <div className="section-title">Video &amp; audio</div>
+        <div className="section-title">{tr('Video & audio')}</div>
         <div className="card guest-controls">
           {call.joined ? <CallButtons call={call} /> : (
             <div className="row" style={{ justifyContent: 'center' }}>
-              <button type="button" className="soft" onClick={() => call.join()}><Icon name="video" size={18} /> Video</button>
-              <button type="button" className="soft" onClick={() => call.join({ audioOnly: true })}><Icon name="mic" size={18} /> Audio only</button>
+              <button type="button" className="soft" onClick={() => call.join()}><Icon name="video" size={18} /> {tr('Video')}</button>
+              <button type="button" className="soft" onClick={() => call.join({ audioOnly: true })}><Icon name="mic" size={18} /> {tr('Audio only')}</button>
             </div>
           )}
           {call.error && <p className="scan-msg">{call.error}</p>}
@@ -744,46 +747,46 @@ function Lobby({ code, table, isHost, me, people, call, icons, profile, onProfil
 
         {isHost ? (
           <>
-            <div className="section-title">Settings</div>
+            <div className="section-title">{tr('Settings')}</div>
             <div className="card group">
-              <div className="field"><span>Play to</span>
-                <Segmented small label="Play to" value={table.settings.target}
+              <div className="field"><span>{tr('Play to')}</span>
+                <Segmented small label={tr('Play to')} value={table.settings.target}
                   options={[250, 300, 500].map((n) => ({ id: n, label: String(n) }))}
                   onChange={(target) => hostActions.settings({ target })} />
               </div>
-              <Toggle label="Bid timer" checked={Boolean(table.settings.bidTimer)}
+              <Toggle label={tr('Bid timer')} checked={Boolean(table.settings.bidTimer)}
                 onChange={(on) => hostActions.settings({ bidTimer: on ? DEFAULT_BID_TIMER : 0 })} />
               {Boolean(table.settings.bidTimer) && (
-                <div className="field"><span>Seconds to bid</span>
-                  <Segmented small label="Seconds to bid" value={table.settings.bidTimer}
+                <div className="field"><span>{tr('Seconds to bid')}</span>
+                  <Segmented small label={tr('Seconds to bid')} value={table.settings.bidTimer}
                     options={BID_TIMES.map((n) => ({ id: n, label: String(n) }))}
                     onChange={(bidTimer) => hostActions.settings({ bidTimer })} />
                 </div>
               )}
-              {Boolean(table.settings.bidTimer) && <p className="footnote">When time runs out, the computer bids for that player.</p>}
-              <Toggle label="Blind nil allowed" checked={table.settings.rules.blindNilAllowed !== false}
+              {Boolean(table.settings.bidTimer) && <p className="footnote">{tr('When time runs out, the computer bids for that player.')}</p>}
+              <Toggle label={tr('Blind nil allowed')} checked={table.settings.rules.blindNilAllowed !== false}
                 onChange={(v) => hostActions.settings({ rules: { ...table.settings.rules, blindNilAllowed: v } })} />
-              <button type="button" className="text-btn" onClick={() => setRulesOpen(true)}><Icon name="edit" size={16} /> More scoring rules</button>
+              <button type="button" className="text-btn" onClick={() => setRulesOpen(true)}><Icon name="edit" size={16} /> {tr('More scoring rules')}</button>
             </div>
           </>
         ) : (
-          <p className="footnote center">The host picks the rules and starts the game. Playing to {table.settings.target}.{table.settings.bidTimer ? ` ${table.settings.bidTimer} seconds to bid.` : ''}</p>
+          <p className="footnote center">{tr('The host picks the rules and starts the game. Playing to {target}.', { target: table.settings.target })}{table.settings.bidTimer ? ` ${tr('{n} seconds to bid.', { n: table.settings.bidTimer })}` : ''}</p>
         )}
       </main>
       <div className="bottom-bar">
         {isHost ? (
           full
-            ? <button type="button" className="primary big go" onClick={hostActions.start}>{table.gamesPlayed ? 'Start the next game' : 'Start game'}</button>
-            : <button type="button" className="primary big" onClick={hostActions.fillBots}>Fill empty seats with computer players</button>
+            ? <button type="button" className="primary big go" onClick={hostActions.start}>{table.gamesPlayed ? tr('Start the next game') : tr('Start game')}</button>
+            : <button type="button" className="primary big" onClick={hostActions.fillBots}>{tr('Fill empty seats with computer players')}</button>
         ) : (
-          <p className="dock-hint dark">{mySeat >= 0 ? `Waiting for ${host?.name ?? 'the host'} to start…` : 'Tap “Sit here” to take a seat.'}</p>
+          <p className="dock-hint dark">{mySeat >= 0 ? tr('Waiting for {name} to start…', { name: host?.name ?? tr('the host') }) : tr('Tap “Sit here” to take a seat.')}</p>
         )}
       </div>
       {statsOpen && <Stats onClose={() => setStatsOpen(false)} />}
       {decksOpen && <DeckPicker onClose={() => setDecksOpen(false)} />}
       {editing && (
-        <Sheet title="You" onClose={() => setEditing(null)}
-          action={{ label: 'Done', onClick: () => { if (editing.name.trim()) onProfile({ ...editing, name: editing.name.trim() }); setEditing(null); } }}>
+        <Sheet title={tr('You')} onClose={() => setEditing(null)}
+          action={{ label: tr('Done'), onClick: () => { if (editing.name.trim()) onProfile({ ...editing, name: editing.name.trim() }); setEditing(null); } }}>
           <ProfileEditor name={editing.name} avatar={editing.avatar}
             onName={(n) => setEditing((x) => ({ ...x, name: n }))} onAvatar={(a) => setEditing((x) => ({ ...x, avatar: a }))} />
         </Sheet>
@@ -799,7 +802,7 @@ function Lobby({ code, table, isHost, me, people, call, icons, profile, onProfil
 function RulesSheetOnline({ rules, onSave, onClose }) {
   const [r, setR] = useState({ ...STANDARD_RULES, ...rules });
   return (
-    <Sheet title="Scoring rules" onClose={onClose} action={{ label: 'Save', onClick: () => onSave(r) }}>
+    <Sheet title={tr('Scoring rules')} onClose={onClose} action={{ label: tr('Save'), onClick: () => onSave(r) }}>
       <RulesFields rules={r} onChange={setR} />
     </Sheet>
   );
@@ -820,6 +823,7 @@ function OnlineTable({ reactions = [], react, teases = {}, tease, alerts = null,
   const [peeked, setPeeked] = useState(null); // hand number whose cards I've looked at
   const [blindAsk, setBlindAsk] = useState(false); // confirming a blind nil bid
   const [decksOpen, setDecksOpen] = useState(false);
+  const [rulesOpen, setRulesOpen] = useState(false);
   const [tvOpen, setTvOpen] = useState(false);
   const [callOpen, setCallOpen] = useState(false);
   const [joinOpen, setJoinOpen] = useState(false); // choosing video or audio only
@@ -835,15 +839,15 @@ function OnlineTable({ reactions = [], react, teases = {}, tease, alerts = null,
   // A seat's books/bid ('bidding…' or '–' until they've bid), for its nameplate or its big video tile.
   const scoreText = (s) => {
     const entry = seatEntry(hand, s);
-    const call = isNil(entry.call) ? nilLabel(entry.call) : entry.bid;
+    const call = isNil(entry.call) ? tr(nilLabel(entry.call)) : entry.bid;
     if (table.phase !== 'bidding') {
       // The winner's new book only shows once the gold has flown into it (see BookFly), then pops in
       const flying = flyUntil && s === r.lastTrick.winner;
       const books = entry.books - (flying && Date.now() < flyUntil ? 1 : 0);
       return <><span key={books} className={`sc-books${flying && Date.now() >= flyUntil ? ' bump' : ''}`}>{books}</span><small>/{call}</small></>;
     }
-    if (hasBid(table, s)) return isNil(entry.call) ? call : `bid ${call}`;
-    return table.round?.turn === s ? 'bidding…' : '–';
+    if (hasBid(table, s)) return isNil(entry.call) ? call : tr('bid {n}', { n: call });
+    return table.round?.turn === s ? tr('bidding…') : '–';
   };
   const deck = useDeck();
   const [now, setNow] = useState(Date.now());
@@ -942,7 +946,7 @@ function OnlineTable({ reactions = [], react, teases = {}, tease, alerts = null,
     <label className="spade-bluff">
       <span className="sb-min" aria-hidden="true">♠</span>
       <input type="range" min="0" max="1" step="0.01" value={teases[mySeat] ?? 0} onChange={(e) => tease(Number(e.target.value))}
-        aria-label="Spade bluff: fade a spade in over your video" />
+        aria-label={tr('Spade bluff: fade a spade in over your video')} />
       <span className="sb-max" aria-hidden="true">♠</span>
     </label>
   );
@@ -956,15 +960,15 @@ function OnlineTable({ reactions = [], react, teases = {}, tease, alerts = null,
   // Your cards (or the dealing / face-down step) and what you can do now: shared by the table view's hand
   // strip and the hand view.
   const handArea = (dealing ? (
-            <p className="dock-hint">Dealing…</p>
+            <p className="dock-hint">{tr('Dealing…')}</p>
           ) : coverCards ? (
             // Your new hand, face down until you look (blind nil has to be bid before looking).
             <div className="blind-choice">
               <div className="facedown-fan" aria-hidden="true">
                 {Array.from({ length: 13 }, (_, k) => <CardBack key={k} size="sm" style={{ '--k': k - 6 }} />)}
               </div>
-              <button type="button" className="primary big" onClick={() => setPeeked(handNo)}>Show my cards</button>
-              {myTurn && <button type="button" className="text-btn blind-link" onClick={() => setBlindAsk(true)}>Bid blind nil…</button>}
+              <button type="button" className="primary big" onClick={() => setPeeked(handNo)}>{tr('Show my cards')}</button>
+              {myTurn && <button type="button" className="text-btn blind-link" onClick={() => setBlindAsk(true)}>{tr('Bid blind nil…')}</button>}
             </div>
           ) : cards ? (
             // Hand view on an upright phone: two overlapping rows, so the cards can be big.
@@ -972,13 +976,13 @@ function OnlineTable({ reactions = [], react, teases = {}, tease, alerts = null,
               ? <div className="hv-rows">{fan(sorted.slice(0, Math.ceil(sorted.length / 2)), 'a')}{fan(sorted.slice(Math.ceil(sorted.length / 2)), 'b')}</div>
               : fan(sorted, '')
           ) : (
-            <p className="dock-hint">Getting your cards…</p>
+            <p className="dock-hint">{tr('Getting your cards…')}</p>
           ));
   const actionArea = (
     <>
             {myTurn && table.phase === 'bidding' && !coverCards && <BidPad onBid={(b) => send('o-bid', b)} />}
             {myTurn && table.phase === 'playing' && (selected
-              ? <button type="button" className="primary big go" disabled={sending} onClick={play}>Play <CardText code={selected} /></button>
+              ? <button type="button" className="primary big go" disabled={sending} onClick={play}>{tx('Play {card}', { card: <CardText code={selected} /> })}</button>
               : null)}
     </>
   );
@@ -1009,46 +1013,48 @@ function OnlineTable({ reactions = [], react, teases = {}, tease, alerts = null,
           ))}
         </div>
         <div className="online-meta">
-          <span>Hand {handNo} · to {game.target}</span>
+          <span>{tr('Hand {n} · to {target}', { n: handNo, target: game.target })}</span>
           {!tv && (
             <TableMenu items={[
               call.joined
-                ? { icon: 'video', label: 'Video chat settings', onClick: () => setCallOpen(true) }
-                : { icon: 'video', label: 'Join A/V Chat', onClick: () => setJoinOpen(true) },
-              { icon: 'users', label: 'Video chat only', note: 'Hide the table, fill it with video', on: tableMode === 'video', onClick: () => setTableMode(tableMode === 'video' ? 'full' : 'video') },
-              { icon: 'expand', label: 'Hide the table', note: 'Just the backdrop', on: tableMode === 'backdrop', onClick: () => setTableMode(tableMode === 'backdrop' ? 'full' : 'backdrop') },
-              mySeat >= 0 && { icon: 'hand', label: 'Hand view', note: 'Just your cards, big', onClick: () => setHandView(true) },
-              { icon: 'tv', label: 'Add a TV', onClick: () => setTvOpen(true) },
-              { icon: 'cards', label: 'Cards & table', onClick: () => setDecksOpen(true) },
+                ? { icon: 'video', label: tr('Video chat settings'), onClick: () => setCallOpen(true) }
+                : { icon: 'video', label: tr('Join A/V Chat'), onClick: () => setJoinOpen(true) },
+              { icon: 'users', label: tr('Video chat only'), note: tr('Hide the table, fill it with video'), on: tableMode === 'video', onClick: () => setTableMode(tableMode === 'video' ? 'full' : 'video') },
+              { icon: 'expand', label: tr('Hide the table'), note: tr('Just the backdrop'), on: tableMode === 'backdrop', onClick: () => setTableMode(tableMode === 'backdrop' ? 'full' : 'backdrop') },
+              mySeat >= 0 && { icon: 'hand', label: tr('Hand view'), note: tr('Just your cards, big'), onClick: () => setHandView(true) },
+              { icon: 'tv', label: tr('Add a TV'), onClick: () => setTvOpen(true) },
+              { icon: 'cards', label: tr('Cards & table'), onClick: () => setDecksOpen(true) },
+              { icon: 'cards', label: tr('How to play'), onClick: () => setRulesOpen(true) },
+              { icon: 'flip', label: 'Language / Idioma', note: LANGS.find((l) => l.id === getLang())?.label, onClick: () => setLang(getLang() === 'es' ? 'en' : 'es') },
               // Turn alerts: always listed, with a note saying what's needed when they can't work here
               alerts && {
-                icon: 'bell', label: 'Turn alerts', on: alerts.on,
-                note: isHost ? 'Not for the host’s phone (it runs the game)'
-                  : alerts.why && !alerts.on ? 'Open the app from your Home Screen first'
-                  : alerts.on && !alerts.sub ? (alerts.problem ?? 'Signing this phone up…')
-                  : 'Buzz when it’s your turn, even in the background',
+                icon: 'bell', label: tr('Turn alerts'), on: alerts.on,
+                note: isHost ? tr('Not for the host’s phone (it runs the game)')
+                  : alerts.why && !alerts.on ? tr('Open the app from your Home Screen first')
+                  : alerts.on && !alerts.sub ? (alerts.problem ?? tr('Signing this phone up…'))
+                  : tr('Buzz when it’s your turn, even in the background'),
                 onClick: () => {
-                  if (isHost) { toast.show('The host’s phone runs the game, so it can’t get alerts. Join from another device as a player to get them.'); return; }
+                  if (isHost) { toast.show(tr('The host’s phone runs the game, so it can’t get alerts. Join from another device as a player to get them.')); return; }
                   alerts.toggle().then((err) => { if (err) toast.show(err); });
                 },
               },
               alerts && alerts.on && !isHost && {
-                icon: 'bell', label: 'Send a test alert',
-                note: lastTest ? `Last test: ${lastTest}` : alerts.sub ? 'Arrives in about 6 seconds: lock your phone' : 'This phone isn’t signed up yet',
+                icon: 'bell', label: tr('Send a test alert'),
+                note: lastTest ? tr('Last test: {result}', { result: lastTest }) : alerts.sub ? tr('Arrives in about 6 seconds: lock your phone') : tr('This phone isn’t signed up yet'),
                 onClick: () => {
                   const perm = alertPermission();
-                  if (perm !== 'granted') { setLastTest(`notifications are ${perm}`); toast.show(`Notifications for Family Spades are ${perm === 'denied' ? 'blocked' : 'not allowed yet'}: allow them in Settings → Notifications → Family Spades.`); return; }
-                  if (!alerts.sub) { alerts.retry().then((why) => { setLastTest(why ?? 'signed up: try the test again'); toast.show(why ?? 'Signed up: tap Send a test alert again.'); }); return; }
-                  toast.show('Test alert on its way: lock your phone or go to the home screen');
+                  if (perm !== 'granted') { setLastTest(tr(`notifications are ${perm}`)); toast.show(perm === 'denied' ? tr('Notifications for Family Spades are blocked: allow them in Settings → Notifications → Family Spades.') : tr('Notifications for Family Spades are not allowed yet: allow them in Settings → Notifications → Family Spades.')); return; }
+                  if (!alerts.sub) { alerts.retry().then((why) => { setLastTest(why ?? tr('signed up: try the test again')); toast.show(why ?? tr('Signed up: tap Send a test alert again.')); }); return; }
+                  toast.show(tr('Test alert on its way: lock your phone or go to the home screen'));
                   // (the result shows when you come back to the app)
-                  setLastTest('sending…');
-                  sendTurnAlert(alerts.sub, { body: 'Test: this is your turn alert', tag: 'test', delay: 6 }).then((r) => { setLastTest(r.why); toast.show(r.why); });
+                  setLastTest(tr('sending…'));
+                  sendTurnAlert(alerts.sub, { body: langMsg('Test: this is your turn alert'), tag: 'test', delay: 6 }).then((r) => { setLastTest(r.why); toast.show(r.why); });
                 },
               },
-              { icon: sound.effects ? 'speaker' : 'speakerOff', label: 'Sound effects', on: sound.effects, onClick: () => setSoundSetting('effects', !sound.effects) },
-              { icon: sound.glass ? 'speaker' : 'speakerOff', label: 'Glass break sound', note: 'When spades are broken', on: sound.glass, onClick: () => setSoundSetting('glass', !sound.glass) },
-              onSave && { icon: 'home', label: 'Save for later', note: 'Pick it up again from the home screen', onClick: onSave },
-              { icon: 'close', label: isHost ? 'End game' : 'Leave game', danger: true, onClick: onLeave },
+              { icon: sound.effects ? 'speaker' : 'speakerOff', label: tr('Sound effects'), on: sound.effects, onClick: () => setSoundSetting('effects', !sound.effects) },
+              { icon: sound.glass ? 'speaker' : 'speakerOff', label: tr('Glass break sound'), note: tr('When spades are broken'), on: sound.glass, onClick: () => setSoundSetting('glass', !sound.glass) },
+              onSave && { icon: 'home', label: tr('Save for later'), note: tr('Pick it up again from the home screen'), onClick: onSave },
+              { icon: 'close', label: isHost ? tr('End game') : tr('Leave game'), danger: true, onClick: onLeave },
             ]} />
           )}
         </div>
@@ -1057,7 +1063,7 @@ function OnlineTable({ reactions = [], react, teases = {}, tease, alerts = null,
       <div className={`felt${big ? ' big-on' : ''}${tableMode !== 'full' || videoOnly ? ' no-table' : ''}${videoOnly ? ' video-only' : ''}`}>
         <div className="table-oval" aria-hidden="true">
           <span className="table-logo">♠</span>
-          {deck.verse && <p className="table-verse">“{deck.verse}”<small>{deck.verseRef}</small></p>}
+          {deck.verse && <p className="table-verse">“{tr(deck.verse)}”<small>{tr(deck.verseRef)}</small></p>}
         </div>
         {SEATS.map((_, s) => {
           const who = table.seats[s];
@@ -1069,14 +1075,14 @@ function OnlineTable({ reactions = [], react, teases = {}, tease, alerts = null,
           return (
             <div key={s} className={`player-spot ${posOf(s)} t${teamOf(s)}${turn ? ' turn' : ''}${showingLast && r.lastTrick.winner === s ? ' won' : ''}${s === mySeat ? ' me' : ''}`}>
               {held > 0 && !big && (
-                <div className="spot-backs" aria-label={`${held} cards`}>
+                <div className="spot-backs" aria-label={tr('{n} cards', { n: held })}>
                   {Array.from({ length: Math.min(held, 7) }, (_, k) => <CardBack key={k} size="xs" style={{ '--k': k - (Math.min(held, 7) - 1) / 2 }} />)}
                   <span className="held-count">{held}</span>
                 </div>
               )}
               <div className={`avatar${canReact ? ' tappable' : ''}`} data-seat={s} onClick={() => tapSeat(s)}>
                 {turn && left != null && (
-                  <svg className={`bid-clock${hurry ? ' hurry' : ''}`} viewBox="0 0 100 100" aria-label={`${left} seconds to bid`}>
+                  <svg className={`bid-clock${hurry ? ' hurry' : ''}`} viewBox="0 0 100 100" aria-label={tr('{n} seconds to bid', { n: left })}>
                     <circle cx="50" cy="50" r="46" pathLength="100" style={{ strokeDashoffset: 100 - (100 * left) / bidTimer }} />
                   </svg>
                 )}
@@ -1098,15 +1104,15 @@ function OnlineTable({ reactions = [], react, teases = {}, tease, alerts = null,
               {/* With big videos on, each player's name and books/bid are in the title bar over their tile instead */}
               {!big && (
                 <div className="nameplate">
-                  <span className="spot-name">{s === mySeat ? 'You' : who?.name}</span>
+                  <span className="spot-name">{s === mySeat ? tr('You') : who?.name}</span>
                   <span className="spot-score">{scoreText(s)}</span>
                 </div>
               )}
               {s === mySeat && call.joined && !big && <MyCallButtons call={call} onMore={() => setCallOpen(true)} />}
               {away && (
                 <div className="away">
-                  {who.standIn ? 'computer playing' : 'reconnecting…'}
-                  {isHost && <button type="button" className="text-btn small" onClick={() => hostActions.standIn(s, !who.standIn)}>{who.standIn ? 'Wait instead' : 'Computer plays'}</button>}
+                  {who.standIn ? tr('computer playing') : tr('reconnecting…')}
+                  {isHost && <button type="button" className="text-btn small" onClick={() => hostActions.standIn(s, !who.standIn)}>{who.standIn ? tr('Wait instead') : tr('Computer plays')}</button>}
                 </div>
               )}
             </div>
@@ -1121,7 +1127,7 @@ function OnlineTable({ reactions = [], react, teases = {}, tease, alerts = null,
             onMore={() => setCallOpen(true)} />
         )}
         {dealing && <DealAnimation dealer={r.dealer} posOf={posOf} />}
-        <ReactionsLayer reactions={reactions} names={table.seats.map((w, s) => (s === mySeat ? 'You' : w?.name))} />
+        <ReactionsLayer reactions={reactions} names={table.seats.map((w, s) => (s === mySeat ? tr('You') : w?.name))} />
         {flyUntil > 0 && Date.now() < flyUntil && <BookFly key={r.lastTrick.at} />}
         {big && (
           <div className="trick trick-ghost" aria-hidden="true">
@@ -1139,9 +1145,9 @@ function OnlineTable({ reactions = [], react, teases = {}, tease, alerts = null,
             </div>
           ))}
           {!trickCards.length && table.phase === 'playing' && (
-            <div className="trick-msg">{r.spadesBroken ? '♠ broken' : 'Spades not broken'}</div>
+            <div className="trick-msg">{r.spadesBroken ? tr('♠ broken') : tr('Spades not broken')}</div>
           )}
-          {showingLast && <div className="trick-msg winner-msg">{r.lastTrick.winner === mySeat ? 'You take it' : `${table.seats[r.lastTrick.winner]?.name} takes it`}</div>}
+          {showingLast && <div className="trick-msg winner-msg">{r.lastTrick.winner === mySeat ? tr('You take it') : tr('{name} takes it', { name: table.seats[r.lastTrick.winner]?.name })}</div>}
         </div>
       </div>
 
@@ -1150,11 +1156,11 @@ function OnlineTable({ reactions = [], react, teases = {}, tease, alerts = null,
         <div className="online-call watching"><CallButtons call={call} size={18} /><SoundNote call={call} /></div>
       )}
       {callOpen && call.joined && (
-        <Sheet title="Video chat" short onClose={() => setCallOpen(false)} closeLabel="Done">
+        <Sheet title={tr('Video chat')} short onClose={() => setCallOpen(false)} closeLabel={tr('Done')}>
           <div className="call-sheet">
             <CallButtons call={{ ...call, leave: () => { setCallOpen(false); call.leave(); } }} size={22} />
             <div className="card group call-options">
-              <Toggle label="Video chat only" checked={videoOnly}
+              <Toggle label={tr('Video chat only')} checked={videoOnly}
                 onChange={(on) => setTableMode(on ? 'video' : 'full')} />
             </div>
             <SoundNote call={call} />
@@ -1166,9 +1172,9 @@ function OnlineTable({ reactions = [], react, teases = {}, tease, alerts = null,
       {mySeat >= 0 && (
         <div className="hand-dock online-dock">
           <div className="dock-head">
-            <span>{myTurn ? (table.phase === 'bidding' ? 'Your bid' : 'Your turn') : turnText(table)}
+            <span>{myTurn ? (table.phase === 'bidding' ? tr('Your bid') : tr('Your turn')) : turnText(table)}
               {left != null && <b className={`dock-clock${hurry ? ' hurry' : ''}`}> · {left}s</b>}</span>
-            <span>{cards ? `${cards.length} cards` : ''}</span>
+            <span>{cards ? tr('{n} cards', { n: cards.length }) : ''}</span>
           </div>
           {handArea}
           {layout !== 'wide' && bluff}
@@ -1177,12 +1183,13 @@ function OnlineTable({ reactions = [], react, teases = {}, tease, alerts = null,
       )}
       </>}
 
+      {rulesOpen && <RulesSheet gameId="spades" onClose={() => setRulesOpen(false)} />}
       {decksOpen && <DeckPicker onClose={() => setDecksOpen(false)} />}
       {blindAsk && myTurn && table.phase === 'bidding' && (
-        <Sheet title="Are you sure?" short onClose={() => setBlindAsk(false)} closeLabel="Cancel">
+        <Sheet title={tr('Are you sure?')} short onClose={() => setBlindAsk(false)} closeLabel={tr('Cancel')}>
           <div className="blind-confirm">
-            <button type="button" className="danger big" onClick={() => { setBlindAsk(false); send('o-bid', { call: 'blind' }); }}>Yes, bid blind nil</button>
-            <button type="button" className="secondary big" onClick={() => { setBlindAsk(false); setPeeked(handNo); }}>No, show my cards</button>
+            <button type="button" className="danger big" onClick={() => { setBlindAsk(false); send('o-bid', { call: 'blind' }); }}>{tr('Yes, bid blind nil')}</button>
+            <button type="button" className="secondary big" onClick={() => { setBlindAsk(false); setPeeked(handNo); }}>{tr('No, show my cards')}</button>
           </div>
         </Sheet>
       )}
@@ -1192,27 +1199,27 @@ function OnlineTable({ reactions = [], react, teases = {}, tease, alerts = null,
           onSend={(to, item, gift) => { react(to, item, gift); setReactTo(null); }} onClose={() => setReactTo(null)} />
       )}
       {holdCard && canAct && (
-        <Sheet title={`Play ${cardLabel(holdCard)} with…`} short onClose={() => setHoldCard(null)} closeLabel="Cancel">
+        <Sheet title={tr('Play {card} with…', { card: cardLabel(holdCard) })} short onClose={() => setHoldCard(null)} closeLabel={tr('Cancel')}>
           <div className="play-styles">
             {PLAY_STYLE_CHOICES.map((p) => (
               <button key={p.id} type="button" className={`play-style style-${p.id}`} onClick={() => { const c = holdCard; setHoldCard(null); playCardNow(c, p.id === 'toss' ? null : p.id); }}>
                 <span className="play-style-icon">{p.icon}</span>
-                <b>{p.name}</b>
-                <span>{p.note}</span>
+                <b>{tr(p.name)}</b>
+                <span>{tr(p.note)}</span>
               </button>
             ))}
           </div>
         </Sheet>
       )}
       {joinOpen && !call.joined && (
-        <Sheet title="Video chat" short onClose={() => setJoinOpen(false)} closeLabel="Cancel">
+        <Sheet title={tr('Video chat')} short onClose={() => setJoinOpen(false)} closeLabel={tr('Cancel')}>
           <div className="blind-confirm">
-            <button type="button" className="primary big" onClick={() => { setJoinOpen(false); call.join(); }}><Icon name="video" /> Video and audio</button>
-            <button type="button" className="secondary big" onClick={() => { setJoinOpen(false); call.join({ audioOnly: true }); }}><Icon name="mic" /> Audio only</button>
+            <button type="button" className="primary big" onClick={() => { setJoinOpen(false); call.join(); }}><Icon name="video" /> {tr('Video and audio')}</button>
+            <button type="button" className="secondary big" onClick={() => { setJoinOpen(false); call.join({ audioOnly: true }); }}><Icon name="mic" /> {tr('Audio only')}</button>
           </div>
         </Sheet>
       )}
-      {tvOpen && <Sheet title="Companion TV" short onClose={() => setTvOpen(false)} closeLabel="Done"><TvInviteCard code={code} /></Sheet>}
+      {tvOpen && <Sheet title={tr('Companion TV')} short onClose={() => setTvOpen(false)} closeLabel={tr('Done')}><TvInviteCard code={code} /></Sheet>}
       {(table.phase === 'scored' || table.phase === 'over') && !showingLast && (
         <HandResult table={table} isHost={isHost} hostActions={hostActions} />
       )}
@@ -1225,7 +1232,7 @@ function OnlineTable({ reactions = [], react, teases = {}, tease, alerts = null,
  * player from the other team guess it (+25 right, -25 wrong), then the card flips.
  */
 function PapiGame({ g, table, mySeat, icons, send }) {
-  const name = (s) => (s === mySeat ? 'You' : table.seats[s]?.name ?? '?');
+  const name = (s) => (s === mySeat ? tr('You') : table.seats[s]?.name ?? '?');
   const papi = table.seats[g.seat]?.name ?? 'Papi';
   const [mine, setMine] = useState(null); // the number this device picked or guessed
   const iAmPapi = mySeat === g.seat;
@@ -1241,14 +1248,14 @@ function PapiGame({ g, table, mySeat, icons, send }) {
   let body;
   if (g.phase === 'pick') {
     body = iAmPapi
-      ? <><p>Pick your secret number. Your partner and one of the other team will try to guess it.</p>{numbers((n) => choose('o-papi-pick', n))}</>
-      : <><p><b>{papi}</b> is picking a secret number…</p>{numbers(null)}</>;
+      ? <><p>{tr('Pick your secret number. Your partner and one of the other team will try to guess it.')}</p>{numbers((n) => choose('o-papi-pick', n))}</>
+      : <><p>{tx('{name} is picking a secret number…', { name: <b>{papi}</b> })}</p>{numbers(null)}</>;
   } else if (g.phase === 'guess') {
     const waiting = g.guessers.filter((s) => g.guesses[s] == null);
     body = iGuess && g.guesses[mySeat] == null && mine == null
-      ? <><p>Which number did <b>{papi}</b> pick? <span className="papi-stakes">+25 right · −25 wrong</span></p>{numbers((n) => choose('o-papi-guess', n))}</>
+      ? <><p>{tx('Which number did {name} pick?', { name: <b>{papi}</b> })} <span className="papi-stakes">{tr('+25 right · −25 wrong')}</span></p>{numbers((n) => choose('o-papi-guess', n))}</>
       : <>
-          <p>{iAmPapi && mine != null ? <>You picked <b>{mine}</b>. </> : null}{waiting.length ? <>Waiting for {waiting.map(name).join(' and ')}…</> : 'Revealing…'}</p>
+          <p>{iAmPapi && mine != null ? <>{tx('You picked {n}.', { n: <b>{mine}</b> })} </> : null}{waiting.length ? tr('Waiting for {names}…', { names: waiting.map(name).join(tr(' and ')) }) : tr('Revealing…')}</p>
           <div className="papi-guessers">
             {g.guessers.map((s) => (
               <span key={s} className={`papi-guesser t${teamOf(s)}`}>
@@ -1260,12 +1267,12 @@ function PapiGame({ g, table, mySeat, icons, send }) {
         </>;
   } else {
     body = <>
-      <p className="papi-answer">{papi} picked <b>{g.pick}</b>!</p>
+      <p className="papi-answer">{tx('{name} picked {n}!', { name: papi, n: <b>{g.pick}</b> })}</p>
       <div className="papi-results">
         {g.guessers.map((s) => (
           <div key={s} className={`papi-result t${teamOf(s)} ${g.results[s] > 0 ? 'won' : 'lost'}`}>
             <Avatar value={icons[table.seats[s]?.id]} name={table.seats[s]?.name ?? '?'} bot={table.seats[s]?.bot} />
-            <span>{name(s)} guessed {g.guesses[s]}</span>
+            <span>{s === mySeat ? tr('You guessed {n}', { n: g.guesses[s] }) : tr('{name} guessed {n}', { name: name(s), n: g.guesses[s] })}</span>
             <b>{g.results[s] > 0 ? `✓ +${g.results[s]}` : `✗ ${g.results[s]}`}</b>
           </div>
         ))}
@@ -1273,8 +1280,8 @@ function PapiGame({ g, table, mySeat, icons, send }) {
     </>;
   }
   return (
-    <div className={`papi-game ${g.phase}`} role="dialog" aria-label="The Papi Flip">
-      <div className="papi-title">🃏 The Papi Flip!</div>
+    <div className={`papi-game ${g.phase}`} role="dialog" aria-label={tr('The Papi Flip')}>
+      <div className="papi-title">🃏 {tr('The Papi Flip!')}</div>
       {body}
     </div>
   );
@@ -1298,9 +1305,9 @@ export function ReactSheet({ table, mySeat, icons, to, onTo, onSend, onClose }) 
   const others = SEATS.map((_, s) => s).filter((s) => s !== mySeat && table.seats[s]);
   const forMe = to === mySeat;
   return (
-    <Sheet title="Emojis & gifts" short onClose={onClose} closeLabel="Close">
+    <Sheet title={tr('Emojis & gifts')} short onClose={onClose} closeLabel={tr('Close')}>
       <div className="react-sheet">
-        <div className="section-title">Send to</div>
+        <div className="section-title">{tr('Send to')}</div>
         <div className="react-to">
           {others.map((s) => (
             <button key={s} type="button" className={`react-person t${teamOf(s)}${to === s ? ' on' : ''}`} onClick={() => onTo(s)}>
@@ -1309,31 +1316,31 @@ export function ReactSheet({ table, mySeat, icons, to, onTo, onSend, onClose }) 
             </button>
           ))}
           <button type="button" className={`react-person me${forMe ? ' on' : ''}`} onClick={() => onTo(mySeat)}>
-            <span className="react-me" aria-hidden="true">✨</span><span>Just me</span>
+            <span className="react-me" aria-hidden="true">✨</span><span>{tr('Just me')}</span>
           </button>
         </div>
         {EMOJI_GROUPS.map(([title, list]) => (
           <div key={title}>
-            <div className="react-subtitle">{title}</div>
+            <div className="react-subtitle">{tr(title)}</div>
             <div className="react-grid emojis">
-              {list.map((e) => <button key={e} type="button" onClick={() => onSend(forMe ? null : to, e, false)} aria-label={`Send ${e}`}>{e}</button>)}
+              {list.map((e) => <button key={e} type="button" onClick={() => onSend(forMe ? null : to, e, false)} aria-label={tr('Send {item}', { item: e })}>{e}</button>)}
             </div>
           </div>
         ))}
-        <div className="section-title">Gifts{forMe ? '' : ` for ${table.seats[to]?.name ?? ''}`}</div>
+        <div className="section-title">{forMe ? tr('Gifts') : tr('Gifts for {name}', { name: table.seats[to]?.name ?? '' })}</div>
         {GIFT_GROUPS.map(([title, list]) => (
           <div key={title}>
-            <div className="react-subtitle">{title}</div>
+            <div className="react-subtitle">{tr(title)}</div>
             <div className={`react-grid gifts${forMe ? ' waiting' : ''}`}>
               {list.map(([e, name]) => (
-                <button key={e} type="button" disabled={forMe} onClick={() => onSend(to, e, true)} aria-label={`Send ${name}`}>
-                  <span>{e}</span><small>{name}</small>
+                <button key={e} type="button" disabled={forMe} onClick={() => onSend(to, e, true)} aria-label={tr('Send {item}', { item: tr(name) })}>
+                  <span>{e}</span><small>{tr(name)}</small>
                 </button>
               ))}
             </div>
           </div>
         ))}
-        {forMe && <p className="footnote center">Pick who the gift is for.</p>}
+        {forMe && <p className="footnote center">{tr('Pick who the gift is for.')}</p>}
       </div>
     </Sheet>
   );
@@ -1404,31 +1411,31 @@ const PLAY_STYLE_CHOICES = [
  */
 function HandView({ reactions, onReact, mySeat, table, st, myTurn, left, hurry, call, handArea, actionArea, onTable, onMore, onJoinCall, entry }) {
   const game = table.game;
-  const status = myTurn ? (table.phase === 'bidding' ? 'Your bid' : 'Your turn') : turnText(table);
-  const mine = table.phase === 'bidding' ? null : `${entry.books}/${isNil(entry.call) ? nilLabel(entry.call) : entry.bid}`;
+  const status = myTurn ? (table.phase === 'bidding' ? tr('Your bid') : tr('Your turn')) : turnText(table);
+  const mine = table.phase === 'bidding' ? null : `${entry.books}/${isNil(entry.call) ? tr(nilLabel(entry.call)) : entry.bid}`;
   return (
     <div className={`hand-view${myTurn ? ' my-turn' : ''}`}>
       <header className="hv-top">
-        <button type="button" className="hv-back" onClick={onTable}><Icon name="tv" size={18} /> Table view</button>
+        <button type="button" className="hv-back" onClick={onTable}><Icon name="tv" size={18} /> {tr('Table view')}</button>
         <div className="hv-scores">
           {[0, 1].map((t) => <span key={t} className={`hv-score t${t}`}>{st[t].score}</span>)}
         </div>
         <div className="row hv-call">
-          {onReact && <button type="button" className="icon-btn round small hv-react" aria-label="Emojis and gifts" onClick={onReact}>😊</button>}
+          {onReact && <button type="button" className="icon-btn round small hv-react" aria-label={tr('Emojis and gifts')} onClick={onReact}>😊</button>}
           {call.joined ? <MyCallButtons call={call} onMore={onMore} /> : (
-            <button type="button" className="icon-btn round small" aria-label="Video chat" onClick={onJoinCall}><Icon name="video" size={18} /></button>
+            <button type="button" className="icon-btn round small" aria-label={tr('Video chat')} onClick={onJoinCall}><Icon name="video" size={18} /></button>
           )}
         </div>
       </header>
       <div className="hv-status">
         <b>{status}</b>{left != null && <span className={`dock-clock${hurry ? ' hurry' : ''}`}> · {left}s</span>}
-        {mine && <span className="hv-mine">You {mine}</span>}
-        <span className="hv-hand-no">Hand {game.hands.length}</span>
+        {mine && <span className="hv-mine">{tr('You {score}', { score: mine })}</span>}
+        <span className="hv-hand-no">{tr('Hand {n}', { n: game.hands.length })}</span>
       </div>
       <div className="hv-feed" aria-live="polite">
         {reactions.slice(-3).map((x) => (
           <span key={x.id} className="hv-react-note">
-            {table.seats[x.from]?.name ?? '?'}{x.to != null && x.to !== x.from ? <> → {x.to === mySeat ? 'you' : table.seats[x.to]?.name}</> : null} <b>{x.item}</b>
+            {table.seats[x.from]?.name ?? '?'}{x.to != null && x.to !== x.from ? <> → {x.to === mySeat ? tr('you') : table.seats[x.to]?.name}</> : null} <b>{x.item}</b>
           </span>
         ))}
       </div>
@@ -1466,7 +1473,7 @@ export function TableMenu({ items }) {
   }, [open]);
   return (
     <div className="table-menu">
-      <button type="button" className={`icon-btn round small${open ? ' on' : ''}`} aria-label="Menu" aria-haspopup="menu" aria-expanded={open}
+      <button type="button" className={`icon-btn round small${open ? ' on' : ''}`} aria-label={tr('Menu')} aria-haspopup="menu" aria-expanded={open}
         onClick={() => setOpen(!open)}><Icon name="more" size={20} /></button>
       {open && (
         <>
@@ -1635,7 +1642,7 @@ function BigVideos({ onTap, table, posOf, mySeat, me, call, icons, videoOf, peer
             {!showVideo && <Avatar value={icons[who.id]} name={who.name} bot={who.bot} className="big-icon" />}
             {teases[s] > 0 && <SpadeTease level={teases[s]} />}
             <div className="big-title">
-              <span className="big-name">{micOff && <Icon name="micOff" size={13} />}{s === mySeat ? 'You' : who.name}{r?.dealer === s && <span className="big-dealer">D</span>}</span>
+              <span className="big-name">{micOff && <Icon name="micOff" size={13} />}{s === mySeat ? tr('You') : who.name}{r?.dealer === s && <span className="big-dealer">D</span>}</span>
               {/* Video chat only: the card this player put down this trick (no table to see it on) */}
               {played?.[s] && <span className={`big-played${wonBy === s ? ' won' : ''}`}><CardText code={played[s]} /></span>}
               <span className="big-score">{scoreText(s)}</span>
@@ -1655,16 +1662,16 @@ export function MyCallButtons({ call, onMore }) {
   return (
     <div className="my-call">
       {call.local && (
-        <button type="button" className={call.micOn ? '' : 'off'} onClick={call.toggleMic} aria-label={call.micOn ? 'Mute microphone' : 'Unmute microphone'}>
+        <button type="button" className={call.micOn ? '' : 'off'} onClick={call.toggleMic} aria-label={call.micOn ? tr('Mute microphone') : tr('Unmute microphone')}>
           <Icon name={call.micOn ? 'mic' : 'micOff'} size={16} />
         </button>
       )}
       {call.local && call.local.getVideoTracks().length > 0 && (
-        <button type="button" className={call.camOn ? '' : 'off'} onClick={call.toggleCam} aria-label={call.camOn ? 'Turn camera off' : 'Turn camera on'}>
+        <button type="button" className={call.camOn ? '' : 'off'} onClick={call.toggleCam} aria-label={call.camOn ? tr('Turn camera off') : tr('Turn camera on')}>
           <Icon name={call.camOn ? 'video' : 'videoOff'} size={16} />
         </button>
       )}
-      <button type="button" onClick={onMore} aria-label="More video chat controls"><Icon name="more" size={16} /></button>
+      <button type="button" onClick={onMore} aria-label={tr('More video chat controls')}><Icon name="more" size={16} /></button>
     </div>
   );
 }
@@ -1689,10 +1696,10 @@ const hasVideo = (stream) => stream.getVideoTracks().length > 0;
 /** Why a card can't be played right now, in words. */
 function refuseReason(table, cards) {
   const r = table.round;
-  if (!r.trick.length) return 'Spades aren’t broken yet: lead another suit.';
+  if (!r.trick.length) return tr('Spades aren’t broken yet: lead another suit.');
   const led = r.trick[0].card.slice(-1);
   const names = { S: 'spades', H: 'hearts', D: 'diamonds', C: 'clubs' };
-  return cards?.some((c) => c.slice(-1) === led) ? `You have to follow suit: play ${names[led]}.` : 'You can’t play that card.';
+  return cards?.some((c) => c.slice(-1) === led) ? tr('You have to follow suit: play {suit}.', { suit: tr(names[led]) }) : tr('You can’t play that card.');
 }
 const CountUp = ({ value }) => useCountUp(value);
 
@@ -1701,7 +1708,7 @@ function alreadyPlayed(t, seat, card) {
   const r = t.round;
   if (!r) return false;
   return r.trick.some((x) => x.seat === seat && x.card === card)
-    || r.tricks.some((tr) => tr.cards.some((x) => x.seat === seat && x.card === card));
+    || r.tricks.some((trk) => trk.cards.some((x) => x.seat === seat && x.card === card));
 }
 
 /** Should a bid from `seat` for hand number `hand` be ignored (already in, or left over from an old hand)? */
@@ -1719,10 +1726,10 @@ const hasBid = (table, s) => {
 };
 
 function turnText(table) {
-  if (table.round?.papiGame) return 'The Papi Flip!';
+  if (table.round?.papiGame) return tr('The Papi Flip!');
   const who = table.seats[table.round?.turn]?.name;
-  if (table.phase === 'bidding') return `${who} is bidding`;
-  if (table.phase === 'playing') return `${who}’s turn`;
+  if (table.phase === 'bidding') return tr('{name} is bidding', { name: who });
+  if (table.phase === 'playing') return tr('{name}’s turn', { name: who });
   return '';
 }
 
@@ -1734,10 +1741,10 @@ function BidPad({ onBid }) {
         {Array.from({ length: 13 }, (_, i) => i + 1).map((b) => (
           <button key={b} type="button" className={n === b ? 'on' : ''} onClick={() => setN(b)}>{b}</button>
         ))}
-        <button type="button" className={`nil${n === 'nil' ? ' on' : ''}`} onClick={() => setN('nil')}>Nil</button>
+        <button type="button" className={`nil${n === 'nil' ? ' on' : ''}`} onClick={() => setN('nil')}>{tr('Nil')}</button>
       </div>
       <button type="button" className="primary big go" disabled={n == null} onClick={() => onBid(n === 'nil' ? { call: 'nil' } : { bid: n })}>
-        {n == null ? 'Choose your bid' : n === 'nil' ? 'Bid nil' : `Bid ${n}`}
+        {n == null ? tr('Choose your bid') : n === 'nil' ? tr('Bid nil') : tr('Bid {n}', { n })}
       </button>
     </div>
   );
@@ -1761,7 +1768,7 @@ function HandResult({ table, isHost, hostActions }) {
   return (
     <div className="sheet-backdrop">
       <div className="result-card">
-        <h2>{over ? `${game.teams[w].name} win!` : `Hand ${game.hands.length}`}</h2>
+        <h2>{over ? tr('{name} win!', { name: game.teams[w].name }) : tr('Hand {n}', { n: game.hands.length })}</h2>
         <div className="result-teams">
           {[0, 1].map((t) => {
             const r = scoreTeam(hand.teams[t], game.rules);
@@ -1769,26 +1776,26 @@ function HandResult({ table, isHost, hostActions }) {
               <div key={t} className={`result-team t${t}`}>
                 <b>{game.teams[t].name}</b>
                 <span className={`points ${last[t].points < 0 ? 'neg' : 'pos'}`}>{signed(last[t].points)}</span>
-                <span className="muted small">{r.lines.join(' · ')}{last[t].penalty ? ` · bag penalty −${last[t].penalty}` : ''}{hand.bonus?.[t] ? ` · Papi Flip ${signed(hand.bonus[t])}` : ''}</span>
+                <span className="muted small">{r.lines.join(' · ')}{last[t].penalty ? ` · ${tr('bag penalty −{n}', { n: last[t].penalty })}` : ''}{hand.bonus?.[t] ? ` · ${tr('Papi Flip {n}', { n: signed(hand.bonus[t]) })}` : ''}</span>
                 <span className="result-total">{last[t].score}</span>
               </div>
             );
           })}
         </div>
         {over && <HandList game={game} />}
-        {over && <button type="button" className="text-btn" onClick={() => setStatsOpen(true)}><Icon name="trophy" size={16} /> See everyone’s stats</button>}
+        {over && <button type="button" className="text-btn" onClick={() => setStatsOpen(true)}><Icon name="trophy" size={16} /> {tr('See everyone’s stats')}</button>}
         {statsOpen && <Stats onClose={() => setStatsOpen(false)} />}
         {isHost ? (
           over ? (
             <div className="stack">
-              <button type="button" className="primary big go" onClick={hostActions.playAgain}>Play again, same seats</button>
-              <button type="button" className="secondary big" onClick={hostActions.toLobby}>Change seats or settings</button>
+              <button type="button" className="primary big go" onClick={hostActions.playAgain}>{tr('Play again, same seats')}</button>
+              <button type="button" className="secondary big" onClick={hostActions.toLobby}>{tr('Change seats or settings')}</button>
             </div>
           ) : (
-            <button type="button" className="primary big" onClick={hostActions.nextHand}>Next hand ({left})</button>
+            <button type="button" className="primary big" onClick={hostActions.nextHand}>{tr('Next hand ({left})', { left })}</button>
           )
         ) : (
-          <p className="muted center">{over ? 'Waiting for the host to start another game…' : `Next hand in ${left}…`}</p>
+          <p className="muted center">{over ? tr('Waiting for the host to start another game…') : tr('Next hand in {left}…', { left })}</p>
         )}
       </div>
       {over && <Confetti />}
@@ -1881,19 +1888,19 @@ export function TvInviteCard({ code, as = 'otv', what = 'cards' }) {
   useEffect(() => { QRCode.toDataURL(tvLink(code, as), { margin: 1, width: 240 }).then(setQr).catch(() => {}); }, [code, as]);
   return (
     <div className="card tv-invite">
-      <p>Show the table big on a TV, with everyone’s video and sound. Your phone keeps your {what}, camera and mic.</p>
+      <p>{tr('Show the table big on a TV, with everyone’s video and sound. Your phone keeps your {what}, camera and mic.', { what: tr(what) })}</p>
       <ol>
-        <li>On the TV’s web browser (or a laptop or iPad hooked up to it), go to <b>{location.host}</b></li>
-        <li>Tap <b>Join a game</b> and type <b className="tv-code">{code}</b></li>
-        <li>Pick <b>Show the table on this TV</b></li>
+        <li>{tx('On the TV’s web browser (or a laptop or iPad hooked up to it), go to {site}', { site: <b>{location.host}</b> })}</li>
+        <li>{tx('Tap {join} and type {code}', { join: <b>{tr('Join a game')}</b>, code: <b className="tv-code">{code}</b> })}</li>
+        <li>{tx('Pick {choice}', { choice: <b>{tr('Show the table on this TV')}</b> })}</li>
       </ol>
       <div className="row tv-invite-row">
-        {qr && <img className="qr small" src={qr} alt="QR code to open the TV view" />}
+        {qr && <img className="qr small" src={qr} alt={tr('QR code to open the TV view')} />}
         <button type="button" className="soft" onClick={() => navigator.clipboard?.writeText(tvLink(code, as)).then(() => setCopied(true)).catch(() => {})}>
-          <Icon name="share" size={16} /> {copied ? 'TV link copied' : 'Copy TV link'}
+          <Icon name="share" size={16} /> {copied ? tr('TV link copied') : tr('Copy TV link')}
         </button>
       </div>
-      <p className="footnote">No TV? Everything works on the phone alone too.</p>
+      <p className="footnote">{tr('No TV? Everything works on the phone alone too.')}</p>
     </div>
   );
 }
@@ -1903,21 +1910,21 @@ function TvLobby({ code, table, icons, onPlayHere }) {
   return (
     <div className="tv-lobby">
       <h1><span className="brand-mark">♠</span> Family Spades</h1>
-      <p className="tv-lobby-code">Game <b>{code}</b></p>
+      <p className="tv-lobby-code">{tx('Game {code}', { code: <b>{code}</b> })}</p>
       <div className="tv-lobby-seats">
         {SEATS.map((_, s) => {
           const who = table.seats[s];
           return (
             <div key={s} className={`tv-lobby-seat t${teamOf(s)}`}>
               {who ? <Avatar value={icons[who.id]} name={who.name} bot={who.bot} className="tv-lobby-avatar" /> : <span className="empty-seat">+</span>}
-              <b>{who?.name ?? 'Open seat'}</b>
-              <span>Team {teamOf(s) + 1}</span>
+              <b>{who?.name ?? tr('Open seat')}</b>
+              <span>{tr('Team {n}', { n: teamOf(s) + 1 })}</span>
             </div>
           );
         })}
       </div>
-      <p className="tv-lobby-wait">Waiting for the host to start the game…</p>
-      <button type="button" className="tv-play-here" onClick={onPlayHere}><Icon name="users" size={16} /> Join as a player</button>
+      <p className="tv-lobby-wait">{tr('Waiting for the host to start the game…')}</p>
+      <button type="button" className="tv-play-here" onClick={onPlayHere}><Icon name="users" size={16} /> {tr('Join as a player')}</button>
     </div>
   );
 }
@@ -1934,21 +1941,24 @@ export function TvControls({ call, onLeave, view, onView, grid, onGrid }) {
   return (
     <>
       <div className="tv-corner">
-        {view != null && <>{viewButton('chat', 'video', 'Table + Chat')}{viewButton('video', 'users', 'Video chat only')}</>}
+        {view != null && <>{viewButton('chat', 'video', tr('Table + Chat'))}{viewButton('video', 'users', tr('Video chat only'))}</>}
         {view === 'video' && (
-          <span className="tv-grid-pick" role="group" aria-label="Video layout">
+          <span className="tv-grid-pick" role="group" aria-label={tr('Video layout')}>
             {[['4x1', '1×4'], ['2x2', '2×2']].map(([g, label]) => (
               <button key={g} type="button" className={grid === g ? 'on' : ''} aria-pressed={grid === g} onClick={() => onGrid(g)}>{label}</button>
             ))}
           </span>
         )}
-        <button type="button" onClick={call.toggleSpeaker} aria-label={call.speakerOn ? 'Turn sound off' : 'Turn sound on'}>
+        <button type="button" className="tv-big" onClick={() => setLang(getLang() === 'es' ? 'en' : 'es')} aria-label="Language / Idioma">
+          {LANGS.find((l) => l.id !== getLang())?.label}
+        </button>
+        <button type="button" onClick={call.toggleSpeaker} aria-label={call.speakerOn ? tr('Turn sound off') : tr('Turn sound on')}>
           <Icon name={call.speakerOn ? 'speaker' : 'speakerOff'} size={18} />
         </button>
-        <button type="button" onClick={() => document.documentElement.requestFullscreen?.().catch(() => {})} aria-label="Full screen">
+        <button type="button" onClick={() => document.documentElement.requestFullscreen?.().catch(() => {})} aria-label={tr('Full screen')}>
           <Icon name="expand" size={18} />
         </button>
-        <button type="button" onClick={() => { if (confirm('Close the TV view?')) onLeave(); }} aria-label="Close TV view">
+        <button type="button" onClick={() => { if (confirm(tr('Close the TV view?'))) onLeave(); }} aria-label={tr('Close TV view')}>
           <Icon name="close" size={18} />
         </button>
       </div>

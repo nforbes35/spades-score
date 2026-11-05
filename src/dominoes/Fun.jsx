@@ -6,6 +6,7 @@ import { VideoTile } from '../Video.jsx';
 import { tileClack, tileRattle } from '../lib/fx.js';
 import Domino from './Domino.jsx';
 import { halves } from './engine.js';
+import { getLang, tr, tMsg } from '../lib/i18n.js';
 import { TALK_LINES, loadTalk, saveTalk, MAX_CLIP_CHARS, validClip, domStats, headToHead, loadDomLog } from './fun.js';
 import { loadPhotos, deletePhoto } from './album.js';
 
@@ -121,14 +122,14 @@ export function DomWash({ table, ms, onSend, bus, onSkip, tv }) {
   return (
     <div className="dom-wash">
       <div className="table-oval" aria-hidden="true" />
-      <canvas ref={canvas} className="dom-wash-canvas" aria-label="Dominoes face down, being mixed" />
+      <canvas ref={canvas} className="dom-wash-canvas" aria-label={tr('Dominoes face down, being mixed')} />
       <div className="dw-head">
-        <h2>Mix the tiles!</h2>
-        <p>{tv ? 'Everyone’s stirring the pile' : 'Drag your finger through the pile'}</p>
-        {lines.map((l) => <p key={l} className="dw-rivalry">{l}</p>)}
+        <h2>{tr('Mix the tiles!')}</h2>
+        <p>{tv ? tr('Everyone’s stirring the pile') : tr('Drag your finger through the pile')}</p>
+        {lines.map((l, i) => <p key={i} className="dw-rivalry">{tMsg(l)}</p>)}
       </div>
       <div className="dw-bar" style={{ animationDuration: `${ms}ms` }} />
-      {!tv && <button type="button" className="dw-skip" onClick={onSkip}>Skip</button>}
+      {!tv && <button type="button" className="dw-skip" onClick={onSkip}>{tr('Skip')}</button>}
     </div>
   );
 }
@@ -151,7 +152,7 @@ export function DomMoment({ table, info, stream, icon, onClose, snap }) {
         </div>
       )}
       <p className="dm-sub">{info.sub}</p>
-      {snap && <p className="dm-snap">📸 Reaction photo saved to the album</p>}
+      {snap && <p className="dm-snap">📸 {tr('Reaction photo saved to the album')}</p>}
       <div className="dm-hands" style={{ '--most': most }}>
         {reveal.map((hand, s) => (hand.length > 0 && table.seats[s] ? (
           <div key={s} className="dm-hand">
@@ -162,7 +163,7 @@ export function DomMoment({ table, info, stream, icon, onClose, snap }) {
           </div>
         ) : null))}
       </div>
-      <p className="dm-tap">Tap to continue</p>
+      <p className="dm-tap">{tr('Tap to continue')}</p>
     </div>
   );
 }
@@ -173,12 +174,13 @@ export const DomCallout = ({ c }) => (
 
 /** Someone's line, over the table for everyone. */
 export const DomTalk = ({ talk }) => (
-  <div className="dom-talk" role="status"><b>{talk.name}</b><span>{talk.text}</span></div>
+  <div className="dom-talk" role="status"><b>{talk.name}</b><span>{talk.text}</span>{talk.original && <small>🌐 {talk.original}</small>}</div>
 );
 
 const CLIP_MS = 3000;
 /** The trash talk lines: tap one to say it; record your own voice for any of them; add your own. */
 export function TalkSheet({ onSay, onClose }) {
+  const lang = getLang();
   const [talk, setTalk] = useState(loadTalk);
   const [recording, setRecording] = useState(null);
   const [draft, setDraft] = useState('');
@@ -189,9 +191,9 @@ export function TalkSheet({ onSay, onClose }) {
   const record = async (id) => {
     setProblem(null);
     if (recording === id) { recorder.current?.stop(); return; }
-    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') { setProblem('This device can’t record here.'); return; }
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') { setProblem(tr('This device can’t record here.')); return; }
     let stream;
-    try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); } catch { setProblem('Allow the microphone to record your voice.'); return; }
+    try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); } catch { setProblem(tr('Allow the microphone to record your voice.')); return; }
     const type = ['audio/webm;codecs=opus', 'audio/mp4'].find((t) => MediaRecorder.isTypeSupported(t));
     const rec = new MediaRecorder(stream, { ...(type ? { mimeType: type } : {}), audioBitsPerSecond: 24000 });
     const parts = [];
@@ -203,7 +205,7 @@ export function TalkSheet({ onSay, onClose }) {
       const reader = new FileReader();
       reader.onload = () => {
         const clip = reader.result;
-        if (!validClip(clip) || clip.length > MAX_CLIP_CHARS) { setProblem('That recording didn’t work. Try a shorter one.'); return; }
+        if (!validClip(clip) || clip.length > MAX_CLIP_CHARS) { setProblem(tr('That recording didn’t work. Try a shorter one.')); return; }
         const now = loadTalk();
         change({ ...now, clips: { ...now.clips, [id]: clip } });
       };
@@ -225,23 +227,23 @@ export function TalkSheet({ onSay, onClose }) {
   };
   const row = (l, custom) => (
     <div key={l.id} className="talk-row">
-      <button type="button" className="talk-say" onClick={() => onSay(l.text, talk.clips[l.id] ?? null)}>{talk.clips[l.id] ? '🗣️ ' : ''}{l.text}</button>
-      <button type="button" className={`talk-mic${recording === l.id ? ' on' : ''}`} aria-label={recording === l.id ? 'Stop recording' : `Record your voice saying ${l.text}`} onClick={() => record(l.id)}>{recording === l.id ? '⏹' : '🎙️'}</button>
-      {talk.clips[l.id] && !custom && <button type="button" className="talk-x" aria-label="Remove your recording" onClick={() => removeVoice(l.id)}><Icon name="close" size={14} /></button>}
-      {custom && <button type="button" className="talk-x" aria-label="Remove this line" onClick={() => removeLine(l.id)}><Icon name="close" size={14} /></button>}
+      <button type="button" className="talk-say" onClick={() => onSay(l.text ?? l[lang], talk.clips[l.id] ?? null, custom ? null : l.id)}>{talk.clips[l.id] ? '🗣️ ' : ''}{l.text ?? l[lang]}</button>
+      <button type="button" className={`talk-mic${recording === l.id ? ' on' : ''}`} aria-label={recording === l.id ? tr('Stop recording') : tr('Record your voice saying {line}', { line: l.text ?? l[lang] })} onClick={() => record(l.id)}>{recording === l.id ? '⏹' : '🎙️'}</button>
+      {talk.clips[l.id] && !custom && <button type="button" className="talk-x" aria-label={tr('Remove your recording')} onClick={() => removeVoice(l.id)}><Icon name="close" size={14} /></button>}
+      {custom && <button type="button" className="talk-x" aria-label={tr('Remove this line')} onClick={() => removeLine(l.id)}><Icon name="close" size={14} /></button>}
     </div>
   );
   return (
-    <Sheet title="Talk some trash" short onClose={onClose} closeLabel="Close">
-      <p className="muted small">Tap a line and everyone hears it. Tap 🎙️ to record it in your own voice (3 seconds).</p>
+    <Sheet title={tr('Talk some trash')} short onClose={onClose} closeLabel={tr('Close')}>
+      <p className="muted small">{tr('Tap a line and everyone hears it. Tap 🎙️ to record it in your own voice (3 seconds).')}</p>
       {problem && <p className="talk-problem">{problem}</p>}
       <div className="talk-list">
         {TALK_LINES.map((l) => row(l, false))}
         {talk.custom.map((l) => row(l, true))}
       </div>
       <form className="talk-add" onSubmit={add}>
-        <input value={draft} onChange={(e) => setDraft(e.target.value)} maxLength={50} placeholder="Add your own line" aria-label="Add your own line" />
-        <button type="submit" className="secondary" disabled={!draft.trim()}>Add</button>
+        <input value={draft} onChange={(e) => setDraft(e.target.value)} maxLength={50} placeholder={tr('Add your own line')} aria-label={tr('Add your own line')} />
+        <button type="submit" className="secondary" disabled={!draft.trim()}>{tr('Add')}</button>
       </form>
     </Sheet>
   );
@@ -258,21 +260,21 @@ export function AlbumSheet({ onClose }) {
   const fileOf = (p) => new File([p.blob], `family-games-${new Date(p.at).toISOString().slice(0, 10)}.jpg`, { type: 'image/jpeg' });
   const canShare = (p) => { try { return Boolean(navigator.canShare?.({ files: [fileOf(p)] })); } catch { return false; } };
   return (
-    <Sheet title={open ? open.title : 'Family album'} onClose={open ? () => setOpen(null) : onClose} closeLabel={open ? 'Back' : 'Done'}>
+    <Sheet title={open ? open.title : tr('Family album')} onClose={open ? () => setOpen(null) : onClose} closeLabel={open ? tr('Back') : tr('Done')}>
       {open ? (
         <div className="album-big">
           <img src={urlOf(open)} alt={open.title} />
-          <p className="muted small center">{new Date(open.at).toLocaleString(undefined, { dateStyle: 'long', timeStyle: 'short' })}</p>
+          <p className="muted small center">{new Date(open.at).toLocaleString(getLang(), { dateStyle: 'long', timeStyle: 'short' })}</p>
           <div className="row">
             {canShare(open)
-              ? <button type="button" className="primary" onClick={() => navigator.share({ files: [fileOf(open)] }).catch(() => {})}>Share</button>
-              : <a className="primary album-save" href={urlOf(open)} download={fileOf(open).name}>Save</a>}
-            <button type="button" className="secondary" onClick={() => { if (confirm('Delete this photo?')) deletePhoto(open.id).then(() => { setOpen(null); reload(); }); }}>Delete</button>
+              ? <button type="button" className="primary" onClick={() => navigator.share({ files: [fileOf(open)] }).catch(() => {})}>{tr('Share')}</button>
+              : <a className="primary album-save" href={urlOf(open)} download={fileOf(open).name}>{tr('Save')}</a>}
+            <button type="button" className="secondary" onClick={() => { if (confirm(tr('Delete this photo?'))) deletePhoto(open.id).then(() => { setOpen(null); reload(); }); }}>{tr('Delete')}</button>
           </div>
         </div>
       ) : (
         <>
-          {photos?.length === 0 && <div className="card empty stats-empty"><span style={{ fontSize: 34 }}>📸</span><p>When a hand ends during a video chat, a picture of everyone’s reaction lands here. Photos stay on this device unless you share them.</p></div>}
+          {photos?.length === 0 && <div className="card empty stats-empty"><span style={{ fontSize: 34 }}>📸</span><p>{tr('When a hand ends during a video chat, a picture of everyone’s reaction lands here. Photos stay on this device unless you share them.')}</p></div>}
           <div className="album-grid">
             {(photos ?? []).map((p) => <button key={p.id} type="button" onClick={() => setOpen(p)} aria-label={p.title}><img src={urlOf(p)} alt="" /></button>)}
           </div>
@@ -287,19 +289,19 @@ export function DomStatsList() {
   const [log] = useState(loadDomLog);
   const players = domStats(log);
   const pairs = headToHead(log, players.map((p) => p.name)).slice(0, 8);
-  if (!players.length) return <div className="card empty stats-empty"><Icon name="trophy" size={34} /><p>Finish a game of dominoes and everyone’s record shows up here.</p></div>;
+  if (!players.length) return <div className="card empty stats-empty"><Icon name="trophy" size={34} /><p>{tr('Finish a game of dominoes and everyone’s record shows up here.')}</p></div>;
   return (
     <>
       <div className="leaderboard">
         {players.map((p, i) => (
           <div key={p.key} className="card lb-row">
             <span className="lb-rank">{['🥇', '🥈', '🥉'][i] ?? i + 1}</span>
-            <span className="lb-main"><b>{p.name}</b><span className="muted small">{p.wins}–{p.losses}{p.streak >= 2 ? ` · won ${p.streak} straight` : p.streak <= -2 ? ` · lost ${-p.streak} straight` : ''}</span><span className="lb-bar"><i style={{ width: `${p.pct}%` }} /></span></span>
+            <span className="lb-main"><b>{p.name}</b><span className="muted small">{p.wins}–{p.losses}{p.streak >= 2 ? ` · ${tr('won {n} straight', { n: p.streak })}` : p.streak <= -2 ? ` · ${tr('lost {n} straight', { n: -p.streak })}` : ''}</span><span className="lb-bar"><i style={{ width: `${p.pct}%` }} /></span></span>
             <span className="lb-pct">{p.pct}%</span>
           </div>
         ))}
       </div>
-      {pairs.length > 0 && <div className="section-title">Head to head</div>}
+      {pairs.length > 0 && <div className="section-title">{tr('Head to head')}</div>}
       {pairs.map((x) => <div key={`${x.a}${x.b}`} className="card dom-h2h"><span>{x.a}</span><b>{x.aw} – {x.bw}</b><span>{x.b}</span></div>)}
     </>
   );

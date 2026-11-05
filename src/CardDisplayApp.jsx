@@ -6,6 +6,7 @@ import { parseCard, cardName } from './lib/cards.js';
 import { useRoom } from './lib/room.js';
 import { useDevice } from './lib/device.js';
 import { useWakeLock } from './lib/fx.js';
+import { tr } from './lib/i18n.js';
 
 const TURN_KEY = 'spades-card-display-turn';
 
@@ -80,11 +81,11 @@ export default function CardDisplayApp({ code, seat, onLeave }) {
   const entry = hand ? seatEntry(hand, seat) : null;
   const notRemote = game && !remoteSeats(game).includes(seat);
 
-  let caption = `Waiting for game ${code}…`;
-  if (game && notRemote) caption = `${name} isn't playing remotely`;
-  else if (game && !hand) caption = `${name}'s card shows here`;
-  else if (stage === 'bids') caption = `${name} ${entry && isNil(entry.call) ? `went ${nilLabel(entry.call)}` : `bid ${entry?.bid ?? 0}`}`;
-  else if (stage === 'play' && !card) caption = `Book ${Math.min(13, booksPlayed(hand) + 1)}: waiting for ${name}`;
+  let caption = tr('Waiting for game {code}…', { code });
+  if (game && notRemote) caption = tr("{name} isn't playing remotely", { name });
+  else if (game && !hand) caption = tr("{name}'s card shows here", { name });
+  else if (stage === 'bids') caption = entry && isNil(entry.call) ? tr('{name} went {nil}', { name, nil: nilLabel(entry.call) }) : tr('{name} bid {n}', { name, n: entry?.bid ?? 0 });
+  else if (stage === 'play' && !card) caption = tr('Book {n}: waiting for {name}', { n: Math.min(13, booksPlayed(hand) + 1), name });
 
   return (
     <div className="card-display" onClick={rotate}>
@@ -97,8 +98,8 @@ export default function CardDisplayApp({ code, seat, onLeave }) {
           {card ? name : caption}
         </div>
       </div>
-      <button type="button" className="cd-leave" onClick={(e) => { e.stopPropagation(); if (confirm('Stop showing cards on this device?')) onLeave(); }}>
-        Leave
+      <button type="button" className="cd-leave" onClick={(e) => { e.stopPropagation(); if (confirm(tr('Stop showing cards on this device?'))) onLeave(); }}>
+        {tr('Leave')}
       </button>
     </div>
   );

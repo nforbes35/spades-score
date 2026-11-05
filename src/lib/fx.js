@@ -300,10 +300,14 @@ export function porchSounds(on) {
 }
 
 /** Someone's recorded voice (a data: URL), or a computer voice saying `text` if there's no recording. */
-export function sayLine(text, clip) {
+export function sayLine(text, clip, lang) {
   if (!settings.effects || !onScreen()) return;
   try {
     if (clip) { new Audio(clip).play().catch(() => {}); return; }
-    if ('speechSynthesis' in window && text) window.speechSynthesis.speak(new SpeechSynthesisUtterance(text));
+    if ('speechSynthesis' in window && text) {
+      const line = new SpeechSynthesisUtterance(text);
+      if (lang) line.lang = lang === 'es' ? 'es-MX' : 'en-US';
+      window.speechSynthesis.speak(line);
+    }
   } catch { /* no sound available */ }
 }

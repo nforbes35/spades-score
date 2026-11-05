@@ -3,24 +3,25 @@
 import { read, write } from '../lib/store.js';
 import { nameKey } from '../lib/stats.js';
 import { kindOf, sideOf, byRounds, VARIANTS, halves } from './engine.js';
+import { tr, langMsg } from '../lib/i18n.js';
 
 const WORDS = { 5: 'Five', 10: 'Ten', 15: 'Fifteen', 20: 'Twenty', 25: 'Twenty-five', 30: 'Thirty', 35: 'Thirty-five', 40: 'Forty', 45: 'Forty-five', 50: 'Fifty', 55: 'Fifty-five', 60: 'Sixty' };
 
-/** What gets called out for the tile just played (null: nothing special). */
+/** What gets called out for the tile just played (null: nothing special). Worked out on each device, in its language. */
 export function calloutFor(table) {
   const r = table.round;
   const last = r?.last;
   if (!last?.tile || r.result) return null;
-  if (last.points) return { text: `${WORDS[last.points] ?? last.points}!`, sub: `+${last.points}`, big: last.points >= 20 };
+  if (last.points) return { text: tr('{word}!', { word: tr(WORDS[last.points] ?? String(last.points)) }), sub: `+${last.points}`, big: last.points >= 20 };
   const [a, b] = halves(last.tile);
   if (a !== b) return null;
   const kind = kindOf(table);
-  if (kind === 'train') return { text: 'Double!', sub: 'Cover it 🚂' };
-  if (kind === 'foot') return { text: 'Chicken foot!', sub: '🐔' };
-  return a >= 5 ? { text: `Double ${a}!` } : null;
+  if (kind === 'train') return { text: tr('Double!'), sub: tr('Cover it 🚂') };
+  if (kind === 'foot') return { text: tr('Chicken foot!'), sub: '🐔' };
+  return a >= 5 ? { text: tr('Double {n}!', { n: a }) } : null;
 }
 
-/** The big moment at the end of a hand: its headline, who it's about, and whether to throw confetti. */
+/** The big moment at the end of a hand: its headline, who it's about, and whether to throw confetti. Each device works it out, in its language. */
 export function momentFor(table) {
   const res = table.round?.result;
   if (!res) return null;
@@ -34,11 +35,11 @@ export function momentFor(table) {
     seat = onSide.length ? onSide.sort((x, y) => x.p - y.p)[0].s : null;
   }
   const name = seat != null ? seats[seat]?.name : null;
-  const title = shutout ? 'Shut out!' : res.reason === 'domino' ? 'Domino!' : 'Blocked!';
-  const sub = res.reason === 'domino' ? `${name} is out of tiles`
-    : name ? `Nobody can play. ${name} has the fewest dots`
-      : 'Nobody can play, and it’s a tie';
-  return { title, sub: byRounds(table) || !shutout ? sub : `${sub}, and nobody else scored`, seat, confetti: res.reason === 'domino' || shutout };
+  const title = shutout ? tr('Shut out!') : res.reason === 'domino' ? tr('Domino!') : tr('Blocked!');
+  const sub = res.reason === 'domino' ? tr('{name} is out of tiles', { name })
+    : name ? tr('Nobody can play. {name} has the fewest dots', { name })
+      : tr('Nobody can play, and it’s a tie');
+  return { title, sub: byRounds(table) || !shutout ? sub : tr('{sub}, and nobody else scored', { sub }), seat, confetti: res.reason === 'domino' || shutout };
 }
 
 // ---------- The record of finished games ----------
@@ -110,29 +111,47 @@ export function headToHead(log, names) {
   return pairs.sort((x, y) => y.aw + y.bw - (x.aw + x.bw));
 }
 
-/** A couple of lines for the start of a game: "Papi leads Nick, 12 games to 9", "Ann has won 3 in a row". */
+/**
+ * A couple of lines for the start of a game: "Papi leads Nick, 12 games to 9", "Ann has won 3 in a row". They go in
+ * the table for everyone, so they're langMsg values: show them with tMsg.
+ */
 export function rivalryLines(log, names, most = 3) {
-  const lines = headToHead(log, names).slice(0, 2).map(({ a, b, aw, bw }) => (aw === bw
-    ? `${a} and ${b} are tied, ${aw} ${aw === 1 ? 'game' : 'games'} each`
-    : `${a} leads ${b}, ${aw} ${aw === 1 ? 'game' : 'games'} to ${bw}`));
+  const lines = headToHead(log, names).slice(0, 2).map(({ a, b, aw, bw }) => {
+    if (aw === bw) return aw === 1 ? langMsg('{a} and {b} are tied, {n} game each', { a, b, n: aw }) : langMsg('{a} and {b} are tied, {n} games each', { a, b, n: aw });
+    return aw === 1 ? langMsg('{a} leads {b}, {n} game to {m}', { a, b, n: aw, m: bw }) : langMsg('{a} leads {b}, {n} games to {m}', { a, b, n: aw, m: bw });
+  });
   const here = new Set(names.map(nameKey));
   domStats(log).filter((p) => here.has(p.key)).forEach((p) => {
-    if (p.streak >= 2) lines.push(`${p.name} has won ${p.streak} in a row`);
-    else if (p.streak <= -3) lines.push(`${p.name} has lost ${-p.streak} straight and wants revenge`);
+    if (p.streak >= 2) lines.push(langMsg('{name} has won {n} in a row', { name: p.name, n: p.streak }));
+    else if (p.streak <= -3) lines.push(langMsg('{name} has lost {n} straight and wants revenge', { name: p.name, n: -p.streak }));
   });
   return lines.slice(0, most);
 }
 
 // ---------- Trash talk ----------
 export const TALK_LINES = [
-  { id: 'knock', text: 'Knock knock!' },
-  { id: 'teach', text: 'Who taught you to play?' },
-  { id: 'weep', text: 'Read ’em and weep.' },
-  { id: 'all', text: 'Is that all you got?' },
-  { id: 'ready', text: 'Y’all ain’t ready!' },
-  { id: 'doctor', text: 'Somebody call a doctor!' },
-  { id: 'papi', text: 'Papi taught me that one.' },
+  { id: 'knock', en: 'Knock knock!', es: '¡Toc, toc!' },
+  { id: 'teach', en: 'Who taught you to play?', es: '¿Quién te enseñó a jugar?' },
+  { id: 'weep', en: 'Read ’em and weep.', es: 'Míralas y llora.' },
+  { id: 'all', en: 'Is that all you got?', es: '¿Eso es todo lo que tienes?' },
+  { id: 'ready', en: 'Y’all ain’t ready!', es: '¡No están listos!' },
+  { id: 'doctor', en: 'Somebody call a doctor!', es: '¡Que alguien llame a un doctor!' },
+  { id: 'papi', en: 'Papi taught me that one.', es: 'Eso me lo enseñó Papi.' },
 ];
+/**
+ * What this device shows for a line someone said ({ text, line, lang }): the wording in `myLang`, plus `original` if
+ * that's different from what they said. `needs` names the language to translate from when it's a typed line in the
+ * other language; `guess` is guessLang from translate.js.
+ */
+export function talkFor(said, myLang, guess) {
+  const built = said.line && TALK_LINES.find((l) => l.id === said.line);
+  if (built) {
+    const from = said.lang === 'es' ? 'es' : 'en';
+    return { text: built[myLang], original: from === myLang ? null : built[from], needs: null };
+  }
+  const from = guess(said.text, said.lang === 'es' || said.lang === 'en' ? said.lang : myLang);
+  return { text: said.text, original: null, needs: from === myLang ? null : from };
+}
 const TALK_KEY = 'dominoes-talk';
 export const MAX_CLIP_CHARS = 80000;
 export const validClip = (c) => typeof c === 'string' && c.length <= MAX_CLIP_CHARS && /^data:audio\/[\w.+-]+(;[\w=.+-]+)*;base64,[A-Za-z0-9+/=]+$/.test(c);

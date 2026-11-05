@@ -4,6 +4,7 @@ import { read, write } from './lib/store.js';
 import { history, standings, winner, contractBid, isNil, nilLabel } from './lib/scoring.js';
 import { SEATS, teamOf, playerName, seatEntry, stageOf, liveOf, leaderOf, remainingCards, booksPlayed, remoteSeats } from './lib/table.js';
 import { sortHand } from './lib/cards.js';
+import { tr, tx } from './lib/i18n.js';
 import { useRoom, joinLink } from './lib/room.js';
 import { useDevice } from './lib/device.js';
 import { useCall } from './lib/call.js';
@@ -89,7 +90,7 @@ export default function RemoteApp({ code, seat: mySeat, onLeave }) {
     if (!sending) return undefined;
     const t = setTimeout(() => {
       setSending(null);
-      toast.show('That card didn’t reach the table. Try again.');
+      toast.show(tr('That card didn’t reach the table. Try again.'));
     }, SEND_TIMEOUT_MS);
     return () => clearTimeout(t);
   }, [sending]);
@@ -118,10 +119,10 @@ export default function RemoteApp({ code, seat: mySeat, onLeave }) {
   let status = null;
   if (stage === 'play') {
     const leader = leaderOf(hand);
-    if (myPlayed || sending) status = { text: <>You played <CardText code={myPlayed ?? sending.card} />. Waiting for the book.</> };
-    else if (booksPlayed(hand) >= 13) status = { text: 'All 13 books played. Waiting for the score.' };
-    else if (leader === mySeat) status = { text: 'You lead this book!', hot: true };
-    else status = { text: `${playerName(game, leader)} leads this book. Play when it's your turn.` };
+    if (myPlayed || sending) status = { text: tx('You played {card}. Waiting for the book.', { card: <CardText code={myPlayed ?? sending.card} /> }) };
+    else if (booksPlayed(hand) >= 13) status = { text: tr('All 13 books played. Waiting for the score.') };
+    else if (leader === mySeat) status = { text: tr('You lead this book!'), hot: true };
+    else status = { text: tr("{name} leads this book. Play when it's your turn.", { name: playerName(game, leader) }) };
   }
 
   return (
@@ -131,18 +132,18 @@ export default function RemoteApp({ code, seat: mySeat, onLeave }) {
           <div className="brand">
             <span className="brand-mark">♠</span>
             <h1>Family Spades</h1>
-            <span className="mode-chip"><Icon name="phone" size={13} /> Remote</span>
+            <span className="mode-chip"><Icon name="phone" size={13} /> {tr('Remote')}</span>
           </div>
           <div className="row">
-            <button type="button" className="icon-btn round" aria-label="Watch on your TV" onClick={() => setTvHelp(true)}>
+            <button type="button" className="icon-btn round" aria-label={tr('Watch on your TV')} onClick={() => setTvHelp(true)}>
               <Icon name="tv" />
             </button>
             {!call.joined && (
-              <button type="button" className="icon-btn round" aria-label="Video chat with the table" disabled={!connected} onClick={call.join}>
+              <button type="button" className="icon-btn round" aria-label={tr('Video chat with the table')} disabled={!connected} onClick={call.join}>
                 <Icon name="video" />
               </button>
             )}
-            <button type="button" className="icon-btn" onClick={() => { if (confirm('Leave this game?')) onLeave(); }}>Leave</button>
+            <button type="button" className="icon-btn" onClick={() => { if (confirm(tr('Leave this game?'))) onLeave(); }}>{tr('Leave')}</button>
           </div>
         </div>
         <div className="wrap">
@@ -155,14 +156,14 @@ export default function RemoteApp({ code, seat: mySeat, onLeave }) {
             </div>
           )}
           <div className="target">
-            <StatusDot on={connected} label={connected ? 'Connected to the table' : room.status === 'error' ? 'Connection problem' : 'Connecting…'} />
+            <StatusDot on={connected} label={connected ? tr('Connected to the table') : room.status === 'error' ? tr('Connection problem') : tr('Connecting…')} />
           </div>
         </div>
       </header>
 
       {pinged && (
         <button type="button" className="ping-banner" onClick={() => setPinged(false)}>
-          <Icon name="bell" /> It's your turn!
+          <Icon name="bell" /> {tr("It's your turn!")}
         </button>
       )}
 
@@ -170,28 +171,28 @@ export default function RemoteApp({ code, seat: mySeat, onLeave }) {
         {!game && (
           <div className="card waiting-card">
             <span className="spinner" />
-            <h2>Joining game {code}</h2>
-            <p className="muted">Make sure the scorekeeper has Spades open with you added as the remote player.</p>
+            <h2>{tr('Joining game {code}', { code })}</h2>
+            <p className="muted">{tr('Make sure the scorekeeper has Spades open with you added as the remote player.')}</p>
           </div>
         )}
         {game && ended && (
           <div className="card waiting-card">
-            <h2>The table stopped remote play</h2>
-            <p className="muted">Ask the scorekeeper for a new code if you're still playing.</p>
-            <button type="button" className="primary big" onClick={onLeave}>OK</button>
+            <h2>{tr('The table stopped remote play')}</h2>
+            <p className="muted">{tr("Ask the scorekeeper for a new code if you're still playing.")}</p>
+            <button type="button" className="primary big" onClick={onLeave}>{tr('OK')}</button>
           </div>
         )}
 
         {game && !ended && (
           <>
-            {win != null && <div className="winner"><Icon name="trophy" size={26} /> {game.teams[win].name} wins!</div>}
-            <p className="you-are">You're playing as <b>{playerName(game, mySeat)}</b> for {game.teams[teamOf(mySeat)].name}</p>
+            {win != null && <div className="winner"><Icon name="trophy" size={26} /> {tr('{name} wins!', { name: game.teams[win].name })}</div>}
+            <p className="you-are">{tx("You're playing as {name} for {team}", { name: <b>{playerName(game, mySeat)}</b>, team: game.teams[teamOf(mySeat)].name })}</p>
             {notMySeat && (
-              <div className="scan-msg">The table hasn't set {playerName(game, mySeat)} as a remote player. Ask the scorekeeper to add you in Invite.</div>
+              <div className="scan-msg">{tr("The table hasn't set {name} as a remote player. Ask the scorekeeper to add you in Invite.", { name: playerName(game, mySeat) })}</div>
             )}
             {call.joined && tvHere && (
               <div className="card tv-bar">
-                <span><Icon name="tv" size={18} /> Video is on your TV</span>
+                <span><Icon name="tv" size={18} /> {tr('Video is on your TV')}</span>
                 <CallButtons call={call} showFlip={false} size={18} />
               </div>
             )}
@@ -199,8 +200,8 @@ export default function RemoteApp({ code, seat: mySeat, onLeave }) {
 
             {!hand && (
               <div className="card waiting-card">
-                <h2>Waiting for the next hand</h2>
-                <p className="muted">Your cards will show up here after the deal.</p>
+                <h2>{tr('Waiting for the next hand')}</h2>
+                <p className="muted">{tr('Your cards will show up here after the deal.')}</p>
               </div>
             )}
 
@@ -208,33 +209,33 @@ export default function RemoteApp({ code, seat: mySeat, onLeave }) {
               <section className="live card">
                 <div className="live-head">
                   <div>
-                    <div className="eyebrow">Hand {game.hands.indexOf(hand) + 1} · Bidding</div>
+                    <div className="eyebrow">{tr('Hand {n} · Bidding', { n: game.hands.indexOf(hand) + 1 })}</div>
                     <LeftOnTable hand={hand} />
                   </div>
-                  <span className="chip quiet">{playerName(game, hand.dealer ?? 0)} deals</span>
+                  <span className="chip quiet">{tr('{name} deals', { name: playerName(game, hand.dealer ?? 0) })}</span>
                 </div>
                 <div className="bid-list">
                   {SEATS.map((_, s) => {
                     const p = seatEntry(hand, s);
                     return (
                       <div key={s} className={`bid-item t${teamOf(s)}${s === mySeat ? ' me' : ''}`}>
-                        <span>{s === mySeat ? 'You' : playerName(game, s)}</span>
+                        <span>{s === mySeat ? tr('You') : playerName(game, s)}</span>
                         <b>{isNil(p.call) ? nilLabel(p.call) : p.bid}</b>
                       </div>
                     );
                   })}
                 </div>
                 <div className="team-bids">
-                  {[0, 1].map((t) => <span key={t} className={`team-pill t${t}`}>{game.teams[t].name}: bid {contractBid(hand.teams[t])}</span>)}
+                  {[0, 1].map((t) => <span key={t} className={`team-pill t${t}`}>{game.teams[t].name}: {tr('bid {n}', { n: contractBid(hand.teams[t]) })}</span>)}
                 </div>
                 <div className="my-bid">
                   <div className="row between">
-                    <span className="eyebrow">Your bid</span>
+                    <span className="eyebrow">{tr('Your bid')}</span>
                     {isNil(shownBid.call)
                       ? <span className="nil-tag">{nilLabel(shownBid.call)}</span>
-                      : <NumberControl label="Your bid" value={shownBid.bid} onChange={(bid) => sendBid({ bid })} />}
+                      : <NumberControl label={tr('Your bid')} value={shownBid.bid} onChange={(bid) => sendBid({ bid })} />}
                   </div>
-                  <NilPicker label="Your nil" value={shownBid.call} onChange={(c) => sendBid({ call: c })} />
+                  <NilPicker label={tr('Your nil')} value={shownBid.call} onChange={(c) => sendBid({ call: c })} />
                 </div>
               </section>
             )}
@@ -243,7 +244,7 @@ export default function RemoteApp({ code, seat: mySeat, onLeave }) {
               <section className="live card">
                 <div className="live-head">
                   <div>
-                    <div className="eyebrow">Hand {game.hands.indexOf(hand) + 1} · Playing</div>
+                    <div className="eyebrow">{tr('Hand {n} · Playing', { n: game.hands.indexOf(hand) + 1 })}</div>
                     <div className={`live-title${status?.hot ? ' hot' : ''}`}>{status?.text}</div>
                   </div>
                 </div>
@@ -254,17 +255,17 @@ export default function RemoteApp({ code, seat: mySeat, onLeave }) {
             {hand && !docked && (
               <section className="my-cards">
                 <div className="section-title row between">
-                  <span>Your cards</span>
-                  {myCards.length > 0 && <span className="count-pill">{myCards.length} left</span>}
+                  <span>{tr('Your cards')}</span>
+                  {myCards.length > 0 && <span className="count-pill">{tr('{n} left', { n: myCards.length })}</span>}
                 </div>
                 {myCards.length === 0 && !live.cards && (
-                  <div className="card empty">The scorekeeper will take a photo of your cards and they'll appear here.</div>
+                  <div className="card empty">{tr("The scorekeeper will take a photo of your cards and they'll appear here.")}</div>
                 )}
                 {coverCards ? (
                   <button type="button" className="card cover-cards" onClick={() => setRevealed((r) => ({ ...r, [hand.id]: true }))}>
                     <div className="cover-stack"><span /><span /><span /></div>
-                    <b>Your {myCards.length} cards are here</b>
-                    <span className="muted small">Thinking about blind nil? Bid first. Tap to look at your cards.</span>
+                    <b>{tr('Your {n} cards are here', { n: myCards.length })}</b>
+                    <span className="muted small">{tr('Thinking about blind nil? Bid first. Tap to look at your cards.')}</span>
                   </button>
                 ) : null}
               </section>
@@ -272,7 +273,7 @@ export default function RemoteApp({ code, seat: mySeat, onLeave }) {
 
             {game.hands.some((h) => !h.inPlay) && (
               <>
-                <div className="section-title">Hands</div>
+                <div className="section-title">{tr('Hands')}</div>
                 <div className="stack">
                   {game.hands.map((h, i) => ({ h, i })).filter(({ h }) => !h.inPlay).reverse().map(({ h, i }) => (
                     <HandRow key={h.id} hand={h} number={i + 1} standing={history(game)[i]} game={game} />
@@ -287,20 +288,20 @@ export default function RemoteApp({ code, seat: mySeat, onLeave }) {
       {docked ? (
         <div className="hand-dock">
           <div className="dock-head">
-            <span>Your cards · {myCards.length} left</span>
-            {stage === 'play' && !connected && <span>Reconnecting…</span>}
+            <span>{tr('Your cards · {n} left', { n: myCards.length })}</span>
+            {stage === 'play' && !connected && <span>{tr('Reconnecting…')}</span>}
           </div>
           <FannedHand cards={myCards} selected={selected} onSelect={stage === 'play' ? setSelected : undefined} dealKey={hand.id}
             onPlay={canPlay ? (c) => play(c) : undefined} />
           <div className="dock-action">
             {stage !== 'play' ? (
-              <p className="dock-hint">Bid above. You'll play from here once the hand starts.</p>
+              <p className="dock-hint">{tr("Bid above. You'll play from here once the hand starts.")}</p>
             ) : selected ? (
               <button type="button" className="primary big go" disabled={!canPlay} onClick={() => play()}>
-                {canPlay ? <>Play <CardText code={selected} /></> : 'Wait for the book to finish'}
+                {canPlay ? tx('Play {card}', { card: <CardText code={selected} /> }) : tr('Wait for the book to finish')}
               </button>
             ) : (
-              <p className="dock-hint">{myPlayed || sending ? 'Waiting for the book to be taken…' : 'Swipe a card up to play it, or tap it.'}</p>
+              <p className="dock-hint">{myPlayed || sending ? tr('Waiting for the book to be taken…') : tr('Swipe a card up to play it, or tap it.')}</p>
             )}
           </div>
         </div>
@@ -310,7 +311,7 @@ export default function RemoteApp({ code, seat: mySeat, onLeave }) {
       {docked && call.error && <p className="scan-msg">{call.error}</p>}
 
       {call.joined && !tvHere && (
-        <CallBox call={call} emptyText="Waiting for the table’s camera…"
+        <CallBox call={call} emptyText={tr('Waiting for the table’s camera…')}
           videos={[...call.videos].sort((a, b) => (a.peer.role === 'host' ? -1 : b.peer.role === 'host' ? 1 : 0))} />
       )}
       {tvHelp && <TvHelp code={code} tvHere={tvHere} onClose={() => setTvHelp(false)} />}
@@ -326,24 +327,23 @@ function TvHelp({ code, tvHere, onClose }) {
   const [qr, setQr] = useState(null);
   useEffect(() => { QRCode.toDataURL(link, { margin: 1, width: 300 }).then(setQr).catch(() => {}); }, [link]);
   return (
-    <Sheet title="Watch on your TV" onClose={onClose} closeLabel="Done">
-      {tvHere && <div className="scan-msg ok">A TV view is connected at your place. Video shows there; this phone keeps your cards.</div>}
+    <Sheet title={tr('Watch on your TV')} onClose={onClose} closeLabel={tr('Done')}>
+      {tvHere && <div className="scan-msg ok">{tr('A TV view is connected at your place. Video shows there; this phone keeps your cards.')}</div>}
       <p className="lead-text">
-        Put the table and everyone’s faces on your TV while this phone keeps your cards. Open the TV view on
-        something connected to the TV:
+        {tr('Put the table and everyone’s faces on your TV while this phone keeps your cards. Open the TV view on something connected to the TV:')}
       </p>
       <ul className="tv-ways">
-        <li><b>A smart TV’s web browser</b>: go to the address below.</li>
-        <li><b>A laptop</b> plugged into the TV with an HDMI cable.</li>
-        <li><b>An iPad or Mac</b> with an Apple TV: open the TV view, then AirPlay <i>Screen Mirroring</i> to the TV.</li>
+        <li>{tx('{way}: go to the address below.', { way: <b>{tr('A smart TV’s web browser')}</b> })}</li>
+        <li>{tx('{way} plugged into the TV with an HDMI cable.', { way: <b>{tr('A laptop')}</b> })}</li>
+        <li>{tx('{way} with an Apple TV: open the TV view, then AirPlay {mirror} to the TV.', { way: <b>{tr('An iPad or Mac')}</b>, mirror: <i>{tr('Screen Mirroring')}</i> })}</li>
       </ul>
       <div className="invite-card card">
-        <div className="eyebrow">TV view address</div>
+        <div className="eyebrow">{tr('TV view address')}</div>
         <div className="tv-link">{link.replace(/^https?:\/\//, '')}</div>
-        {qr && <img className="qr" src={qr} alt="QR code for the TV view" />}
-        <p className="footnote center">Or open Spades on that device, tap <b>Join a game</b>, type <b>{code}</b> and choose <b>TV view</b>.</p>
+        {qr && <img className="qr" src={qr} alt={tr('QR code for the TV view')} />}
+        <p className="footnote center">{tx('Or open Spades on that device, tap {join}, type {code} and choose {view}.', { join: <b>{tr('Join a game')}</b>, code: <b>{code}</b>, view: <b>{tr('TV view')}</b> })}</p>
       </div>
-      <p className="footnote">An iPhone can’t send a separate picture to the TV, only mirror itself, which is why the TV view goes on a second device. Sound stays on this phone so there’s no echo.</p>
+      <p className="footnote">{tr('An iPhone can’t send a separate picture to the TV, only mirror itself, which is why the TV view goes on a second device. Sound stays on this phone so there’s no echo.')}</p>
     </Sheet>
   );
 }

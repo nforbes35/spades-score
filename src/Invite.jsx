@@ -3,6 +3,7 @@ import QRCode from 'qrcode';
 import { SEATS, playerName, teamOf, remoteSeats } from './lib/table.js';
 import { makeCode, joinLink, onlineReady } from './lib/room.js';
 import { Sheet, Icon, StatusDot } from './components.jsx';
+import { tr, tx } from './lib/i18n.js';
 
 async function share(text, url, onCopied) {
   try {
@@ -35,18 +36,17 @@ export default function Invite({ game, peers, onSet, onClose }) {
   const tvs = peers.filter((p) => p.role === 'tv');
 
   return (
-    <Sheet title="Invite" onClose={onClose} closeLabel="Done">
-      <div className="section-title">Remote players</div>
+    <Sheet title={tr('Invite')} onClose={onClose} closeLabel={tr('Done')}>
+      <div className="section-title">{tr('Remote players')}</div>
       <p className="footnote">
-        Who’s playing from somewhere else? Their phone shows their cards, bids and books. A spare phone or tablet
-        laid in their spot at the table can show each card they play, full screen.
+        {tr('Who’s playing from somewhere else? Their phone shows their cards, bids and books. A spare phone or tablet laid in their spot at the table can show each card they play, full screen.')}
       </p>
       <div className="seat-pick">
         {SEATS.map((_, s) => (
           <button key={s} type="button" className={`seat-choice t${teamOf(s)}${seats.includes(s) ? ' on' : ''}`}
             aria-pressed={seats.includes(s)} onClick={() => toggleSeat(s)}>
             {playerName(game, s)}
-            <small>{seats.includes(s) ? 'remote' : game.teams[teamOf(s)].name}</small>
+            <small>{seats.includes(s) ? tr('remote') : game.teams[teamOf(s)].name}</small>
           </button>
         ))}
       </div>
@@ -59,20 +59,20 @@ export default function Invite({ game, peers, onSet, onClose }) {
             return (
               <div key={s} className="invite-seat">
                 <div className="invite-row">
-                  <div><b>{name}</b><StatusDot on={here} label={here ? 'connected' : 'not connected yet'} /></div>
+                  <div><b>{name}</b><StatusDot on={here} label={here ? tr('connected') : tr('not connected yet')} /></div>
                   <button type="button" className="soft"
-                    onClick={() => share(`${name}, join our spades game! You’ll see your cards on your phone.`, joinLink(code, { seat: s }), done(name))}>
-                    <Icon name="share" size={18} /> {copied === name ? 'Copied' : 'Send link'}
+                    onClick={() => share(tr('{name}, join our spades game! You’ll see your cards on your phone.', { name }), joinLink(code, { seat: s }), done(name))}>
+                    <Icon name="share" size={18} /> {copied === name ? tr('Copied') : tr('Send link')}
                   </button>
                 </div>
                 <div className="invite-row">
                   <div>
-                    <span>Card display for {name}</span>
-                    <StatusDot on={shows} label={shows ? 'on the table' : 'a spare phone or tablet laid in their spot'} />
+                    <span>{tr('Card display for {name}', { name })}</span>
+                    <StatusDot on={shows} label={shows ? tr('on the table') : tr('a spare phone or tablet laid in their spot')} />
                   </div>
                   <button type="button" className="soft"
-                    onClick={() => share(`Open this on the device lying in ${name}’s spot:`, joinLink(code, { as: 'card', seat: s }), done(`card${s}`))}>
-                    <Icon name="cards" size={18} /> {copied === `card${s}` ? 'Copied' : 'Link'}
+                    onClick={() => share(tr('Open this on the device lying in {name}’s spot:', { name }), joinLink(code, { as: 'card', seat: s }), done(`card${s}`))}>
+                    <Icon name="cards" size={18} /> {copied === `card${s}` ? tr('Copied') : tr('Link')}
                   </button>
                 </div>
               </div>
@@ -81,45 +81,44 @@ export default function Invite({ game, peers, onSet, onClose }) {
         </div>
       )}
 
-      <div className="section-title">Video chat</div>
+      <div className="section-title">{tr('Video chat')}</div>
       <p className="footnote">
-        Extra phones or iPads at the table put more faces around the table picture. Family at home can watch and
-        talk too. Devices on the same Wi-Fi as this phone start with their mic and speaker off, so nothing squeals.
+        {tr('Extra phones or iPads at the table put more faces around the table picture. Family at home can watch and talk too. Devices on the same Wi-Fi as this phone start with their mic and speaker off, so nothing squeals.')}
       </p>
       <div className="card group invite-list">
         <div className="invite-row">
           <div>
-            <b>Video guests</b>
-            <StatusDot on={guests.length > 0} label={guests.length ? guests.map((g) => g.name || 'Guest').join(', ') : 'nobody yet'} />
+            <b>{tr('Video guests')}</b>
+            <StatusDot on={guests.length > 0} label={guests.length ? guests.map((g) => g.name || tr('Guest')).join(', ') : tr('nobody yet')} />
           </div>
           <button type="button" className="soft"
-            onClick={() => share('Join our spades game on video!', joinLink(code, { as: 'guest' }), done('guest'))}>
-            <Icon name="share" size={18} /> {copied === 'guest' ? 'Copied' : 'Send link'}
+            onClick={() => share(tr('Join our spades game on video!'), joinLink(code, { as: 'guest' }), done('guest'))}>
+            <Icon name="share" size={18} /> {copied === 'guest' ? tr('Copied') : tr('Send link')}
           </button>
         </div>
         <div className="invite-row">
           <div>
-            <b>TV view</b>
-            <StatusDot on={tvs.length > 0} label={tvs.length ? `${tvs.length} connected` : 'for a remote player’s TV'} />
+            <b>{tr('TV view')}</b>
+            <StatusDot on={tvs.length > 0} label={tvs.length ? tr('{n} connected', { n: tvs.length }) : tr('for a remote player’s TV')} />
           </div>
           <button type="button" className="soft"
-            onClick={() => share('Open this on the TV (smart-TV browser, laptop, or iPad on AirPlay) to see the table big:', joinLink(code, { as: 'tv' }), done('tv'))}>
-            <Icon name="share" size={18} /> {copied === 'tv' ? 'Copied' : 'Send link'}
+            onClick={() => share(tr('Open this on the TV (smart-TV browser, laptop, or iPad on AirPlay) to see the table big:'), joinLink(code, { as: 'tv' }), done('tv'))}>
+            <Icon name="share" size={18} /> {copied === 'tv' ? tr('Copied') : tr('Send link')}
           </button>
         </div>
       </div>
 
       <div className="invite-card card">
-        <div className="eyebrow">Or join with the code</div>
+        <div className="eyebrow">{tr('Or join with the code')}</div>
         <div className="code">{code.split('').map((c, i) => <span key={i}>{c}</span>)}</div>
-        {qr && <img className="qr" src={qr} alt="QR code to join this game" />}
-        <p className="footnote center">Open Spades, tap <b>Join a game</b>, type the code, then choose a player, video chat or TV view.</p>
+        {qr && <img className="qr" src={qr} alt={tr('QR code to join this game')} />}
+        <p className="footnote center">{tx('Open Spades, tap {join}, type the code, then choose a player, video chat or TV view.', { join: <b>{tr('Join a game')}</b> })}</p>
       </div>
       {!onlineReady && (
-        <p className="scan-msg">Remote play isn’t connected to the internet in this copy of the app, so this only works between tabs on this device.</p>
+        <p className="scan-msg">{tr('Remote play isn’t connected to the internet in this copy of the app, so this only works between tabs on this device.')}</p>
       )}
-      <button type="button" className="danger-link" onClick={() => { if (confirm('Stop remote play and video for everyone?')) { onSet(null); onClose(); } }}>
-        Stop remote play
+      <button type="button" className="danger-link" onClick={() => { if (confirm(tr('Stop remote play and video for everyone?'))) { onSet(null); onClose(); } }}>
+        {tr('Stop remote play')}
       </button>
     </Sheet>
   );

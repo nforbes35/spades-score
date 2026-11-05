@@ -1,11 +1,13 @@
 // Spades scoring, ported from the iPhone app (SpadesCore). Plain data so it saves as JSON.
+import { tr } from './i18n.js';
 
+// Labels are getters so they're put into words when drawn, in this device's language.
 export const NIL_CALLS = [
-  { id: 'none', label: 'None' },
-  { id: 'nil', label: 'Nil' },
-  { id: 'blind', label: 'Blind Nil' },
+  { id: 'none', get label() { return tr('None'); } },
+  { id: 'nil', get label() { return tr('Nil'); } },
+  { id: 'blind', get label() { return tr('Blind Nil'); } },
 ];
-export const nilLabel = (call) => NIL_CALLS.find((c) => c.id === call)?.label ?? 'None';
+export const nilLabel = (call) => NIL_CALLS.find((c) => c.id === call)?.label ?? tr('None');
 export const isNil = (call) => call === 'nil' || call === 'blind';
 
 export const STANDARD_RULES = {
@@ -35,31 +37,33 @@ export const newHand = (dealer = 0) => ({
 export const signed = (n) => (n > 0 ? `+${n}` : `${n}`);
 
 /** Every book the team took, nil players included. */
-export const totalBooks = (tr) => tr.players.reduce((s, p) => s + p.books, 0);
+export const totalBooks = (round) => round.players.reduce((s, p) => s + p.books, 0);
 /** Books taken by players who went nil / blind nil. */
-export const nilBooks = (tr) => tr.players.filter((p) => isNil(p.call)).reduce((s, p) => s + p.books, 0);
+export const nilBooks = (round) => round.players.filter((p) => isNil(p.call)).reduce((s, p) => s + p.books, 0);
 /** The team's bid, not counting nil players. */
-export const contractBid = (tr) => tr.players.filter((p) => !isNil(p.call)).reduce((s, p) => s + p.bid, 0);
+export const contractBid = (round) => round.players.filter((p) => !isNil(p.call)).reduce((s, p) => s + p.bid, 0);
 /** Total bid at the table, nil players counting as zero. */
 export const tableBid = (hand) => hand.teams.reduce((s, t) => s + contractBid(t), 0);
 
 /** Score one team's hand. Partners' books are added together, so one can cover the other. */
-export function scoreTeam(tr, rules = STANDARD_RULES) {
+export function scoreTeam(round, rules = STANDARD_RULES) {
   const lines = [];
 
   // Nil / blind nil: all or nothing for each player who called it.
   let nilPoints = 0;
-  for (const p of tr.players) {
+  for (const p of round.players) {
     if (!isNil(p.call)) continue;
     const value = p.call === 'blind' ? rules.blindNilValue : rules.nilValue;
     const made = p.books === 0;
     nilPoints += made ? value : -value;
-    lines.push(`${nilLabel(p.call)} ${made ? 'made' : `set (${p.books} books)`}: ${signed(made ? value : -value)}`);
+    lines.push(made
+      ? tr('{nil} made: {pts}', { nil: nilLabel(p.call), pts: signed(value) })
+      : tr('{nil} set ({n} books): {pts}', { nil: nilLabel(p.call), n: p.books, pts: signed(-value) }));
   }
 
-  const bid = contractBid(tr);
-  const nb = nilBooks(tr);
-  const books = rules.nilBooksCountTowardBid ? totalBooks(tr) : Math.max(0, totalBooks(tr) - nb);
+  const bid = contractBid(round);
+  const nb = nilBooks(round);
+  const books = rules.nilBooksCountTowardBid ? totalBooks(round) : Math.max(0, totalBooks(round) - nb);
 
   let madeBid = null;
   let bidPoints = 0;
@@ -71,27 +75,28 @@ export function scoreTeam(tr, rules = STANDARD_RULES) {
     if (madeBid) {
       bags = books - bid;
       bidPoints = bid * 10 + bags;
-      lines.push(`Bid ${bid}, took ${books}: ${signed(bid * 10)}${bags > 0 ? ` + ${bags} bag${bags === 1 ? '' : 's'}` : ''}`);
+      const bagText = bags === 1 ? tr('{n} bag', { n: bags }) : tr('{n} bags', { n: bags });
+      lines.push(tr('Bid {bid}, took {books}: {pts}', { bid, books, pts: `${signed(bid * 10)}${bags > 0 ? ` + ${bagText}` : ''}` }));
       if (bid >= rules.bigBidThreshold) {
         bonus = rules.bigBidBonus;
-        lines.push(`${rules.bigBidThreshold}+ bid bonus: ${signed(bonus)}`);
+        lines.push(tr('{n}+ bid bonus: {pts}', { n: rules.bigBidThreshold, pts: signed(bonus) }));
       }
     } else {
       bidPoints = -bid * 10;
-      lines.push(`Bid ${bid}, took ${books}: set ${signed(bidPoints)}`);
+      lines.push(tr('Bid {bid}, took {books}: set {pts}', { bid, books, pts: signed(bidPoints) }));
     }
   } else if (books > 0) {
     // No bid of their own, so anything they took is a bag.
     bags = books;
     bidPoints = books;
-    lines.push(`No bid, ${books} bag${books === 1 ? '' : 's'}: ${signed(books)}`);
+    lines.push(books === 1 ? tr('No bid, {n} bag: {pts}', { n: books, pts: signed(books) }) : tr('No bid, {n} bags: {pts}', { n: books, pts: signed(books) }));
   }
 
   // Books a nil player took that didn't go toward the bid are bags.
   if (!rules.nilBooksCountTowardBid && nb > 0) {
     bags += nb;
     bidPoints += nb;
-    lines.push(`Nil player's books as bags: ${signed(nb)}`);
+    lines.push(tr("Nil player's books as bags: {pts}", { pts: signed(nb) }));
   }
 
   return { contractBid: bid, contractBooks: books, madeBid, bags, lines, total: bidPoints + bonus + nilPoints };

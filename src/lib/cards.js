@@ -1,4 +1,5 @@
 // Playing cards are short codes: rank + suit letter, e.g. "QH", "10S", "AD".
+import { getLang, tr } from './i18n.js';
 
 export const RANKS = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
 // Hands sort diamonds, clubs, hearts, spades (colors alternate, spades last), like the family's
@@ -19,7 +20,12 @@ export function parseCard(code) {
 }
 export const isCard = (code) => typeof code === 'string' && FULL_DECK.includes(code);
 export const cardLabel = (code) => { const { rank, suit } = parseCard(code); return `${rank}${suit.sym}`; };
-export const cardName = (code) => { const { rank, suit } = parseCard(code); return `${RANK_NAMES[rank] ?? rank} of ${suit.name}`; };
+// A suit's name in this device's language. The keys say "suit" because plain "Spades" is the game, whose name stays.
+export const suitName = (suit) => (getLang() === 'es' ? tr(`suit ${suit.name}`) : suit.name);
+export const cardName = (code) => {
+  const { rank, suit } = parseCard(code);
+  return tr('{rank} of {suit}', { rank: RANK_NAMES[rank] ? tr(RANK_NAMES[rank]) : rank, suit: suitName(suit) });
+};
 
 /** Group by suit (diamonds, clubs, hearts, spades), low to high within a suit (ace high). */
 export function sortHand(cards) {
