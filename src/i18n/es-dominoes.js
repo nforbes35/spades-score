@@ -1,5 +1,6 @@
 // Dominoes: the Spanish wording, keyed by the exact English (see "Languages" in CLAUDE.md).
 export default {
+  'Turn on sound effects to hear them': 'Activa los efectos de sonido para oírlos',
   'The microphone didn’t pick anything up. Try again.': 'El micrófono no captó nada. Inténtalo otra vez.',
   'That recording didn’t work. Try again.': 'Esa grabación no funcionó. Inténtalo otra vez.',
   'That recording is too big to send.': 'Esa grabación es muy grande para enviarla.',

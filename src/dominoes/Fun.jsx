@@ -7,6 +7,7 @@ import { tileClack, tileRattle } from '../lib/fx.js';
 import Domino from './Domino.jsx';
 import { halves } from './engine.js';
 import { getLang, tr, tMsg } from '../lib/i18n.js';
+import { newHand, moveHand, stepWash } from './wash.js';
 import { TALK_LINES, loadTalk, saveTalk, MAX_CLIP_CHARS, validClip, clipType, domStats, headToHead, loadDomLog } from './fun.js';
 import { loadPhotos, deletePhoto } from './album.js';
 
@@ -33,31 +34,30 @@ export function DomWash({ table, ms, onSend, bus, onSkip, tv }) {
     const tiles = [];
     const layOut = () => {
       for (let i = 0; i < count; i++) {
-        const a = Math.random() * 6.28, d = Math.random() * Math.min(W, H) * 0.28;
+        const a = Math.random() * 6.28, d = Math.sqrt(Math.random()) * Math.min(W, H) * 0.36;
         tiles.push({ x: W / 2 + Math.cos(a) * d, y: H / 2 + Math.sin(a) * d, r: Math.random() * 6.28, vx: 0, vy: 0, vr: 0 });
       }
     };
-    const fingers = [];
+    let ghost = newHand();
+    const hands = new Map(); // each finger here, and each other player's, by id
     let lastClack = 0, raf = 0, last = performance.now();
-    const push = (x, y, strength = 1) => {
-      fingers.push({ x, y, strength, at: performance.now() });
-      if (fingers.length > 24) fingers.shift();
-    };
-    const clack = () => { const now = performance.now(); if (now - lastClack > 90) { lastClack = now; tileClack({ volume: 0.14 + Math.random() * 0.14 }); } };
-    bus.current = (x, y) => { if (Number.isFinite(x) && Number.isFinite(y)) { push(x * W, y * H); clack(); } };
-    // the pointer
-    let down = false, sent = 0;
+    const handMove = (id, x, y, now) => { hands.set(id, moveHand(hands.get(id) ?? newHand(), x, y, now, L)); };
+    const clack = () => { const now = performance.now(); if (now - lastClack > 110) { lastClack = now; tileClack({ volume: 0.14 + Math.random() * 0.14 }); } };
+    bus.current = (x, y, who) => { if (Number.isFinite(x) && Number.isFinite(y)) { handMove(`them-${who}`, x * W, y * H, performance.now()); clack(); } };
+    // the pointer(s)
+    const downs = new Set();
+    let sent = 0;
     const at = (e) => { const r = el.getBoundingClientRect(); return { x: ((e.clientX - r.left) / r.width) * W, y: ((e.clientY - r.top) / r.height) * H }; };
     const move = (e) => {
-      if (!down) return;
+      if (!downs.has(e.pointerId)) return;
       const p = at(e);
-      push(p.x, p.y, 1.4);
-      clack();
       const now = performance.now();
+      handMove(e.pointerId, p.x, p.y, now);
+      if (Math.hypot(hands.get(e.pointerId).vx, hands.get(e.pointerId).vy) > 1) clack();
       if (now - sent > 110) { sent = now; onSend?.(+(p.x / W).toFixed(3), +(p.y / H).toFixed(3)); }
     };
-    const start = (e) => { down = true; el.setPointerCapture?.(e.pointerId); move(e); };
-    const stop = () => { down = false; };
+    const start = (e) => { downs.add(e.pointerId); el.setPointerCapture?.(e.pointerId); hands.delete(e.pointerId); move(e); };
+    const stop = (e) => { downs.delete(e.pointerId); };
     el.addEventListener('pointerdown', start);
     el.addEventListener('pointermove', move);
     el.addEventListener('pointerup', stop);
@@ -83,25 +83,13 @@ export function DomWash({ table, ms, onSend, bus, onSkip, tv }) {
       const dt = Math.min(2, (now - last) / 16.7);
       last = now;
       if (!tiles.length && W > 0 && H > 0) layOut();
-      // a slow stir of its own, so the pile is alive even when nobody's touching it
-      const ghost = { x: W / 2 + Math.cos(now / 480) * W * 0.2, y: H / 2 + Math.sin(now / 370) * H * 0.16, strength: 0.35, at: now };
-      const reach = L * 2;
-      const active = [ghost, ...fingers.filter((f) => now - f.at < 200)];
-      tiles.forEach((t) => {
-        active.forEach((f) => {
-          const dx = t.x - f.x, dy = t.y - f.y, d = Math.hypot(dx, dy) || 1;
-          if (d > reach) return;
-          const k = (1 - d / reach) * f.strength * 1.1 * dt;
-          t.vx += (dx / d) * k - (dy / d) * k * 0.7;
-          t.vy += (dy / d) * k + (dx / d) * k * 0.7;
-          t.vr += (Math.random() - 0.5) * k * 0.12;
-        });
-        t.x += t.vx * dt; t.y += t.vy * dt; t.r += t.vr * dt;
-        const damp = 0.93 ** dt;
-        t.vx *= damp; t.vy *= damp; t.vr *= damp;
-        if (t.x < L / 2 || t.x > W - L / 2) { t.vx *= -0.6; t.x = Math.max(L / 2, Math.min(W - L / 2, t.x)); }
-        if (t.y < L / 2 || t.y > H - L / 2) { t.vy *= -0.6; t.y = Math.max(L / 2, Math.min(H - L / 2, t.y)); }
-      });
+      // a slow stir of its own while nobody's touching it, so the pile is alive
+      const live = [...hands.values()].filter((h) => now - h.at < 300);
+      if (!live.length) {
+        ghost = moveHand(ghost, W / 2 + Math.cos(now / 700) * W * 0.18, H / 2 + Math.sin(now / 520) * H * 0.12, now, L);
+        ghost.soft = 0.3;
+      }
+      stepWash(tiles, live.length ? live : [ghost], { W, H, L, dt, now });
       c.setTransform(dpr, 0, 0, dpr, 0, 0);
       c.clearRect(0, 0, W, H);
       tiles.forEach(body);
@@ -170,6 +158,19 @@ export function DomMoment({ table, info, stream, icon, onClose, snap }) {
 
 export const DomCallout = ({ c }) => (
   <div className={`dom-callout${c.big ? ' big' : ''}`} aria-live="polite"><b>{c.text}</b>{c.sub && <span>{c.sub}</span>}</div>
+);
+
+const FIREFLIES = [[12, 30, 0], [28, 62, 2.1], [44, 22, 4.3], [61, 70, 1.2], [76, 38, 3.4], [88, 60, 5.2], [20, 80, 2.8], [68, 18, 0.7], [52, 48, 3.9]];
+const STARS = [[6, 8], [15, 16], [24, 6], [33, 13], [42, 5], [55, 11], [64, 5], [83, 8], [92, 15], [9, 26], [96, 28], [37, 22]];
+/** The night out on the porch that goes with the crickets: dark sky, moon, string lights, a railing and fireflies. Drawn under the tiles. */
+export const PorchNight = () => (
+  <div className="porch-night" aria-hidden="true">
+    {STARS.map(([x, y]) => <i key={`${x}${y}`} className="porch-star" style={{ left: `${x}%`, top: `${y}%`, animationDelay: `${(x % 5) * 0.6}s` }} />)}
+    <i className="porch-moon" />
+    <i className="porch-lights" />
+    <i className="porch-rail" />
+    {FIREFLIES.map(([x, y, d]) => <i key={`${x}${y}`} className="porch-fly" style={{ left: `${x}%`, top: `${y}%`, animationDelay: `${d}s` }} />)}
+  </div>
 );
 
 /** Someone's line, over the table for everyone. */

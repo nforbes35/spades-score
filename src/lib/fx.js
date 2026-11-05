@@ -286,17 +286,28 @@ export function knockSound({ delay = 0, volume = 0.7 } = {}) {
 }
 
 let porchTimer = null;
+const CRICKET_VOLUME = 0.2;
 /** Crickets, quietly, for a night on the porch. */
 export function porchSounds(on) {
   clearTimeout(porchTimer);
   porchTimer = null;
   if (!on) return;
+  // A cricket's chirp: a few quick pulses of one high note. Two crickets, one nearer than the other, take turns.
+  let turn = 0;
   const chirp = () => {
+    if (settings.effects && onScreen()) {
+      try { const c = context(); if (c.state !== 'running') c.resume?.().catch?.(() => {}); } catch { /* no sound available */ }
+    }
     const a = running();
-    if (a) [0, 0.07, 0.14].forEach((gap) => ping(a, a.currentTime + gap, { freq: 4300 + Math.random() * 200, length: 0.05, volume: 0.018, type: 'sine' }));
-    porchTimer = setTimeout(chirp, 900 + Math.random() * 900);
+    turn += 1;
+    const near = turn % 3 !== 0;
+    if (a) {
+      const pitch = (near ? 4200 : 3700) + Math.random() * 120;
+      [0, 0.055, 0.11, 0.165].forEach((gap) => ping(a, a.currentTime + gap, { freq: pitch, length: 0.045, volume: near ? CRICKET_VOLUME : CRICKET_VOLUME * 0.55, type: 'sine' }));
+    }
+    porchTimer = setTimeout(chirp, 650 + Math.random() * 700);
   };
-  chirp();
+  porchTimer = setTimeout(chirp, 150); // straight away, so you know the switch worked
 }
 
 /** Someone's recorded voice (a data: URL), or a computer voice saying `text` if there's no recording. */

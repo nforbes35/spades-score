@@ -1457,13 +1457,17 @@ export function TableMenu({ items }) {
     const fit = () => {
       el.style.maxHeight = 'none';
       const r = el.getBoundingClientRect();
-      const k = el.offsetHeight / (r.height || 1);
-      const room = (window.innerHeight - r.top - 12) * k;
+      // the table's zoom, read from the button: the list itself is mid-animation, a little shrunk, right now
+      const btn = el.parentElement.querySelector('button');
+      const k = btn.offsetHeight / (btn.getBoundingClientRect().height || 1);
+      const screenH = window.visualViewport?.height ?? window.innerHeight;
+      const room = (screenH - r.top - 12) * k;
       el.style.maxHeight = `${Math.max(160, room)}px`;
     };
     fit();
     window.addEventListener('resize', fit);
-    return () => window.removeEventListener('resize', fit);
+    window.visualViewport?.addEventListener('resize', fit);
+    return () => { window.removeEventListener('resize', fit); window.visualViewport?.removeEventListener('resize', fit); };
   }, [open]);
   useEffect(() => {
     if (!open) return undefined;

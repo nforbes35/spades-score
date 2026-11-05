@@ -2108,7 +2108,7 @@ button.choice:active { transform: scale(0.98); }
   overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; touch-action: pan-y;
 }
 .table-menu-list button { flex: none; }
-.table-menu-list { min-width: 268px; }
+.table-menu-list { min-width: 268px; padding-bottom: calc(6px + env(safe-area-inset-bottom)); }
 
 /* ---------- Family Games: the game picker, and the way back to it ---------- */
 .hub-showcase { position: relative; height: 150px; display: flex; align-items: center; justify-content: center; margin: 0 auto 14px; }
@@ -2626,3 +2626,21 @@ button.choice:active { transform: scale(0.98); }
 .learn-bids button { min-height: 44px; padding: 0; font-size: 17px; font-weight: 700; }
 .learn-cards { flex: none; padding: 0 4px 4px; }
 .learn-felt .dom-board-hint { display: none; }
+
+/* Crickets on: a night out on the porch, under the tiles */
+.dom-porch .table-oval { filter: brightness(0.5) saturate(0.6); opacity: 0.45; }
+.porch-night { position: absolute; inset: 0; overflow: hidden; pointer-events: none; background: linear-gradient(#050a24f2 0%, #0b1538e6 45%, #1a1a2ed9 80%, #231a14e6 100%); }
+.porch-night i { position: absolute; display: block; }
+.porch-star { width: 3px; height: 3px; border-radius: 50%; background: #fff; animation: porch-twinkle 3s ease-in-out infinite; }
+.porch-moon { right: 12%; top: 26%; width: clamp(36px, 9vw, 72px); aspect-ratio: 1; border-radius: 50%; background: radial-gradient(circle at 38% 38%, #fffbe8, #e8dfb6 70%); box-shadow: 0 0 30px 8px rgba(255, 244, 200, 0.35); }
+.porch-lights { left: -2%; right: -2%; top: 0; height: 26px; background: radial-gradient(circle at 50% 70%, #ffd98a 0 4px, rgba(255, 200, 110, 0.45) 5px, transparent 13px) 0 0 / 48px 26px repeat-x; }
+.porch-rail { left: 0; right: 0; bottom: 0; height: clamp(44px, 11%, 84px); background: linear-gradient(#17110c, #17110c) 0 0 / 100% 7px no-repeat, repeating-linear-gradient(90deg, #17110c 0 9px, transparent 9px 34px); opacity: 0.85; }
+.porch-fly { width: 5px; height: 5px; border-radius: 50%; background: #e9ff8a; box-shadow: 0 0 9px 3px rgba(214, 255, 110, 0.7); opacity: 0; animation: porch-fly 6.5s ease-in-out infinite; }
+@keyframes porch-twinkle { 50% { opacity: 0.25; } }
+@keyframes porch-fly {
+  0%, 100% { opacity: 0; translate: 0 0; }
+  25% { opacity: 1; translate: 22px -18px; }
+  50% { opacity: 0.15; translate: 44px 4px; }
+  75% { opacity: 1; translate: 18px 22px; }
+}
+@media (prefers-reduced-motion: reduce) { .porch-star, .porch-fly { animation: none; } .porch-fly { opacity: 0.8; } }

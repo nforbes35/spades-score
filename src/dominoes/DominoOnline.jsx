@@ -28,7 +28,7 @@ import { fitBoard } from './board.js';
 import { AIM, aimPages, swipeDirection, handTileWidth } from './handmode.js';
 import { calloutFor, momentFor, recordDomGame, loadDomLog, mergeIntoDomLog, rivalryLines, validClip, talkFor } from './fun.js';
 import { snapReactions, savePhoto } from './album.js';
-import { DomWash, DomMoment, DomCallout, DomTalk, TalkSheet, AlbumSheet } from './Fun.jsx';
+import { PorchNight, DomWash, DomMoment, DomCallout, DomTalk, TalkSheet, AlbumSheet } from './Fun.jsx';
 import {
   VARIANTS, SETS, startingTiles, kindOf, sideOf, teamsPossible, maxPlayers, roundsOf, lineName, byRounds, roundsToWin, halves, newDominoTable, startMatch, deal, legalMoves, playTile, drawTile, pass, publicTable, botMove, openEnds,
 } from './engine.js';
@@ -188,7 +188,7 @@ function DominoRoom({ code, isHost = false, tv = false, name, avatar, onLeave, o
       if (seatFrom >= 0) addReaction({ from: seatFrom, to: m.to, item: String(m.item).slice(0, 8), gift: Boolean(m.gift) });
       return;
     }
-    if (m.type === 'd-wash') { washBus.current?.(Number(m.x), Number(m.y)); return; }
+    if (m.type === 'd-wash') { washBus.current?.(Number(m.x), Number(m.y), from?.id); return; }
     if (m.type === 'd-talk') {
       const t = tableRef.current ?? viewRef.current;
       const seatFrom = from && t ? seatOf(t, from.id) : -1;
@@ -748,7 +748,7 @@ function DominoTable({ table, mySeat, tiles, icons, isHost, send, act, onLeave, 
       onClick: testAlert,
     },
     { icon: sound.effects ? 'speaker' : 'speakerOff', label: tr('Sound effects'), on: sound.effects, onClick: () => setSoundSetting('effects', !sound.effects) },
-    { icon: sound.effects ? 'speaker' : 'speakerOff', label: tr('Crickets'), note: tr('A night out on the porch'), on: porch, onClick: () => setPorch(!porch) },
+    { icon: sound.effects ? 'speaker' : 'speakerOff', label: tr('Crickets'), note: sound.effects ? tr('A night out on the porch') : tr('Turn on sound effects to hear them'), on: porch, onClick: () => setPorch(!porch) },
     isHost && { icon: 'cards', label: tr('Mix the tiles first'), note: tr('Everyone stirs the pile before each hand'), on: table.settings.wash !== false, onClick: () => setTableOption('wash', table.settings.wash === false) },
     isHost && { icon: 'video', label: tr('Reaction photos'), note: tr('In a video chat, snap everyone when a hand ends'), on: table.settings.photos !== false, onClick: () => setTableOption('photos', table.settings.photos === false) },
     { icon: 'trophy', label: tr('Family album'), onClick: () => setAlbumOpen(true) },
@@ -992,7 +992,8 @@ function DominoTable({ table, mySeat, tiles, icons, isHost, send, act, onLeave, 
         </div>
       </header>
 
-      <div className={`felt dom-felt${lines ? ' dom-lines' : ''}${videoMode ? ' dom-video' : ''}`} style={{ marginBottom: dockH }}>
+      <div className={`felt dom-felt${lines ? ' dom-lines' : ''}${videoMode ? ' dom-video' : ''}${porch ? ' dom-porch' : ''}`} style={{ marginBottom: dockH }}>
+        {porch && <PorchNight />}
         <div className="table-oval" aria-hidden="true" />
         {videoMode && (
           <div className={`dom-vstrip n${n}`}>
