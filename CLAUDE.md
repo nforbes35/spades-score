@@ -133,4 +133,4 @@ plain words, keep text large and buttons big, check every screen fits a 320px ph
 ## Learn to play (`src/learn/`)
 - `rules.js`: each game's rules and strategy as { en, es } side by side; keep them matching the engines. `Learn.jsx`: the screen (hub, Home, Dominoes home) and `RulesSheet` (in-game menus).
 - `Practice.jsx`: a practice game run right on the device with the real engines, nothing sent or saved. `coach.js` (pure; test/learn.test.js plays whole games through it) picks a move and says why; `lessons.js` holds the opening lessons and the ones given the first time something happens. Lessons pause the bots.
-- Crickets switch (Dominoes menu, per device): `PorchNight` under the tiles, and `porchSounds` in fx.js loops `public/sounds/night.m4a`, a real CC0 recording (see CREDITS.txt there).
+- Crickets switch (Dominoes menu, per device): `PorchNight` under the tiles, and `porchSounds` in fx.js loops `public/sounds/night.m4a`, a real CC0 recording (see CREDITS.txt there), very quiet and coming and going (`NIGHT_VOLUME`, `NIGHT_CYCLE`), at the owner's request.

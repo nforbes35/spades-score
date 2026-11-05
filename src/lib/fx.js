@@ -290,8 +290,19 @@ export function knockSound({ delay = 0, volume = 0.7 } = {}) {
 const NIGHT_URL = '/sounds/night.m4a';
 const NIGHT_PAD = 0.5;
 const NIGHT_LOOP = 45;
-const NIGHT_VOLUME = 0.3; // quiet: background, under the game and the talk
-const NIGHT_FADE = 1.2;
+const NIGHT_VOLUME = 0.1; // barely there: under the game and the talk
+// Crickets come and go instead of never stopping: seconds of fading in, staying, fading out and quiet.
+const NIGHT_CYCLE = { rise: 5, stay: 10, fall: 6, quiet: 24 };
+
+/** How loud the night is (0 to 1 of NIGHT_VOLUME), `t` seconds after it started. */
+export function nightLevel(t, { rise, stay, fall, quiet } = NIGHT_CYCLE) {
+  const at = t % (rise + stay + fall + quiet);
+  if (at < rise) return at / rise;
+  if (at < rise + stay) return 1;
+  if (at < rise + stay + fall) return 1 - (at - rise - stay) / fall;
+  return 0;
+}
+const PORCH_STEP = 800;
 let porchWatch = null;
 let night = null;
 
@@ -319,7 +330,12 @@ export function porchSounds(on) {
     let ctx;
     try { ctx = context(); } catch { return; }
     if (ctx.state !== 'running') { ctx.resume?.().catch?.(() => {}); return; }
-    if (night || starting) return;
+    if (night) {
+      const when = ctx.currentTime + PORCH_STEP / 1000;
+      night.gain.gain.linearRampToValueAtTime(nightLevel(when - night.began) * NIGHT_VOLUME, when);
+      return;
+    }
+    if (starting) return;
     starting = true;
     load(ctx, NIGHT_URL).then((buffer) => {
       starting = false;
@@ -330,14 +346,18 @@ export function porchSounds(on) {
       src.loop = true;
       src.loopStart = NIGHT_PAD;
       src.loopEnd = NIGHT_PAD + NIGHT_LOOP;
+      // the shrill top of the sound taken down, since that's what a phone speaker brings out
+      const soften = ctx.createBiquadFilter();
+      soften.type = 'highshelf';
+      soften.frequency.value = 3000;
+      soften.gain.value = -9;
       gain.gain.setValueAtTime(0, ctx.currentTime);
-      gain.gain.linearRampToValueAtTime(NIGHT_VOLUME, ctx.currentTime + NIGHT_FADE);
-      src.connect(gain).connect(ctx.destination);
+      src.connect(soften).connect(gain).connect(ctx.destination);
       src.start(ctx.currentTime, NIGHT_PAD);
-      night = { src, gain, ctx };
+      night = { src, gain, ctx, began: ctx.currentTime };
     });
   };
-  porchWatch = setInterval(check, 800);
+  porchWatch = setInterval(check, PORCH_STEP);
   check();
 }
 

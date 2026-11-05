@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { newHand, moveHand, stepWash } from '../src/dominoes/wash.js';
+import { nightLevel } from '../src/lib/fx.js';
 
 const W = 320, H = 640, L = 45;
 let seed = 7;
@@ -59,4 +60,13 @@ test('tiles move with the hand, not away from it', () => {
   let hand = newHand();
   for (let i = 0; i < 12; i++) { hand = moveHand(hand, 120 + i * 8, 320, i * 16.7, L); stepWash(tiles, [hand], { W, H, L, now: i * 16.7 }); }
   assert.ok(tiles[0].x > 175, `x ${tiles[0].x}`);
+});
+
+test('the night sound comes and goes, and is silent more than half the time', () => {
+  assert.equal(nightLevel(0), 0);
+  assert.equal(nightLevel(10), 1);
+  assert.equal(nightLevel(30), 0);
+  assert.equal(nightLevel(45), 0); // the cycle starts over
+  const samples = Array.from({ length: 450 }, (_, i) => nightLevel(i / 10));
+  assert.ok(samples.filter((v) => v === 0).length > 200);
 });
