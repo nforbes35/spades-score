@@ -14,8 +14,8 @@ const lineBasics = {
   es: 'Cada ficha tiene dos lados con puntos. Una ficha va en un extremo abierto de la línea si uno de sus lados coincide: un 6|4 va en un 6 abierto o en un 4 abierto.',
 };
 const lineFirst = {
-  en: 'In the first hand, whoever holds the highest double starts with it (or the heaviest tile, if nobody has a double). After that, whoever won the last hand starts with any tile.',
-  es: 'En la primera mano, quien tenga el doble más alto empieza con él (o con la ficha más pesada, si nadie tiene dobles). Después, quien ganó la mano anterior empieza con cualquier ficha.',
+  en: 'In the first hand, whoever holds the highest double starts with it (or the heaviest tile, if nobody has a double). After that, whoever won the last hand starts with any tile, unless the host turned on “Double 6 always goes first”.',
+  es: 'En la primera mano, quien tenga el doble más alto empieza con él (o con la ficha más pesada, si nadie tiene dobles). Después, quien ganó la mano anterior empieza con cualquier ficha, salvo que el anfitrión active “El doble 6 siempre sale primero”.',
 };
 const lineBlocked = {
   en: 'Blocked: when nobody can play, the hand is over. The player with the fewest dots left wins it, and scores everyone else’s dots minus their own. A tie for fewest scores nothing.',

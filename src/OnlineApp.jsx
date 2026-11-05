@@ -55,6 +55,12 @@ const PAPI_FLIP_MS = 3000;
 const showMs = (lastTrick) => (lastTrick?.cards.at(-1)?.style === 'papi' ? PAPI_FLIP_MS + 1200 : TRICK_SHOW_MS);
 const BANNER_DELAY_MS = 4000;
 const REACTION_MS = 3200;
+const LAST_SETTINGS_KEY = 'spades-last-settings';
+const lastSettings = () => {
+  const s = read(LAST_SETTINGS_KEY);
+  if (!s || !(Number(s.target) > 0) || !s.rules || typeof s.rules !== 'object') return {};
+  return { target: Number(s.target), rules: s.rules, ...(s.bidTimer ? { bidTimer: s.bidTimer } : {}) };
+};
 const PAPI_ANSWER_MS = 30000;
 const PAPI_REVEAL_MS = 5500;
 const BOT_GUESS_MS = 1800;
@@ -143,8 +149,11 @@ function OnlineRoom({ code, isHost = false, tv = false, name, avatar, onLeave, o
 
   // ----- Host: runs the game -----
   const tableKey = `spades-online-table-${code}`;
-  const [table, setTable] = useState(() => (isHost ? read(tableKey) ?? newTable() : null));
+  const [table, setTable] = useState(() => (isHost ? read(tableKey) ?? newTable(lastSettings()) : null));
   useEffect(() => { if (isHost) write(tableKey, table); }, [isHost, table]);
+  // the rules of the game being played are where the next new game starts from
+  const inPlay = isHost && table && table.phase !== 'lobby';
+  useEffect(() => { if (inPlay) write(LAST_SETTINGS_KEY, table.settings); }, [inPlay, table?.settings]);
 
   const room = useRoom(code, me, onMessage);
   const call = useCall({ room, me, setMe, facing: 'user', receiveOnly: tv });

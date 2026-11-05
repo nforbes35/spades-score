@@ -30,7 +30,7 @@ import { calloutFor, momentFor, recordDomGame, loadDomLog, mergeIntoDomLog, riva
 import { snapReactions, savePhoto } from './album.js';
 import { PorchNight, DomWash, DomMoment, DomCallout, DomTalk, TalkSheet, AlbumSheet } from './Fun.jsx';
 import {
-  VARIANTS, SETS, startingTiles, kindOf, sideOf, teamsPossible, maxPlayers, roundsOf, lineName, byRounds, roundsToWin, halves, newDominoTable, startMatch, deal, legalMoves, playTile, drawTile, pass, publicTable, botMove, openEnds,
+  VARIANTS, SETS, tableFromSaved, savedSettings, startingTiles, kindOf, sideOf, teamsPossible, maxPlayers, roundsOf, lineName, byRounds, roundsToWin, halves, newDominoTable, startMatch, deal, legalMoves, playTile, drawTile, pass, publicTable, botMove, openEnds,
 } from './engine.js';
 
 const ID_KEY = 'spades-device-id'; // the same device id as Spades online, so a reload rejoins the same seat
@@ -44,6 +44,7 @@ const RESYNC_MS = 5000;
 const LAST_KEY = 'dominoes-last-online';
 const HAND_MODE_KEY = 'dominoes-hand-mode'; // this device stays in hand mode
 const PORCH_KEY = 'dominoes-porch-sounds';
+const LAST_SETTINGS_KEY = 'dominoes-last-settings';
 const WASH_MS = 4500; // mixing the tiles before each hand
 const FLY_MS = 1000;
 const MOMENT_MS = 5500; // "Domino!" before the score card
@@ -150,8 +151,11 @@ function DominoRoom({ code, isHost = false, tv = false, name, avatar, onLeave, o
 
   // ----- Host: runs the game -----
   const tableKey = `dominoes-online-table-${code}`;
-  const [table, setTable] = useState(() => (isHost ? read(tableKey) ?? newDominoTable() : null));
+  const [table, setTable] = useState(() => (isHost ? read(tableKey) ?? tableFromSaved(read(LAST_SETTINGS_KEY)) : null));
   useEffect(() => { if (isHost) write(tableKey, table); }, [isHost, table]);
+  // the rules of the game being played are where the next new game starts from
+  const inPlay = isHost && table && table.phase !== 'lobby';
+  useEffect(() => { if (inPlay) write(LAST_SETTINGS_KEY, savedSettings(table)); }, [inPlay, table?.settings, table?.seats.length]);
   useEffect(() => { if (!tv) write(LAST_KEY, { code, host: isHost, at: Date.now() }); }, [code, isHost, tv]);
   const tableRef = useRef(table);
   tableRef.current = table;
@@ -536,6 +540,12 @@ function DominoLobby({ code, table, isHost, me, icons, act, onSit, onStand, onSt
                   <small className="dom-teams-note">{startingTiles(table) * table.seats.length >= 28 ? tr('Every tile is dealt, so there’s nothing to draw.') : tr('{n} tiles left in the boneyard to draw from.', { n: 28 - startingTiles(table) * table.seats.length })}</small>
                 </div>
               )}
+              {kindOf(table) === 'line' && (
+                <>
+                  <Toggle label={tr('Double {n} always goes first', { n: settings.setMax })} checked={Boolean(settings.topDoubleFirst)} onChange={(v) => set({ topDoubleFirst: v })} />
+                  <small className="dom-teams-note">{settings.topDoubleFirst ? tr('Whoever has it starts every hand.') : tr('It starts the first hand. After that, the last winner starts with any tile.')}</small>
+                </>
+              )}
               <div className="field-block"><span>{tr('Players')}</span>
                 <Segmented value={table.seats.length} onChange={(n) => act((t) => setPlayers(t, n))} options={Array.from({ length: maxPlayers(settings.variant, settings.setMax) - 1 }, (_, i) => i + 2).map((n) => ({ id: n, label: String(n) }))} />
               </div>
@@ -567,7 +577,7 @@ function DominoLobby({ code, table, isHost, me, icons, act, onSit, onStand, onSt
               )}
             </>
           ) : (
-            <p className="dom-rules-line">{tr(VARIANTS[settings.variant].name)} · {tr('Double {n}', { n: settings.setMax })} · {tr('{n} tiles each', { n: startingTiles(table) })} · {settings.teams ? tr('{n} teams of 2', { n: table.seats.length / 2 }) : tr('Each for themselves')} · {scoringText(table)}</p>
+            <p className="dom-rules-line">{tr(VARIANTS[settings.variant].name)} · {tr('Double {n}', { n: settings.setMax })} · {tr('{n} tiles each', { n: startingTiles(table) })} · {settings.topDoubleFirst && kindOf(table) === 'line' ? `${tr('Double {n} always goes first', { n: settings.setMax })} · ` : ''}{settings.teams ? tr('{n} teams of 2', { n: table.seats.length / 2 }) : tr('Each for themselves')} · {scoringText(table)}</p>
           )}
         </div>
         <p className="footnote">{tr(byRounds(table) ? RULES_PLAY[settings.variant] : RULES_NOTE[settings.variant])}{byRounds(table) ? ` ${tr('Scoring by rounds: each hand is a round, won by whoever goes out first, or if nobody can play, by the player with the fewest dots left.')} ${settings.bestOf ? tr('First to win {n} rounds wins the set; the app keeps count of sets won.', { n: roundsToWin(table) }) : tr('The app counts rounds won until you end the game.')}` : ''}</p>

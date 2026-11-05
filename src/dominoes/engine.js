@@ -109,6 +109,20 @@ export function startingTiles(table) {
 }
 
 /** Start the match (scores at 0) and deal the first hand. */
+/** The rules and table size from the last game, as a new table (anything saved that no longer makes sense is ignored). */
+export function tableFromSaved(saved) {
+  const fresh = newDominoTable();
+  if (!saved || !VARIANTS[saved.settings?.variant] || !SETS.includes(saved.settings?.setMax)) return fresh;
+  const { variant, setMax } = saved.settings;
+  const most = maxPlayers(variant, setMax);
+  const players = Number.isInteger(saved.players) && saved.players >= 2 && saved.players <= most ? saved.players : 4 <= most ? 4 : most;
+  const base = newDominoTable({ players, setMax, variant, teams: Boolean(saved.settings.teams), target: Number(saved.settings.target) > 0 ? Number(saved.settings.target) : undefined });
+  const known = {};
+  for (const key of ['rounds', 'scoring', 'bestOf', 'turnTimer', 'startTiles', 'wash', 'photos', 'topDoubleFirst']) if (saved.settings[key] !== undefined) known[key] = saved.settings[key];
+  return { ...base, settings: { ...base.settings, ...known } };
+}
+export const savedSettings = (table) => ({ settings: table.settings, players: table.seats.length });
+
 export function startMatch(table, random = Math.random) {
   const sides = sideCount(table);
   // sets won carry on to the next match (same players and sides)
@@ -127,7 +141,18 @@ export function deal(table, random = Math.random) {
   const size = startingTiles(table);
   const hands = table.seats.map((_, s) => tiles.slice(s * size, (s + 1) * size));
   const boneyard = tiles.slice(n * size);
-  let turn = table.match.lastWinner;
+  const topFirst = Boolean(table.settings.topDoubleFirst);
+  if (topFirst) {
+    // the top double always goes first: if it's in the boneyard, it trades places with a tile from a random hand
+    const top = tileId(setMax, setMax);
+    const spot = boneyard.indexOf(top);
+    if (spot >= 0) {
+      const s = Math.floor(random() * n), i = Math.floor(random() * size);
+      boneyard[spot] = hands[s][i];
+      hands[s][i] = top;
+    }
+  }
+  let turn = topFirst ? null : table.match.lastWinner;
   let mustPlay = null;
   if (turn == null) {
     // the highest double in anyone's hand opens (or the heaviest tile if nobody has a double)

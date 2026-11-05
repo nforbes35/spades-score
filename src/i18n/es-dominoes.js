@@ -1,5 +1,8 @@
 // Dominoes: the Spanish wording, keyed by the exact English (see "Languages" in CLAUDE.md).
 export default {
+  'Double {n} always goes first': 'El doble {n} siempre sale primero',
+  'Whoever has it starts every hand.': 'Quien lo tenga empieza cada mano.',
+  'It starts the first hand. After that, the last winner starts with any tile.': 'Empieza la primera mano. Después, el último ganador empieza con cualquier ficha.',
   'Turn on sound effects to hear them': 'Activa los efectos de sonido para oírlos',
   'The microphone didn’t pick anything up. Try again.': 'El micrófono no captó nada. Inténtalo otra vez.',
   'That recording didn’t work. Try again.': 'Esa grabación no funcionó. Inténtalo otra vez.',

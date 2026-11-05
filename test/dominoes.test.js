@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import { tMsg } from '../src/lib/i18n.js';
 import { calloutFor, momentFor, toDomRecord, mergeDomLog, domStats, headToHead, rivalryLines, validClip, clipType } from '../src/dominoes/fun.js';
 import assert from 'node:assert/strict';
+import { tableFromSaved, savedSettings } from '../src/dominoes/engine.js';
 import {
   fullSet, handSize, newDominoTable, startMatch, legalMoves, playTile, drawTile, pass, openEnds, endsTotal,
   publicTable, botMove, canDraw, mustPass, pips,
@@ -521,5 +522,42 @@ test('only real audio recordings are played from other devices', () => {
   assert.equal(clipType(''), 'audio/mp4');
   assert.ok(validClip(`data:${clipType('audio/mp4; codecs="mp4a.40.2"')};base64,AAAA`));
   assert.ok(!validClip(`data:audio/mp4;base64,${'A'.repeat(170000)}`));
+});
+
+test('double six always first: whoever holds it starts every hand, even after someone won', () => {
+  for (const players of [2, 3, 4]) {
+    for (let n = 1; n <= 60; n++) {
+      let x = n * 7919;
+      const random = () => { x = (x * 16807) % 2147483647; return (x - 1) / 2147483646; };
+      let t = newDominoTable({ players, setMax: 6, variant: 'draw' });
+      t = { ...t, seats: t.seats.map((_, s) => ({ id: `p${s}`, name: `P${s}` })), settings: { ...t.settings, startTiles: 7, topDoubleFirst: true } };
+      t = startMatch(t, random);
+      assert.equal(t.round.mustPlay, '6-6');
+      assert.ok(t.round.hands[t.round.turn].includes('6-6'));
+      const all = [...t.round.hands.flat(), ...t.round.boneyard];
+      assert.equal(new Set(all).size, 28, 'every tile once');
+      const again = deal({ ...t, match: { ...t.match, lastWinner: (t.round.turn + 1) % players } }, random);
+      assert.equal(again.round.mustPlay, '6-6');
+      assert.ok(again.round.hands[again.round.turn].includes('6-6'));
+    }
+  }
+});
+test('without the option, the last winner starts with anything', () => {
+  let t = newDominoTable({ players: 2, setMax: 6, variant: 'draw' });
+  t = startMatch({ ...t, seats: [{ id: 'a', name: 'A' }, { id: 'b', name: 'B' }] });
+  const next = deal({ ...t, match: { ...t.match, lastWinner: 1 } });
+  assert.equal(next.round.turn, 1);
+  assert.equal(next.round.mustPlay, null);
+});
+test('last game’s settings come back; nonsense doesn’t', () => {
+  let t = newDominoTable({ players: 3, setMax: 9, variant: 'allfives', target: 200 });
+  t = { ...t, settings: { ...t.settings, topDoubleFirst: true, wash: false, scoring: 'rounds', bestOf: 5 } };
+  const back = tableFromSaved(JSON.parse(JSON.stringify(savedSettings(t))));
+  assert.equal(back.seats.length, 3);
+  assert.equal(back.phase, 'lobby');
+  assert.deepEqual([back.settings.variant, back.settings.setMax, back.settings.target, back.settings.topDoubleFirst, back.settings.wash, back.settings.scoring, back.settings.bestOf], ['allfives', 9, 200, true, false, 'rounds', 5]);
+  assert.equal(tableFromSaved(null).settings.variant, 'draw');
+  assert.equal(tableFromSaved({ settings: { variant: 'nope', setMax: 6 } }).settings.variant, 'draw');
+  assert.equal(tableFromSaved({ players: 99, settings: { variant: 'draw', setMax: 6 } }).seats.length, 4);
 });
 
