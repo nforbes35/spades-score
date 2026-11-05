@@ -264,7 +264,8 @@ export function playTile(table, seat, tile, arm, style = null, thrown = false) {
   if (!move) throw new Error('That tile doesn’t fit there.');
 
   const hands = r.hands.map((h, s) => (s === seat ? h.filter((t) => t !== tile) : h));
-  const flair = { ...(TILE_STYLES.includes(style) ? { style } : {}), ...(thrown ? { thrown: true } : {}) };
+  // (your last tile always gets slammed: that's how you go out)
+  const flair = { ...(TILE_STYLES.includes(style) ? { style } : {}), ...(thrown ? { thrown: true } : {}), ...(hands[seat].length ? {} : { style: 'slam' }) };
   if (r.layout?.lines) return playOnLine(table, seat, tile, move.arm, hands, flair);
   let layout;
   if (!r.layout) {
@@ -280,7 +281,10 @@ export function playTile(table, seat, tile, arm, style = null, thrown = false) {
   // All Fives: the open ends add up to a multiple of 5 → that many points
   if (VARIANTS[table.settings.variant].fives) {
     const total = endsTotal(next);
-    if (total > 0 && total % 5 === 0) next = addPoints(next, sideOf(table, seat), total, { seat, kind: 'fives', points: total });
+    if (total > 0 && total % 5 === 0) {
+      next = addPoints(next, sideOf(table, seat), total, { seat, kind: 'fives', points: total });
+      next = { ...next, round: { ...next.round, last: { ...next.round.last, points: total } } };
+    }
   }
   if (!hands[seat].length) return endHand(next, seat, 'domino');
   return next;
@@ -453,7 +457,8 @@ function endRound(table, outSeat, reason) {
 export function publicTable(table) {
   if (!table.round) return table;
   const r = table.round;
-  return { ...table, round: { ...r, hands: null, boneyard: null, counts: r.hands.map((h) => h.length), boneyardCount: r.boneyard.length } };
+  // (once the hand is over everyone's leftover tiles get turned over)
+  return { ...table, round: { ...r, hands: null, boneyard: null, counts: r.hands.map((h) => h.length), boneyardCount: r.boneyard.length, ...(r.result ? { reveal: r.hands } : {}) } };
 }
 
 /** A computer player's move: the heaviest tile that fits (All Fives: the one scoring most), else draw/pass. */

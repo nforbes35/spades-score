@@ -4,6 +4,7 @@ import { read, write } from '../lib/store.js';
 import Domino from './Domino.jsx';
 import { savedGames, forgetSaved } from '../lib/saved.js';
 import { savedWhen } from '../Home.jsx';
+import { AlbumSheet } from './Fun.jsx';
 
 const dominoSaves = () => savedGames().filter((e) => e.kind === 'dominoes');
 
@@ -17,6 +18,7 @@ export default function DominoesApp({ onAllGames, onPlayOnline, onJoin, onRejoin
   const clean = code.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 4);
   const [last, setLast] = useState(() => { const l = read(LAST_KEY); return l?.code && Date.now() - l.at < REJOIN_WINDOW_MS ? l : null; });
   const [saved, setSaved] = useState(dominoSaves);
+  const [albumOpen, setAlbumOpen] = useState(false);
   const forget = (e) => {
     if (!confirm('Delete this saved game?')) return;
     forgetSaved(e.id); write(`dominoes-online-table-${e.code}`, null); setSaved(dominoSaves());
@@ -82,8 +84,10 @@ export default function DominoesApp({ onAllGames, onPlayOnline, onJoin, onRejoin
             </div>
           </form>
         )}
+        <button type="button" className="home-stats" onClick={() => setAlbumOpen(true)}>📸 Family album</button>
         <p className="muted-light center small">Scoring a game at the table is coming next.</p>
       </div>
+      {albumOpen && <AlbumSheet onClose={() => setAlbumOpen(false)} />}
     </div>
   );
 }

@@ -218,3 +218,92 @@ export function glassBreak({ delay = 0, volume = 0.8 } = {}) {
   if (!settings.glass || !onScreen()) return;
   playSample(GLASS_URL, { delay, volume });
 }
+
+// ---------- Dominoes: sounds made here in the browser (no recordings needed) ----------
+let noiseBuffer;
+function noiseBurst(a, t, { length, freq, q = 1.2, volume }) {
+  if (!noiseBuffer) {
+    noiseBuffer = a.createBuffer(1, Math.floor(a.sampleRate * 0.2), a.sampleRate);
+    const d = noiseBuffer.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  }
+  const src = a.createBufferSource();
+  src.buffer = noiseBuffer;
+  const filter = a.createBiquadFilter();
+  filter.type = 'bandpass';
+  filter.frequency.value = freq;
+  filter.Q.value = q;
+  const gain = a.createGain();
+  gain.gain.setValueAtTime(volume, t);
+  gain.gain.exponentialRampToValueAtTime(0.0001, t + length);
+  src.connect(filter).connect(gain).connect(a.destination);
+  src.start(t, Math.random() * 0.1, length + 0.02);
+}
+function ping(a, t, { freq, endFreq = freq, length, volume, type = 'triangle' }) {
+  const osc = a.createOscillator();
+  const gain = a.createGain();
+  osc.type = type;
+  osc.frequency.setValueAtTime(freq, t);
+  if (endFreq !== freq) osc.frequency.exponentialRampToValueAtTime(endFreq, t + length);
+  gain.gain.setValueAtTime(volume, t);
+  gain.gain.exponentialRampToValueAtTime(0.0001, t + length);
+  osc.connect(gain).connect(a.destination);
+  osc.start(t);
+  osc.stop(t + length + 0.02);
+}
+const running = () => {
+  if (!settings.effects || !onScreen()) return null;
+  try { const a = context(); return a.state === 'running' ? a : null; } catch { return null; }
+};
+
+/** A domino hitting the table: a hard, short clack. `heavy`: a slam, with weight behind it. */
+export function tileClack({ delay = 0, volume = 0.6, heavy = false } = {}) {
+  const a = running();
+  if (!a) return;
+  const t = a.currentTime + delay;
+  const tune = 0.92 + Math.random() * 0.16;
+  noiseBurst(a, t, { length: heavy ? 0.07 : 0.035, freq: (heavy ? 1500 : 2700) * tune, volume });
+  ping(a, t, { freq: (heavy ? 900 : 1900) * tune, length: heavy ? 0.05 : 0.028, volume: volume * 0.5 });
+  ping(a, t, { freq: (heavy ? 1700 : 3200) * tune, length: heavy ? 0.035 : 0.02, volume: volume * 0.3 });
+  if (heavy) ping(a, t, { freq: 110, endFreq: 42, length: 0.22, volume: volume * 0.9, type: 'sine' });
+}
+
+/** A pile of dominoes being stirred or dealt: a run of quick, soft clacks. */
+export function tileRattle({ delay = 0, length = 0.8, volume = 0.3 } = {}) {
+  const count = Math.round(length * 14);
+  for (let i = 0; i < count; i++) tileClack({ delay: delay + (i / count) * length + Math.random() * 0.03, volume: volume * (0.5 + Math.random() * 0.5) });
+}
+
+/** Knuckles rapping twice on a wooden table: "I pass". */
+export function knockSound({ delay = 0, volume = 0.7 } = {}) {
+  const a = running();
+  if (!a) return;
+  [0, 0.15].forEach((gap) => {
+    const t = a.currentTime + delay + gap;
+    ping(a, t, { freq: 190, endFreq: 105, length: 0.1, volume, type: 'sine' });
+    noiseBurst(a, t, { length: 0.03, freq: 700, volume: volume * 0.45 });
+  });
+}
+
+let porchTimer = null;
+/** Crickets, quietly, for a night on the porch. */
+export function porchSounds(on) {
+  clearTimeout(porchTimer);
+  porchTimer = null;
+  if (!on) return;
+  const chirp = () => {
+    const a = running();
+    if (a) [0, 0.07, 0.14].forEach((gap) => ping(a, a.currentTime + gap, { freq: 4300 + Math.random() * 200, length: 0.05, volume: 0.018, type: 'sine' }));
+    porchTimer = setTimeout(chirp, 900 + Math.random() * 900);
+  };
+  chirp();
+}
+
+/** Someone's recorded voice (a data: URL), or a computer voice saying `text` if there's no recording. */
+export function sayLine(text, clip) {
+  if (!settings.effects || !onScreen()) return;
+  try {
+    if (clip) { new Audio(clip).play().catch(() => {}); return; }
+    if ('speechSynthesis' in window && text) window.speechSynthesis.speak(new SpeechSynthesisUtterance(text));
+  } catch { /* no sound available */ }
+}

@@ -2478,3 +2478,88 @@ button.choice:active { transform: scale(0.98); }
   .dom-fly .domino { animation-duration: 0.01s !important; }
   .felt:has(.dom-fly.fly-slam) { animation: none; }
 }
+
+/* ---------- Dominoes: the moments around the game ---------- */
+.app.dominoes.at-table { touch-action: manipulation; }
+
+/* Mixing the tiles */
+.dom-wash { position: fixed; inset: 0; z-index: 60; background: var(--noise), var(--felt); overflow: hidden; touch-action: none; }
+.dom-wash .table-oval { position: absolute; }
+.dom-wash-canvas { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; cursor: grab; }
+.dw-head { position: absolute; top: calc(14px + env(safe-area-inset-top)); left: 16px; right: 16px; text-align: center; color: #fff; pointer-events: none; text-shadow: 0 2px 8px rgba(0, 0, 0, 0.75); }
+.dw-head h2 { font-size: clamp(24px, 6vw, 44px); font-weight: 900; margin: 0; }
+.dw-head p { margin: 2px 0 0; font-weight: 700; font-size: clamp(14px, 2.6vw, 22px); }
+.dw-head .dw-rivalry { color: var(--gold, #f5b82e); font-weight: 800; }
+.dw-bar { position: absolute; left: 0; bottom: 0; height: 6px; width: 100%; background: var(--gold, #f5b82e); transform-origin: left; animation: dw-shrink linear both; pointer-events: none; }
+@keyframes dw-shrink { to { transform: scaleX(0); } }
+.dw-skip { position: absolute; right: 14px; bottom: calc(18px + env(safe-area-inset-bottom)); padding: 10px 18px; border: 0; border-radius: 999px; background: rgba(0, 0, 0, 0.55); color: #fff; font-weight: 800; font-size: 15px; }
+
+/* Domino! */
+.dom-moment { position: fixed; inset: 0; z-index: 65; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: calc(16px + env(safe-area-inset-top)) 12px calc(12px + env(safe-area-inset-bottom)); background: rgba(10, 6, 2, 0.86); color: #fff; overflow-y: auto; text-align: center; animation: fade 0.2s; }
+.dm-title { margin: 0; font-size: clamp(44px, 14vw, 110px); font-weight: 900; line-height: 1; color: var(--gold, #f5b82e); text-shadow: 0 4px 0 rgba(0, 0, 0, 0.5); animation: dm-pop 0.45s cubic-bezier(.2, 1.5, .4, 1) both; }
+.dom-moment.stuck .dm-title { color: #fff; }
+@keyframes dm-pop { from { scale: 2.4; opacity: 0; } }
+.dm-hero { width: min(62vw, 42vh); aspect-ratio: 4 / 3; flex: none; border-radius: 16px; overflow: hidden; border: 3px solid var(--gold, #f5b82e); background: rgba(255, 255, 255, 0.08); display: grid; place-items: center; animation: dm-pop 0.5s 0.1s cubic-bezier(.2, 1.3, .4, 1) both; }
+.dm-hero video, .dm-hero > * { width: 100%; height: 100%; object-fit: cover; }
+.dm-hero .seat-icon { width: min(30vw, 22vh); height: min(30vw, 22vh); font-size: min(14vw, 10vh); border-radius: 50%; display: grid; place-items: center; }
+.dm-sub { margin: 2px 0; font-weight: 700; font-size: clamp(15px, 3vw, 24px); }
+.dm-snap { margin: 0; font-size: 13px; color: var(--gold, #f5b82e); font-weight: 700; }
+.dm-flash { position: fixed; inset: 0; background: #fff; pointer-events: none; animation: dm-flash 0.45s ease-out both; z-index: 2; }
+@keyframes dm-flash { from { opacity: 0.85; } to { opacity: 0; } }
+.dm-hands { width: 100%; max-width: 760px; display: flex; flex-direction: column; gap: 5px; }
+.dm-hand { display: flex; align-items: center; gap: 8px; background: rgba(255, 255, 255, 0.08); border-radius: 10px; padding: 4px 8px; text-align: left; }
+.dm-name { flex: none; width: 76px; display: flex; flex-direction: column; font-size: 12.5px; font-weight: 700; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.dm-name b { font-size: 11px; opacity: 0.75; font-weight: 600; }
+.dm-name b::after { content: ' dots'; }
+.dm-tiles { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; gap: 3px; perspective: 500px; }
+.dm-flip { display: inline-flex; animation: dm-flip 0.4s ease-out both; }
+@keyframes dm-flip { from { transform: rotateY(90deg); opacity: 0; } }
+.dm-tap { margin: auto 0 0; padding-top: 8px; font-size: 12px; opacity: 0.65; }
+.tv-mode .dm-tap { display: none; }
+
+/* Call-outs and trash talk */
+.dom-callout { position: fixed; left: 50%; top: 38%; z-index: 47; translate: -50% -50%; display: flex; flex-direction: column; align-items: center; color: #fff; pointer-events: none; text-shadow: 0 3px 10px rgba(0, 0, 0, 0.85); animation: dom-callout 1.7s ease-out both; white-space: nowrap; }
+.dom-callout b { font-size: clamp(34px, 10vw, 76px); font-weight: 900; color: var(--gold, #f5b82e); line-height: 1.05; }
+.dom-callout.big b { font-size: clamp(46px, 14vw, 104px); }
+.dom-callout span { font-size: clamp(18px, 4.5vw, 34px); font-weight: 800; }
+@keyframes dom-callout { 0% { scale: 0.4; opacity: 0; } 14% { scale: 1.12; opacity: 1; } 22% { scale: 1; } 78% { opacity: 1; } 100% { opacity: 0; translate: -50% -80%; } }
+.dom-talk { position: fixed; left: 50%; top: calc(58px + env(safe-area-inset-top)); z-index: 62; translate: -50% 0; max-width: min(92vw, 640px); width: max-content; display: flex; flex-direction: column; padding: 9px 16px; border-radius: 18px 18px 18px 4px; background: #fff; color: #1b1208; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45); pointer-events: none; animation: dm-pop 0.25s ease-out both; }
+.dom-talk b { font-size: 12px; opacity: 0.65; }
+.dom-talk span { font-size: clamp(16px, 3.4vw, 26px); font-weight: 800; }
+.dom-talk-btn { border: 0; background: rgba(255, 255, 255, 0.16); border-radius: 50%; width: 36px; height: 36px; font-size: 18px; line-height: 1; padding: 0; flex: none; }
+.talk-list { display: flex; flex-direction: column; gap: 6px; padding-top: 8px; }
+.talk-row { display: flex; align-items: center; gap: 6px; }
+.talk-say { flex: 1; min-width: 0; text-align: left; padding: 12px 14px; border-radius: 14px; border: 2px solid var(--line); background: var(--surface); color: var(--ink); font-weight: 700; font-size: 15px; }
+.talk-mic { flex: none; width: 46px; height: 46px; border-radius: 50%; border: 2px solid var(--line); background: var(--surface); font-size: 18px; padding: 0; }
+.talk-mic.on { background: #dc2626; border-color: #dc2626; }
+.talk-x { flex: none; width: 30px; height: 30px; border: 0; background: none; color: var(--muted); padding: 0; display: grid; place-items: center; }
+.talk-problem { color: #dc2626; font-weight: 700; font-size: 14px; margin: 6px 0 0; }
+.talk-add { display: flex; gap: 8px; margin-top: 10px; }
+.talk-add input { flex: 1; min-width: 0; font-size: 16px; padding: 10px 12px; border-radius: 12px; border: 2px solid var(--line); background: var(--surface); color: var(--ink); }
+
+/* The family album and head to head */
+.album-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px; padding-top: 10px; }
+.album-grid button { padding: 0; border: 0; border-radius: 10px; overflow: hidden; background: none; }
+.album-grid img { width: 100%; display: block; aspect-ratio: 4 / 3; object-fit: cover; }
+.album-big { padding-top: 10px; display: flex; flex-direction: column; gap: 10px; }
+.album-big img { width: 100%; border-radius: 12px; display: block; }
+.album-save { text-align: center; text-decoration: none; }
+.dom-h2h { display: grid; grid-template-columns: 1fr auto 1fr; gap: 10px; align-items: center; padding: 10px 14px; margin-bottom: 6px; font-weight: 700; }
+.dom-h2h span:last-child { text-align: right; }
+
+/* The TV: each player's tiles standing on edge */
+.dom-standing { display: inline-flex; align-items: center; gap: 2px; flex-wrap: wrap; justify-content: center; margin-top: 3px; }
+.dom-standing .domino { width: 11px; height: 22px; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5)); }
+.dom-standing small { color: #fff; font-weight: 800; font-size: 13px; margin-left: 3px; }
+.dom-vtile .dom-standing { position: absolute; left: 6px; bottom: 34px; z-index: 2; }
+
+/* Papi's table: drinks on the corners */
+:root[data-deck='papi'] .dom-felt::before, :root[data-deck='papi'] .dom-felt::after { position: absolute; bottom: 12px; font-size: clamp(30px, 6vw, 56px); pointer-events: none; z-index: 0; filter: drop-shadow(0 4px 5px rgba(0, 0, 0, 0.55)); opacity: 0.92; }
+:root[data-deck='papi'] .dom-felt::before { content: '🥤'; left: 10px; }
+:root[data-deck='papi'] .dom-felt::after { content: '☕'; right: 10px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .dm-title, .dm-hero, .dm-flip, .dom-callout, .dom-talk, .dm-flash { animation-duration: 0.01s !important; animation-delay: 0s !important; }
+}
+.tv-mode .dom-standing .domino { width: 17px; height: 34px; }
+.dom-standing .domino-body { stroke: rgba(255, 255, 255, 0.75); stroke-width: 0.06; }

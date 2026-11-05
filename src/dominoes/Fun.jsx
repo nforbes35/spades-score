@@ -1,0 +1,306 @@
+// The moments around the game: mixing the tiles, "Domino!", call-outs, trash talk and the photo album.
+import { useEffect, useRef, useState } from 'react';
+import { Confetti, Icon, Sheet } from '../components.jsx';
+import { Avatar } from '../Avatar.jsx';
+import { VideoTile } from '../Video.jsx';
+import { tileClack, tileRattle } from '../lib/fx.js';
+import Domino from './Domino.jsx';
+import { halves } from './engine.js';
+import { TALK_LINES, loadTalk, saveTalk, MAX_CLIP_CHARS, validClip, domStats, headToHead, loadDomLog } from './fun.js';
+import { loadPhotos, deletePhoto } from './album.js';
+
+/** The tiles face down in a pile; everyone drags a finger to stir them (others' fingers arrive through `bus`). */
+export function DomWash({ table, ms, onSend, bus, onSkip, tv }) {
+  const canvas = useRef(null);
+  const lines = table.match?.hands.length === 0 ? table.match?.rivalry ?? [] : [];
+  useEffect(() => {
+    const el = canvas.current;
+    if (!el) return undefined;
+    const c = el.getContext('2d');
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    let W = 0, H = 0, L = 40;
+    const size = () => {
+      W = el.clientWidth; H = el.clientHeight;
+      el.width = W * dpr; el.height = H * dpr;
+      L = Math.max(34, Math.min(72, Math.min(W, H) / 7));
+    };
+    size();
+    const watch = new ResizeObserver(size);
+    watch.observe(el);
+    const count = Math.min(36, ((table.settings.setMax + 1) * (table.settings.setMax + 2)) / 2);
+    // (laid out once the screen has a size: it can still be 0 × 0 at the very start)
+    const tiles = [];
+    const layOut = () => {
+      for (let i = 0; i < count; i++) {
+        const a = Math.random() * 6.28, d = Math.random() * Math.min(W, H) * 0.28;
+        tiles.push({ x: W / 2 + Math.cos(a) * d, y: H / 2 + Math.sin(a) * d, r: Math.random() * 6.28, vx: 0, vy: 0, vr: 0 });
+      }
+    };
+    const fingers = [];
+    let lastClack = 0, raf = 0, last = performance.now();
+    const push = (x, y, strength = 1) => {
+      fingers.push({ x, y, strength, at: performance.now() });
+      if (fingers.length > 24) fingers.shift();
+    };
+    const clack = () => { const now = performance.now(); if (now - lastClack > 90) { lastClack = now; tileClack({ volume: 0.14 + Math.random() * 0.14 }); } };
+    bus.current = (x, y) => { if (Number.isFinite(x) && Number.isFinite(y)) { push(x * W, y * H); clack(); } };
+    // the pointer
+    let down = false, sent = 0;
+    const at = (e) => { const r = el.getBoundingClientRect(); return { x: ((e.clientX - r.left) / r.width) * W, y: ((e.clientY - r.top) / r.height) * H }; };
+    const move = (e) => {
+      if (!down) return;
+      const p = at(e);
+      push(p.x, p.y, 1.4);
+      clack();
+      const now = performance.now();
+      if (now - sent > 110) { sent = now; onSend?.(+(p.x / W).toFixed(3), +(p.y / H).toFixed(3)); }
+    };
+    const start = (e) => { down = true; el.setPointerCapture?.(e.pointerId); move(e); };
+    const stop = () => { down = false; };
+    el.addEventListener('pointerdown', start);
+    el.addEventListener('pointermove', move);
+    el.addEventListener('pointerup', stop);
+    el.addEventListener('pointercancel', stop);
+    const body = (t) => {
+      const w = L, h = L / 2;
+      c.save();
+      c.translate(t.x, t.y);
+      c.rotate(t.r);
+      c.shadowColor = 'rgba(0, 0, 0, 0.45)'; c.shadowBlur = 5; c.shadowOffsetY = 2;
+      c.fillStyle = '#f5efe0';
+      c.beginPath();
+      c.roundRect(-w / 2, -h / 2, w, h, 4);
+      c.fill();
+      c.shadowColor = 'transparent';
+      c.fillStyle = 'rgba(110, 85, 50, 0.55)';
+      c.beginPath();
+      c.arc(0, 0, h * 0.13, 0, 6.3);
+      c.fill();
+      c.restore();
+    };
+    const frame = (now) => {
+      const dt = Math.min(2, (now - last) / 16.7);
+      last = now;
+      if (!tiles.length && W > 0 && H > 0) layOut();
+      // a slow stir of its own, so the pile is alive even when nobody's touching it
+      const ghost = { x: W / 2 + Math.cos(now / 480) * W * 0.2, y: H / 2 + Math.sin(now / 370) * H * 0.16, strength: 0.35, at: now };
+      const reach = L * 2;
+      const active = [ghost, ...fingers.filter((f) => now - f.at < 200)];
+      tiles.forEach((t) => {
+        active.forEach((f) => {
+          const dx = t.x - f.x, dy = t.y - f.y, d = Math.hypot(dx, dy) || 1;
+          if (d > reach) return;
+          const k = (1 - d / reach) * f.strength * 1.1 * dt;
+          t.vx += (dx / d) * k - (dy / d) * k * 0.7;
+          t.vy += (dy / d) * k + (dx / d) * k * 0.7;
+          t.vr += (Math.random() - 0.5) * k * 0.12;
+        });
+        t.x += t.vx * dt; t.y += t.vy * dt; t.r += t.vr * dt;
+        const damp = 0.93 ** dt;
+        t.vx *= damp; t.vy *= damp; t.vr *= damp;
+        if (t.x < L / 2 || t.x > W - L / 2) { t.vx *= -0.6; t.x = Math.max(L / 2, Math.min(W - L / 2, t.x)); }
+        if (t.y < L / 2 || t.y > H - L / 2) { t.vy *= -0.6; t.y = Math.max(L / 2, Math.min(H - L / 2, t.y)); }
+      });
+      c.setTransform(dpr, 0, 0, dpr, 0, 0);
+      c.clearRect(0, 0, W, H);
+      tiles.forEach(body);
+      raf = requestAnimationFrame(frame);
+    };
+    raf = requestAnimationFrame(frame);
+    tileRattle({ length: 0.9 });
+    return () => {
+      cancelAnimationFrame(raf);
+      watch.disconnect();
+      el.removeEventListener('pointerdown', start);
+      el.removeEventListener('pointermove', move);
+      el.removeEventListener('pointerup', stop);
+      el.removeEventListener('pointercancel', stop);
+      bus.current = null;
+    };
+  }, []);
+  return (
+    <div className="dom-wash">
+      <div className="table-oval" aria-hidden="true" />
+      <canvas ref={canvas} className="dom-wash-canvas" aria-label="Dominoes face down, being mixed" />
+      <div className="dw-head">
+        <h2>Mix the tiles!</h2>
+        <p>{tv ? 'Everyone’s stirring the pile' : 'Drag your finger through the pile'}</p>
+        {lines.map((l) => <p key={l} className="dw-rivalry">{l}</p>)}
+      </div>
+      <div className="dw-bar" style={{ animationDuration: `${ms}ms` }} />
+      {!tv && <button type="button" className="dw-skip" onClick={onSkip}>Skip</button>}
+    </div>
+  );
+}
+
+/** "Domino!": the winner, big, and everyone else's leftover tiles turned over. Tap to move on. */
+export function DomMoment({ table, info, stream, icon, onClose, snap }) {
+  const reveal = table.round.reveal ?? [];
+  const seatPips = table.round.result?.seatPips ?? [];
+  const who = info.seat != null ? table.seats[info.seat] : null;
+  const anyVideo = stream && stream.getVideoTracks().length > 0;
+  const most = Math.max(1, ...reveal.map((h) => h.length));
+  return (
+    <div className={`dom-moment${info.confetti ? ' won' : ' stuck'}`} onClick={onClose}>
+      {info.confetti && <Confetti />}
+      {snap && <div className="dm-flash" aria-hidden="true" />}
+      <h1 className="dm-title">{info.title}</h1>
+      {who && (
+        <div className="dm-hero">
+          {anyVideo ? <VideoTile stream={stream} muted /> : <Avatar value={icon} name={who.name} bot={who.bot} className="seat-icon" />}
+        </div>
+      )}
+      <p className="dm-sub">{info.sub}</p>
+      {snap && <p className="dm-snap">📸 Reaction photo saved to the album</p>}
+      <div className="dm-hands" style={{ '--most': most }}>
+        {reveal.map((hand, s) => (hand.length > 0 && table.seats[s] ? (
+          <div key={s} className="dm-hand">
+            <span className="dm-name">{table.seats[s].name}<b>{seatPips[s] ?? 0}</b></span>
+            <span className="dm-tiles">
+              {hand.map((t, i) => { const [a, b] = halves(t); return <span key={t} className="dm-flip" style={{ animationDelay: `${0.5 + i * 0.09}s` }}><Domino a={a} b={b} size={42} /></span>; })}
+            </span>
+          </div>
+        ) : null))}
+      </div>
+      <p className="dm-tap">Tap to continue</p>
+    </div>
+  );
+}
+
+export const DomCallout = ({ c }) => (
+  <div className={`dom-callout${c.big ? ' big' : ''}`} aria-live="polite"><b>{c.text}</b>{c.sub && <span>{c.sub}</span>}</div>
+);
+
+/** Someone's line, over the table for everyone. */
+export const DomTalk = ({ talk }) => (
+  <div className="dom-talk" role="status"><b>{talk.name}</b><span>{talk.text}</span></div>
+);
+
+const CLIP_MS = 3000;
+/** The trash talk lines: tap one to say it; record your own voice for any of them; add your own. */
+export function TalkSheet({ onSay, onClose }) {
+  const [talk, setTalk] = useState(loadTalk);
+  const [recording, setRecording] = useState(null);
+  const [draft, setDraft] = useState('');
+  const [problem, setProblem] = useState(null);
+  const change = (next) => { setTalk(next); saveTalk(next); };
+  const recorder = useRef(null);
+  useEffect(() => () => recorder.current?.stop?.(), []);
+  const record = async (id) => {
+    setProblem(null);
+    if (recording === id) { recorder.current?.stop(); return; }
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') { setProblem('This device can’t record here.'); return; }
+    let stream;
+    try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); } catch { setProblem('Allow the microphone to record your voice.'); return; }
+    const type = ['audio/webm;codecs=opus', 'audio/mp4'].find((t) => MediaRecorder.isTypeSupported(t));
+    const rec = new MediaRecorder(stream, { ...(type ? { mimeType: type } : {}), audioBitsPerSecond: 24000 });
+    const parts = [];
+    rec.ondataavailable = (e) => parts.push(e.data);
+    rec.onstop = () => {
+      stream.getTracks().forEach((t) => t.stop());
+      recorder.current = null;
+      setRecording(null);
+      const reader = new FileReader();
+      reader.onload = () => {
+        const clip = reader.result;
+        if (!validClip(clip) || clip.length > MAX_CLIP_CHARS) { setProblem('That recording didn’t work. Try a shorter one.'); return; }
+        const now = loadTalk();
+        change({ ...now, clips: { ...now.clips, [id]: clip } });
+      };
+      reader.readAsDataURL(new Blob(parts, { type: rec.mimeType }));
+    };
+    recorder.current = rec;
+    setRecording(id);
+    rec.start();
+    setTimeout(() => { if (rec.state === 'recording') rec.stop(); }, CLIP_MS);
+  };
+  const removeVoice = (id) => { const { [id]: _gone, ...clips } = talk.clips; change({ ...talk, clips }); };
+  const removeLine = (id) => { const { [id]: _gone, ...clips } = talk.clips; change({ custom: talk.custom.filter((l) => l.id !== id), clips }); };
+  const add = (e) => {
+    e.preventDefault();
+    const text = draft.trim().slice(0, 50);
+    if (!text) return;
+    change({ ...talk, custom: [...talk.custom, { id: `c${Date.now().toString(36)}`, text }] });
+    setDraft('');
+  };
+  const row = (l, custom) => (
+    <div key={l.id} className="talk-row">
+      <button type="button" className="talk-say" onClick={() => onSay(l.text, talk.clips[l.id] ?? null)}>{talk.clips[l.id] ? '🗣️ ' : ''}{l.text}</button>
+      <button type="button" className={`talk-mic${recording === l.id ? ' on' : ''}`} aria-label={recording === l.id ? 'Stop recording' : `Record your voice saying ${l.text}`} onClick={() => record(l.id)}>{recording === l.id ? '⏹' : '🎙️'}</button>
+      {talk.clips[l.id] && !custom && <button type="button" className="talk-x" aria-label="Remove your recording" onClick={() => removeVoice(l.id)}><Icon name="close" size={14} /></button>}
+      {custom && <button type="button" className="talk-x" aria-label="Remove this line" onClick={() => removeLine(l.id)}><Icon name="close" size={14} /></button>}
+    </div>
+  );
+  return (
+    <Sheet title="Talk some trash" short onClose={onClose} closeLabel="Close">
+      <p className="muted small">Tap a line and everyone hears it. Tap 🎙️ to record it in your own voice (3 seconds).</p>
+      {problem && <p className="talk-problem">{problem}</p>}
+      <div className="talk-list">
+        {TALK_LINES.map((l) => row(l, false))}
+        {talk.custom.map((l) => row(l, true))}
+      </div>
+      <form className="talk-add" onSubmit={add}>
+        <input value={draft} onChange={(e) => setDraft(e.target.value)} maxLength={50} placeholder="Add your own line" aria-label="Add your own line" />
+        <button type="submit" className="secondary" disabled={!draft.trim()}>Add</button>
+      </form>
+    </Sheet>
+  );
+}
+
+/** The photos this device has kept: look, share or delete. */
+export function AlbumSheet({ onClose }) {
+  const [photos, setPhotos] = useState(null);
+  const [open, setOpen] = useState(null);
+  const urls = useRef(new Map());
+  const urlOf = (p) => { if (!urls.current.has(p.id)) urls.current.set(p.id, URL.createObjectURL(p.blob)); return urls.current.get(p.id); };
+  const reload = () => loadPhotos().then(setPhotos).catch(() => setPhotos([]));
+  useEffect(() => { reload(); const map = urls.current; return () => map.forEach((u) => URL.revokeObjectURL(u)); }, []);
+  const fileOf = (p) => new File([p.blob], `family-games-${new Date(p.at).toISOString().slice(0, 10)}.jpg`, { type: 'image/jpeg' });
+  const canShare = (p) => { try { return Boolean(navigator.canShare?.({ files: [fileOf(p)] })); } catch { return false; } };
+  return (
+    <Sheet title={open ? open.title : 'Family album'} onClose={open ? () => setOpen(null) : onClose} closeLabel={open ? 'Back' : 'Done'}>
+      {open ? (
+        <div className="album-big">
+          <img src={urlOf(open)} alt={open.title} />
+          <p className="muted small center">{new Date(open.at).toLocaleString(undefined, { dateStyle: 'long', timeStyle: 'short' })}</p>
+          <div className="row">
+            {canShare(open)
+              ? <button type="button" className="primary" onClick={() => navigator.share({ files: [fileOf(open)] }).catch(() => {})}>Share</button>
+              : <a className="primary album-save" href={urlOf(open)} download={fileOf(open).name}>Save</a>}
+            <button type="button" className="secondary" onClick={() => { if (confirm('Delete this photo?')) deletePhoto(open.id).then(() => { setOpen(null); reload(); }); }}>Delete</button>
+          </div>
+        </div>
+      ) : (
+        <>
+          {photos?.length === 0 && <div className="card empty stats-empty"><span style={{ fontSize: 34 }}>📸</span><p>When a hand ends during a video chat, a picture of everyone’s reaction lands here. Photos stay on this device unless you share them.</p></div>}
+          <div className="album-grid">
+            {(photos ?? []).map((p) => <button key={p.id} type="button" onClick={() => setOpen(p)} aria-label={p.title}><img src={urlOf(p)} alt="" /></button>)}
+          </div>
+        </>
+      )}
+    </Sheet>
+  );
+}
+
+/** Dominoes' part of Stats & records. */
+export function DomStatsList() {
+  const [log] = useState(loadDomLog);
+  const players = domStats(log);
+  const pairs = headToHead(log, players.map((p) => p.name)).slice(0, 8);
+  if (!players.length) return <div className="card empty stats-empty"><Icon name="trophy" size={34} /><p>Finish a game of dominoes and everyone’s record shows up here.</p></div>;
+  return (
+    <>
+      <div className="leaderboard">
+        {players.map((p, i) => (
+          <div key={p.key} className="card lb-row">
+            <span className="lb-rank">{['🥇', '🥈', '🥉'][i] ?? i + 1}</span>
+            <span className="lb-main"><b>{p.name}</b><span className="muted small">{p.wins}–{p.losses}{p.streak >= 2 ? ` · won ${p.streak} straight` : p.streak <= -2 ? ` · lost ${-p.streak} straight` : ''}</span><span className="lb-bar"><i style={{ width: `${p.pct}%` }} /></span></span>
+            <span className="lb-pct">{p.pct}%</span>
+          </div>
+        ))}
+      </div>
+      {pairs.length > 0 && <div className="section-title">Head to head</div>}
+      {pairs.map((x) => <div key={`${x.a}${x.b}`} className="card dom-h2h"><span>{x.a}</span><b>{x.aw} – {x.bw}</b><span>{x.b}</span></div>)}
+    </>
+  );
+}

@@ -1,4 +1,5 @@
 import { test } from 'node:test';
+import { calloutFor, momentFor, toDomRecord, mergeDomLog, domStats, headToHead, rivalryLines, validClip } from '../src/dominoes/fun.js';
 import assert from 'node:assert/strict';
 import {
   fullSet, handSize, newDominoTable, startMatch, legalMoves, playTile, drawTile, pass, openEnds, endsTotal,
@@ -463,3 +464,56 @@ test('a slam, a spin or a throw is remembered with the tile; anything else is ju
     assert.equal(last('papi').style, undefined); // no Papi Flip in dominoes
   }
 });
+
+test('going out is always a slam, and the leftover tiles are shown once the hand is over', () => {
+  const t = fixed([['3-4'], ['5-6', '0-0']]);
+  const done = playTile(t, 0, '3-4');
+  assert.equal(done.round.last.style, 'slam');
+  const open = publicTable(fixed([['3-4', '1-2'], ['5-6', '0-0']]));
+  assert.equal(open.round.reveal, undefined);
+  assert.deepEqual(publicTable(done).round.reveal, [[], ['5-6', '0-0']]);
+  assert.equal(momentFor(done).title, 'Domino!');
+  assert.equal(momentFor(done).seat, 0);
+});
+
+test('call-outs: scoring in All Fives, and doubles', () => {
+  const fives = fixed([['0-5', '1-2'], ['3-4', '0-0']], { variant: 'allfives' });
+  const scored = playTile(fives, 0, '0-5');
+  assert.equal(scored.round.last.points, 5);
+  assert.equal(calloutFor(scored).text, 'Five!');
+  assert.equal(calloutFor(playTile(fixed([['6-6', '1-2'], ['3-4', '0-0']]), 0, '6-6')).text, 'Double 6!');
+  assert.equal(calloutFor(playTile(fixed([['1-2', '3-3'], ['3-4', '0-0']]), 0, '1-2')), null);
+});
+
+const game = (id, winner, a, b) => ({ id, at: Number(id), winner, sides: [[{ name: a }], [{ name: b }]] });
+
+test('records: wins, streaks, head to head and the lines at the start of a game', () => {
+  const log = mergeDomLog([], [game('1', 0, 'Papi', 'Nick'), game('2', 0, 'Papi', 'Nick'), game('3', 1, 'Papi', 'Nick'), game('4', 1, 'Papi', 'Nick'), game('5', 0, 'Papi', 'nick ')]);
+  const stats = domStats(log);
+  assert.equal(stats[0].name, 'Papi');
+  assert.deepEqual([stats[0].wins, stats[0].losses], [3, 2]);
+  assert.deepEqual(headToHead(log, ['Papi', 'Nick']), [{ a: 'Papi', b: 'Nick', aw: 3, bw: 2 }]);
+  assert.deepEqual(rivalryLines(log, ['Papi', 'Nick']), ['Papi leads Nick, 3 games to 2']);
+  const moreLog = mergeDomLog(log, [game('6', 0, 'Papi', 'Nick')]);
+  assert.ok(rivalryLines(moreLog, ['Papi', 'Nick']).includes('Papi has won 2 in a row'));
+  // the same game twice counts once; junk from another device is ignored
+  assert.equal(mergeDomLog(log, [game('1', 1, 'A', 'B'), { id: 7 }, null]).length, 5);
+});
+
+test('computer players get no record, and a finished game with a winner is what gets kept', () => {
+  const t = seated(newDominoTable({ players: 2 }));
+  const over = { ...t, phase: 'over', seats: [t.seats[0], { id: 'b', name: 'Boomer', bot: true }], match: { id: 'x', scores: [100, 40], winner: 0 } };
+  const rec = toDomRecord(over);
+  assert.equal(rec.winner, 0);
+  assert.deepEqual(domStats([rec]).map((p) => p.name), ['P0']);
+  assert.equal(toDomRecord({ ...over, phase: 'scored' }), null);
+});
+
+test('only real audio recordings are played from other devices', () => {
+  assert.ok(validClip('data:audio/webm;codecs=opus;base64,AAAA'));
+  assert.ok(validClip('data:audio/mp4;base64,AAAA'));
+  assert.ok(!validClip('data:text/html;base64,AAAA'));
+  assert.ok(!validClip('https://example.com/a.mp3'));
+  assert.ok(!validClip(`data:audio/mp4;base64,${'A'.repeat(90000)}`));
+});
+

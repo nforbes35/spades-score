@@ -60,6 +60,9 @@ export const DECKS = [
     ['#1c0805', '#3d140b', '#622214'], ['#b4452a', '#fff']),
   realTable('farmhouse', 'Farmhouse table', 'radial-gradient(80% 60% at 50% 30%, rgba(255, 245, 225, 0.1), rgba(20, 16, 12, 0.3))',
     ['#121110', '#26231f', '#3d3933'], ['#8a7a64', '#fff']),
+  // Papi's table: a warm evening light on the oak table, with drinks on the corners (see .dom-felt in styles.css)
+  { id: 'papi', name: 'Papi’s table', group: 'Real tables', faces: 'classic', felt: ['#1a0e05', '#3a2110', '#5e3a1a'], button: ['#c77a2c', '#fff'],
+    table: 'radial-gradient(75% 60% at 50% 35%, rgba(255, 200, 120, 0.3), rgba(45, 20, 4, 0.5)), url(/decks/real-oak-table.jpg) center / cover', home: 'url(/decks/real-oak-table.jpg)' },
   photoDeck('mountains', 'Mountains', 'Photos', 'mountains', 'mountains', { button: PHOTO_BUTTONS.mountains }),
   photoDeck('reef', 'Ocean reef', 'Photos', 'reef', 'reef', { button: PHOTO_BUTTONS.reef }),
   photoDeck('space', 'Space', 'Photos', 'space', 'space', { button: PHOTO_BUTTONS.space }),

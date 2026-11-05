@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { loadLog, computeStats, forgetGame } from './lib/stats.js';
 import { history } from './lib/scoring.js';
 import { Sheet, Segmented, Icon } from './components.jsx';
+import { DomStatsList } from './dominoes/Fun.jsx';
 
 const MEDALS = ['🥇', '🥈', '🥉'];
 const fmtPct = (n) => (n == null ? '—' : `${n}%`);
@@ -26,14 +27,14 @@ export default function Stats({ onClose }) {
             <div><b>{log.reduce((n, g) => n + g.hands.length, 0)}</b><span>hands</span></div>
             <div><b>{players.length}</b><span>players</span></div>
           </div>
-          <Segmented options={[{ id: 'players', label: 'Players' }, { id: 'games', label: 'Games' }]} value={tab} onChange={setTab} label="Show" />
-          {!log.length && (
+          <Segmented options={[{ id: 'players', label: 'Spades' }, { id: 'games', label: 'Games' }, { id: 'dominoes', label: 'Dominoes' }]} value={tab} onChange={setTab} label="Show" />
+          {!log.length && tab !== 'dominoes' && (
             <div className="card empty stats-empty">
               <Icon name="trophy" size={34} />
               <p>Finish a game and everyone’s stats show up here. Phones in the same game share their history, so stats fill in for everybody.</p>
             </div>
           )}
-          {tab === 'players' ? (
+          {tab === 'dominoes' ? <DomStatsList /> : tab === 'players' ? (
             <div className="leaderboard">
               {players.map((p, i) => (
                 <button key={p.key} type="button" className="card lb-row" onClick={() => setWho(p.key)}>
