@@ -6,3 +6,7 @@ glass.m4a: "Small Glass Pane Shatter", supplied by Nick for the family game; tri
 
 Animated emojis: Noto Emoji Animation by Google (CC BY 4.0), loaded from fonts.gstatic.com when shown;
   https://googlefonts.github.io/noto-emoji-animation/
+
+night.m4a: from "Campaign at Night #4" (field crickets and rare frogs in a meadow, France, 2020) by Joseph Sardin,
+BigSoundBank, https://bigsoundbank.com/campagne-la-nuit-4-s1880.html, CC0 (public domain). 50 seconds from 1:40,
+low rumble removed, levelled, its end crossfaded into its start to make a 45-second loop (half a second extra each end).

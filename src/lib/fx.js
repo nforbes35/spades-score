@@ -285,29 +285,60 @@ export function knockSound({ delay = 0, volume = 0.7 } = {}) {
   });
 }
 
-let porchTimer = null;
-const CRICKET_VOLUME = 0.2;
-/** Crickets, quietly, for a night on the porch. */
+// A real night out (public/sounds/night.m4a, see CREDITS.txt), looping on its own while the switch is on. The file
+// has half a second extra at each end, so the loop is exact however the phone decodes it.
+const NIGHT_URL = '/sounds/night.m4a';
+const NIGHT_PAD = 0.5;
+const NIGHT_LOOP = 45;
+const NIGHT_VOLUME = 0.3; // quiet: background, under the game and the talk
+const NIGHT_FADE = 1.2;
+let porchWatch = null;
+let night = null;
+
+function stopNight() {
+  if (!night) return;
+  const { src, gain, ctx } = night;
+  night = null;
+  try {
+    gain.gain.cancelScheduledValues(ctx.currentTime);
+    gain.gain.setTargetAtTime(0, ctx.currentTime, 0.25);
+    src.stop(ctx.currentTime + 1);
+  } catch { /* already stopped */ }
+}
+
+/** The sound of the porch at night: on, off, and quiet whenever sound effects are off or the app isn't on screen. */
 export function porchSounds(on) {
-  clearTimeout(porchTimer);
-  porchTimer = null;
+  clearInterval(porchWatch);
+  porchWatch = null;
+  stopNight();
   if (!on) return;
-  // A cricket's chirp: a few quick pulses of one high note. Two crickets, one nearer than the other, take turns.
-  let turn = 0;
-  const chirp = () => {
-    if (settings.effects && onScreen()) {
-      try { const c = context(); if (c.state !== 'running') c.resume?.().catch?.(() => {}); } catch { /* no sound available */ }
-    }
-    const a = running();
-    turn += 1;
-    const near = turn % 3 !== 0;
-    if (a) {
-      const pitch = (near ? 4200 : 3700) + Math.random() * 120;
-      [0, 0.055, 0.11, 0.165].forEach((gap) => ping(a, a.currentTime + gap, { freq: pitch, length: 0.045, volume: near ? CRICKET_VOLUME : CRICKET_VOLUME * 0.55, type: 'sine' }));
-    }
-    porchTimer = setTimeout(chirp, 650 + Math.random() * 700);
+  let starting = false;
+  const check = () => {
+    const wanted = settings.effects && onScreen();
+    if (!wanted) { stopNight(); return; }
+    let ctx;
+    try { ctx = context(); } catch { return; }
+    if (ctx.state !== 'running') { ctx.resume?.().catch?.(() => {}); return; }
+    if (night || starting) return;
+    starting = true;
+    load(ctx, NIGHT_URL).then((buffer) => {
+      starting = false;
+      if (!buffer || night || !porchWatch || !settings.effects || !onScreen()) return;
+      const src = ctx.createBufferSource();
+      const gain = ctx.createGain();
+      src.buffer = buffer;
+      src.loop = true;
+      src.loopStart = NIGHT_PAD;
+      src.loopEnd = NIGHT_PAD + NIGHT_LOOP;
+      gain.gain.setValueAtTime(0, ctx.currentTime);
+      gain.gain.linearRampToValueAtTime(NIGHT_VOLUME, ctx.currentTime + NIGHT_FADE);
+      src.connect(gain).connect(ctx.destination);
+      src.start(ctx.currentTime, NIGHT_PAD);
+      night = { src, gain, ctx };
+    });
   };
-  porchTimer = setTimeout(chirp, 150); // straight away, so you know the switch worked
+  porchWatch = setInterval(check, 800);
+  check();
 }
 
 /** Someone's recorded voice (a data: URL), or a computer voice saying `text` if there's no recording. */
