@@ -27,8 +27,16 @@ function reachOf(hand, x, y) {
   return { dx: x - (ax + bx * u), dy: y - (ay + by * u) };
 }
 
-/** Moves the tiles one frame (dt = 1 at 60 frames a second). */
-export function stepWash(tiles, hands, { W, H, L, dt = 1, now = 0 }) {
+const SAME_HIT_MS = 260; // two tiles still rubbing together aren't a new click
+
+/**
+ * Moves the tiles one frame (dt = 1 at 60 frames a second). Returns how hard the hardest new collision was this frame
+ * (0 = none, 1 = as hard as they get), so the clicks you hear are tiles really hitting. `touching` remembers who hit whom.
+ */
+export function stepWash(tiles, hands, { W, H, L, dt = 1, now = 0, touching = new Map() }) {
+  let hardest = 0;
+  const softest = L * 0.05; // slower than this, tiles nudge without a sound
+  const fullForce = L * 0.3;
   const reach = L * 1.3;
   const maxSpeed = L * 0.42;
   for (const hand of hands) {
@@ -58,6 +66,12 @@ export function stepWash(tiles, hands, { W, H, L, dt = 1, now = 0 }) {
       if (d >= room) continue;
       const shove = ((room - d) / room) * 0.32 * dt;
       const nx = dx / d, ny = dy / d;
+      const closing = (a.vx - b.vx) * nx + (a.vy - b.vy) * ny;
+      if (closing > softest) {
+        const pair = i * 1000 + j;
+        if (now - (touching.get(pair) ?? -Infinity) > SAME_HIT_MS) hardest = Math.max(hardest, Math.min(1, closing / fullForce));
+        touching.set(pair, now);
+      }
       a.vx -= nx * shove; a.vy -= ny * shove;
       b.vx += nx * shove; b.vy += ny * shove;
       // some of a moving tile's motion passes to the one it hits
@@ -83,4 +97,5 @@ export function stepWash(tiles, hands, { W, H, L, dt = 1, now = 0 }) {
     if (t.x < L / 2 || t.x > W - L / 2) { t.vx *= -0.3; t.x = Math.max(L / 2, Math.min(W - L / 2, t.x)); }
     if (t.y < L / 2 || t.y > H - L / 2) { t.vy *= -0.3; t.y = Math.max(L / 2, Math.min(H - L / 2, t.y)); }
   }
+  return hardest;
 }

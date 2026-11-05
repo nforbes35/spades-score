@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Confetti, Icon, Sheet } from '../components.jsx';
 import { Avatar } from '../Avatar.jsx';
 import { VideoTile } from '../Video.jsx';
-import { tileClack, tileRattle } from '../lib/fx.js';
+import { tileClack } from '../lib/fx.js';
 import Domino from './Domino.jsx';
 import { halves } from './engine.js';
 import { getLang, tr, tMsg } from '../lib/i18n.js';
@@ -42,8 +42,14 @@ export function DomWash({ table, ms, onSend, bus, onSkip, tv }) {
     const hands = new Map(); // each finger here, and each other player's, by id
     let lastClack = 0, raf = 0, last = performance.now();
     const handMove = (id, x, y, now) => { hands.set(id, moveHand(hands.get(id) ?? newHand(), x, y, now, L)); };
-    const clack = () => { const now = performance.now(); if (now - lastClack > 110) { lastClack = now; tileClack({ volume: 0.14 + Math.random() * 0.14 }); } };
-    bus.current = (x, y, who) => { if (Number.isFinite(x) && Number.isFinite(y)) { handMove(`them-${who}`, x * W, y * H, performance.now()); clack(); } };
+    // each click is two tiles really hitting: louder the harder they hit
+    const touching = new Map();
+    const click = (force, now) => {
+      if (!force || now - lastClack < 45) return;
+      lastClack = now;
+      tileClack({ volume: 0.1 + force * 0.5 });
+    };
+    bus.current = (x, y, who) => { if (Number.isFinite(x) && Number.isFinite(y)) { handMove(`them-${who}`, x * W, y * H, performance.now()); } };
     // the pointer(s)
     const downs = new Set();
     let sent = 0;
@@ -53,7 +59,6 @@ export function DomWash({ table, ms, onSend, bus, onSkip, tv }) {
       const p = at(e);
       const now = performance.now();
       handMove(e.pointerId, p.x, p.y, now);
-      if (Math.hypot(hands.get(e.pointerId).vx, hands.get(e.pointerId).vy) > 1) clack();
       if (now - sent > 110) { sent = now; onSend?.(+(p.x / W).toFixed(3), +(p.y / H).toFixed(3)); }
     };
     const start = (e) => { downs.add(e.pointerId); el.setPointerCapture?.(e.pointerId); hands.delete(e.pointerId); move(e); };
@@ -89,14 +94,13 @@ export function DomWash({ table, ms, onSend, bus, onSkip, tv }) {
         ghost = moveHand(ghost, W / 2 + Math.cos(now / 700) * W * 0.18, H / 2 + Math.sin(now / 520) * H * 0.12, now, L);
         ghost.soft = 0.3;
       }
-      stepWash(tiles, live.length ? live : [ghost], { W, H, L, dt, now });
+      click(stepWash(tiles, live.length ? live : [ghost], { W, H, L, dt, now, touching }), now);
       c.setTransform(dpr, 0, 0, dpr, 0, 0);
       c.clearRect(0, 0, W, H);
       tiles.forEach(body);
       raf = requestAnimationFrame(frame);
     };
     raf = requestAnimationFrame(frame);
-    tileRattle({ length: 0.9 });
     return () => {
       cancelAnimationFrame(raf);
       watch.disconnect();

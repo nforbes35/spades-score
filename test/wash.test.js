@@ -70,3 +70,30 @@ test('the night sound comes and goes, and is silent more than half the time', ()
   const samples = Array.from({ length: 450 }, (_, i) => nightLevel(i / 10));
   assert.ok(samples.filter((v) => v === 0).length > 200);
 });
+
+const hitsDuring = (tiles, speed, ms) => {
+  const touching = new Map();
+  let hand = newHand(), x = W / 2 - 80, dir = 1, now = 0, hits = 0;
+  while (now < ms) {
+    x += dir * speed * 16.7;
+    if (x > W / 2 + 80) dir = -1;
+    if (x < W / 2 - 80) dir = 1;
+    hand = moveHand(hand, x, H / 2, now, L);
+    if (stepWash(tiles, [hand], { W, H, L, now, touching }) > 0) hits += 1;
+    now += 16.7;
+  }
+  return hits;
+};
+test('clicks only come from tiles really hitting', () => {
+  const touching = new Map();
+  const tiles = pile();
+  settle(tiles, [], 0, 200);
+  let silent = 0;
+  for (let i = 0; i < 200; i++) if (stepWash(tiles, [], { W, H, L, now: i * 16.7, touching }) > 0) silent += 1;
+  assert.equal(silent, 0, 'a still pile makes no sound');
+  const alone = [{ x: 100, y: 300, r: 0, vx: 0, vy: 0, vr: 0 }];
+  assert.equal(hitsDuring(alone, 1, 1000), 0, 'a tile with nothing to hit makes no sound');
+  const hits = hitsDuring(tiles, 1, 2000);
+  console.log('hits in 2s of stirring', hits);
+  assert.ok(hits >= 3 && hits <= 70, `${hits} hits in 2 seconds`);
+});
