@@ -256,22 +256,47 @@ const running = () => {
   try { const a = context(); return a.state === 'running' ? a : null; } catch { return null; }
 };
 
-/** A domino hitting the table: a hard, short clack. `heavy`: a slam, with weight behind it. */
-export function tileClack({ delay = 0, volume = 0.6, heavy = false } = {}) {
+// Real dominoes (public/sounds/tiles.wav, see CREDITS.txt): one tile put down, then single clicks cut from a shuffle.
+// A plain .wav so each slice starts exactly where it should on every phone.
+const TILES_URL = '/sounds/tiles.wav';
+const TILE_PUT = 0.25;
+const TILE_CLICK = 0.13;
+const TILE_CLICKS = 8;
+let lastHit = 0;
+let tileBuffer = null;
+/** Gets the tile sounds ready ahead of time, so the first tile isn't silent. */
+export function loadTileSounds() {
+  try { load(context(), TILES_URL).then((b) => { tileBuffer = b ?? tileBuffer; }); } catch { /* no sound available */ }
+}
+function tileSample(offset, length, { delay = 0, volume = 0.6, rate = 1 }) {
   const a = running();
   if (!a) return;
-  const t = a.currentTime + delay;
-  const tune = 0.92 + Math.random() * 0.16;
-  noiseBurst(a, t, { length: heavy ? 0.07 : 0.035, freq: (heavy ? 1500 : 2700) * tune, volume });
-  ping(a, t, { freq: (heavy ? 900 : 1900) * tune, length: heavy ? 0.05 : 0.028, volume: volume * 0.5 });
-  ping(a, t, { freq: (heavy ? 1700 : 3200) * tune, length: heavy ? 0.035 : 0.02, volume: volume * 0.3 });
-  if (heavy) ping(a, t, { freq: 110, endFreq: 42, length: 0.22, volume: volume * 0.9, type: 'sine' });
+  if (!tileBuffer) { loadTileSounds(); return; }
+  const src = a.createBufferSource();
+  const gain = a.createGain();
+  src.buffer = tileBuffer;
+  src.playbackRate.value = rate;
+  gain.gain.value = volume;
+  src.connect(gain).connect(a.destination);
+  src.start(a.currentTime + delay, offset, length);
 }
 
-/** A pile of dominoes being stirred or dealt: a run of quick, soft clacks. */
+/** A domino hitting the table: a hard, short clack. `heavy`: a slam, with weight behind it. */
+export function tileClack({ delay = 0, volume = 0.6, heavy = false } = {}) {
+  // a slam is the same tile hitting harder: lower and louder
+  tileSample(0, TILE_PUT, { delay, volume: heavy ? Math.min(1, volume * 1.25) : volume, rate: (heavy ? 0.8 : 1) * (0.97 + Math.random() * 0.06) });
+}
+
+/** Two tiles knocking together while being mixed. `force`: 0 (a touch) to 1 (a hard hit). */
+export function tileHit(force = 0.5, delay = 0) {
+  lastHit = (lastHit + 1 + Math.floor(Math.random() * (TILE_CLICKS - 1))) % TILE_CLICKS; // never the same one twice running
+  tileSample(TILE_PUT + lastHit * TILE_CLICK, TILE_CLICK, { delay, volume: 0.12 + force * 0.5, rate: 0.92 + Math.random() * 0.16 });
+}
+
+/** A pile of dominoes being stirred or dealt: a run of quick, soft clicks. */
 export function tileRattle({ delay = 0, length = 0.8, volume = 0.3 } = {}) {
   const count = Math.round(length * 14);
-  for (let i = 0; i < count; i++) tileClack({ delay: delay + (i / count) * length + Math.random() * 0.03, volume: volume * (0.5 + Math.random() * 0.5) });
+  for (let i = 0; i < count; i++) tileHit(volume * (0.5 + Math.random() * 0.5), delay + (i / count) * length + Math.random() * 0.03);
 }
 
 /** Knuckles rapping twice on a wooden table: "I pass". */

@@ -9,7 +9,7 @@ import { useDevice } from '../lib/device.js';
 import { useKeys, seal, unseal } from '../lib/secret.js';
 import { tr, tx, tMsg, langMsg, getLang, setLang, LANGS } from '../lib/i18n.js';
 import { guessLang, translateText } from '../lib/translate.js';
-import { useWakeLock, buzz, chime, tileClack, tileRattle, knockSound, porchSounds, sayLine, setSoundSetting, useSoundSettings } from '../lib/fx.js';
+import { useWakeLock, buzz, chime, tileClack, tileRattle, knockSound, porchSounds, loadTileSounds, sayLine, setSoundSetting, useSoundSettings } from '../lib/fx.js';
 import { useCall } from '../lib/call.js';
 import { useTurnAlerts, sendTurnAlert, alertPermission } from '../lib/push.js';
 import { saveGame, forgetSaved } from '../lib/saved.js';
@@ -703,6 +703,7 @@ function DominoTable({ table, mySeat, tiles, icons, isHost, send, act, onLeave, 
   const [porch, setPorchState] = useState(() => read(PORCH_KEY) === true);
   const setPorch = (on) => { setPorchState(on); write(PORCH_KEY, on); };
   useEffect(() => { porchSounds(porch); return () => porchSounds(false); }, [porch]);
+  useEffect(() => { loadTileSounds(); }, []);
   const setTableOption = (key, on) => act((x) => ({ ...x, settings: { ...x.settings, [key]: on } }));
   const [handMode, setHandModeState] = useState(() => read(HAND_MODE_KEY) === true);
   const setHandMode = (on) => { setHandModeState(on); write(HAND_MODE_KEY, on); };

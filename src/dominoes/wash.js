@@ -35,7 +35,7 @@ const SAME_HIT_MS = 260; // two tiles still rubbing together aren't a new click
  */
 export function stepWash(tiles, hands, { W, H, L, dt = 1, now = 0, touching = new Map() }) {
   let hardest = 0;
-  const softest = L * 0.05; // slower than this, tiles nudge without a sound
+  const softest = L * 0.035; // slower than this, tiles nudge without a sound
   const fullForce = L * 0.3;
   const reach = L * 1.3;
   const maxSpeed = L * 0.42;

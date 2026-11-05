@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Confetti, Icon, Sheet } from '../components.jsx';
 import { Avatar } from '../Avatar.jsx';
 import { VideoTile } from '../Video.jsx';
-import { tileClack } from '../lib/fx.js';
+import { tileHit } from '../lib/fx.js';
 import Domino from './Domino.jsx';
 import { halves } from './engine.js';
 import { getLang, tr, tMsg } from '../lib/i18n.js';
@@ -47,7 +47,7 @@ export function DomWash({ table, ms, onSend, bus, onSkip, tv }) {
     const click = (force, now) => {
       if (!force || now - lastClack < 45) return;
       lastClack = now;
-      tileClack({ volume: 0.1 + force * 0.5 });
+      tileHit(force);
     };
     bus.current = (x, y, who) => { if (Number.isFinite(x) && Number.isFinite(y)) { handMove(`them-${who}`, x * W, y * H, performance.now()); } };
     // the pointer(s)

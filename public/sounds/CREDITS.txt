@@ -10,3 +10,7 @@ Animated emojis: Noto Emoji Animation by Google (CC BY 4.0), loaded from fonts.g
 night.m4a: from "Campaign at Night #4" (field crickets and rare frogs in a meadow, France, 2020) by Joseph Sardin,
 BigSoundBank, https://bigsoundbank.com/campagne-la-nuit-4-s1880.html, CC0 (public domain). 50 seconds from 1:40,
 low rumble removed, levelled, its end crossfaded into its start to make a 45-second loop (half a second extra each end).
+
+tiles.wav: real domino sounds, all CC0 (public domain), from Freesound. First 0.25 s: "Domino_sfx_putOnBoard" by poenia,
+https://freesound.org/people/poenia/sounds/745030/ . Then 8 slices of 0.13 s: single clicks cut from "domino shuffle" by Millavsb,
+https://freesound.org/people/Millavsb/sounds/197868/ (low rumble removed, each faded quickly and levelled).
