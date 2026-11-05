@@ -445,3 +445,21 @@ test('hand mode: tiles fill the space on any screen', () => {
     }
   }
 });
+
+test('a slam, a spin or a throw is remembered with the tile; anything else is just a plain play', () => {
+  const line = fixed([['3-4', '1-2'], ['5-6', '0-0']]);
+  // Mexican Train: the first dealt table where the player on turn has a tile to play
+  const seeds = Array.from({ length: 50 }, (_, i) => startMatch(seated(newDominoTable({ players: 2, setMax: 6, variant: 'train' })), seeded(i + 1)));
+  const train = seeds.find((t) => legalMoves(t, t.round.turn).length);
+  for (const t of [line, train]) {
+    const seat = t.round.turn;
+    const m = legalMoves(t, seat)[0];
+    const last = (...how) => playTile(t, seat, m.tile, m.arm, ...how).round.last;
+    assert.equal(last('slam', true).style, 'slam');
+    assert.equal(last('slam', true).thrown, true);
+    assert.equal(last('spin').style, 'spin');
+    assert.equal(last().style, undefined);
+    assert.equal(last().thrown, undefined);
+    assert.equal(last('papi').style, undefined); // no Papi Flip in dominoes
+  }
+});

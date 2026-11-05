@@ -251,7 +251,10 @@ export const mustPass = (table, seat) => table.round.turn === seat && legalMoves
 const nextSeat = (table, seat) => (seat + 1) % table.seats.length;
 
 /** Play `tile` on `arm` (any arm it fits when arm is omitted). Throws with a plain reason if it can't. */
-export function playTile(table, seat, tile, arm) {
+/** Fancier ways to put a tile down (only the look differs). `thrown`: swiped in from hand mode. */
+export const TILE_STYLES = ['slam', 'spin'];
+
+export function playTile(table, seat, tile, arm, style = null, thrown = false) {
   const r = table.round;
   if (table.phase !== 'playing') throw new Error('The hand is over.');
   if (r.turn !== seat) throw new Error('It’s not your turn.');
@@ -261,7 +264,8 @@ export function playTile(table, seat, tile, arm) {
   if (!move) throw new Error('That tile doesn’t fit there.');
 
   const hands = r.hands.map((h, s) => (s === seat ? h.filter((t) => t !== tile) : h));
-  if (r.layout?.lines) return playOnLine(table, seat, tile, move.arm, hands);
+  const flair = { ...(TILE_STYLES.includes(style) ? { style } : {}), ...(thrown ? { thrown: true } : {}) };
+  if (r.layout?.lines) return playOnLine(table, seat, tile, move.arm, hands, flair);
   let layout;
   if (!r.layout) {
     layout = { root: tile, spinner: VARIANTS[table.settings.variant].spinner && isDouble(tile), arms: { L: [], R: [], U: [], D: [] } };
@@ -271,7 +275,7 @@ export function playTile(table, seat, tile, arm) {
     const placed = { t: tile, inner: value, outer: a === value ? b : a };
     layout = { ...r.layout, arms: { ...r.layout.arms, [move.arm]: [...r.layout.arms[move.arm], placed] } };
   }
-  let next = { ...table, round: { ...r, hands, layout, mustPlay: null, passes: 0, moves: r.moves + 1, turn: nextSeat(table, seat), last: { seat, tile, arm: move.arm, at: Date.now() } } };
+  let next = { ...table, round: { ...r, hands, layout, mustPlay: null, passes: 0, moves: r.moves + 1, turn: nextSeat(table, seat), last: { seat, tile, arm: move.arm, at: Date.now(), ...flair } } };
 
   // All Fives: the open ends add up to a multiple of 5 → that many points
   if (VARIANTS[table.settings.variant].fives) {
@@ -283,7 +287,7 @@ export function playTile(table, seat, tile, arm) {
 }
 
 /** Train and Chicken Foot: put `tile` on the line `arm`. */
-function playOnLine(table, seat, tile, arm, hands) {
+function playOnLine(table, seat, tile, arm, hands, flair = {}) {
   const r = table.round;
   const lay = r.layout;
   const line = lay.lines.find((l) => l.id === arm);
@@ -306,7 +310,7 @@ function playOnLine(table, seat, tile, arm, hands) {
   }
   const next = {
     ...table,
-    round: { ...r, hands, layout: { ...lay, lines, feet }, markers, openDouble, drew: false, passes: 0, moves: r.moves + 1, turn, last: { seat, tile, arm, at: Date.now() } },
+    round: { ...r, hands, layout: { ...lay, lines, feet }, markers, openDouble, drew: false, passes: 0, moves: r.moves + 1, turn, last: { seat, tile, arm, at: Date.now(), ...flair } },
   };
   if (!hands[seat].length) return endHand(next, seat, 'domino');
   return next;

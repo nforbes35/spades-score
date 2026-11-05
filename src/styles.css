@@ -2456,3 +2456,25 @@ button.choice:active { transform: scale(0.98); }
 .dh-edge.up > span, .dh-edge.down > span { max-width: calc(100% - 230px); min-width: 120px; }
 .dh-edge.left i, .dh-edge.right i { display: none; } /* (sideways text would turn the arrow the wrong way; the bar's own side says which way) */
 .dom-vtile:has(.dom-vcall) .dom-vscore { top: 30px; }
+
+/* ---------- Dominoes: thrown, spun and slammed tiles (only the tile itself moves; its place on the table is set) ---------- */
+.dom-play-styles .play-style:last-child { grid-column: 1 / -1; }
+.dom-tile, .dh-tile { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+.dom-placed.dom-fly { z-index: 6; }
+.dom-row-tile.dom-fly { position: relative; z-index: 6; animation: none; }
+.dom-row:has(.dom-fly) { position: relative; z-index: 6; overflow: visible; }
+.dom-lines-board:has(.dom-fly) { overflow: visible; }
+.dom-fly.fly-thrown .domino, .dom-fly.fly-spin .domino { animation: dom-thrown 0.6s cubic-bezier(.2, .8, .3, 1) both; }
+.dom-fly.fly-spin .domino { animation-duration: 0.85s; }
+.dom-fly.fly-slam .domino { animation: slam-drop 0.7s linear both; }
+.dom-fly.fly-slam::after { content: ''; position: absolute; inset: -8px; border-radius: 12px; border: 3px solid rgba(255, 255, 255, 0.8); pointer-events: none; animation: slam-ring 0.55s ease-out 0.4s both; }
+.felt:has(.dom-fly.fly-slam) { animation: table-shake 0.42s ease-out 0.4s; }
+@keyframes dom-thrown {
+  0% { translate: var(--fx) var(--fy); rotate: var(--spin); scale: 1.2; opacity: 0; }
+  20% { opacity: 1; }
+  100% { translate: 0 0; rotate: 0deg; scale: 1; opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dom-fly .domino { animation-duration: 0.01s !important; }
+  .felt:has(.dom-fly.fly-slam) { animation: none; }
+}

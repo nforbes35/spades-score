@@ -7,7 +7,7 @@ import { read, write, tabRead, tabWrite } from '../lib/store.js';
 import { useRoom, joinLink } from '../lib/room.js';
 import { useDevice } from '../lib/device.js';
 import { useKeys, seal, unseal } from '../lib/secret.js';
-import { useWakeLock, buzz, dealSound, cardSound, setSoundSetting, useSoundSettings } from '../lib/fx.js';
+import { useWakeLock, buzz, dealSound, cardSound, thud, setSoundSetting, useSoundSettings } from '../lib/fx.js';
 import { useCall } from '../lib/call.js';
 import { useTurnAlerts, sendTurnAlert, alertPermission } from '../lib/push.js';
 import { saveGame, forgetSaved } from '../lib/saved.js';
@@ -164,7 +164,7 @@ function DominoRoom({ code, isHost = false, tv = false, name, avatar, onLeave, o
       else if (m.type === 'd-sit') error = act((x) => sit(x, m.seat, { id: from.id, name: String(m.name || from.name || 'Player').slice(0, 14) }));
       else if (m.type === 'd-stand') error = act((x) => ({ ...x, seats: x.seats.map((s) => (s?.id !== from.id ? s : x.phase === 'lobby' ? null : { ...s, standIn: true })) }));
       else if (seat >= 0 && m.type === 'd-rename') error = act((x) => renameSeat(x, seat, m.name));
-      else if (seat >= 0 && m.type === 'd-play') error = act((x) => (handNo(x) === m.hand ? playTile(x, seat, m.tile, m.arm) : x));
+      else if (seat >= 0 && m.type === 'd-play') error = act((x) => (handNo(x) === m.hand ? playTile(x, seat, m.tile, m.arm, m.style, Boolean(m.thrown)) : x));
       else if (seat >= 0 && m.type === 'd-draw') error = act((x) => (handNo(x) === m.hand ? drawTile(x, seat) : x));
       else if (seat >= 0 && m.type === 'd-pass') error = act((x) => (handNo(x) === m.hand ? pass(x, seat) : x));
       if (error) room.send({ type: 'd-error', text: error }, from.id);
@@ -290,7 +290,7 @@ function DominoRoom({ code, isHost = false, tv = false, name, avatar, onLeave, o
   /** Send a move to the host (or make it, on the host). */
   const send = (type, body = {}) => {
     if (isHost) {
-      const fn = { 'd-play': (x) => playTile(x, mySeat, body.tile, body.arm), 'd-draw': (x) => drawTile(x, mySeat), 'd-pass': (x) => pass(x, mySeat) }[type];
+      const fn = { 'd-play': (x) => playTile(x, mySeat, body.tile, body.arm, body.style, Boolean(body.thrown)), 'd-draw': (x) => drawTile(x, mySeat), 'd-pass': (x) => pass(x, mySeat) }[type];
       const err = act(fn);
       if (err) toast.show(err);
       return;
@@ -596,6 +596,34 @@ const RULES_NOTE = {
 // Where each seat sits around the table, from your seat (you're always at the bottom).
 const AROUND = { 2: ['bottom', 'top'], 3: ['bottom', 'left', 'right'], 4: ['bottom', 'left', 'top', 'right'] };
 
+// Hold a tile to choose how it goes down (as in Spades, without the Papi Flip)
+const TILE_STYLE_CHOICES = [
+  { id: 'slam', icon: '💥', name: 'Slam', note: 'Bang it down on the table' },
+  { id: 'spin', icon: '🌀', name: 'Spin', note: 'Twirl it in' },
+  { id: 'toss', icon: '✋', name: 'Toss', note: 'Just play it' },
+];
+const styleWord = (style) => { const c = TILE_STYLE_CHOICES.find((x) => x.id === style); return c ? `${c.icon} ${c.name}` : ''; };
+const HOLD_MS = 480;
+// Where a thrown tile comes from, relative to where it lands
+const FLY_FROM = { bottom: ['0px', '46vh', '-24deg'], top: ['0px', '-46vh', '24deg'], left: ['-52vw', '0px', '30deg'], right: ['52vw', '0px', '-30deg'] };
+
+function TileStyleSheet({ tile, onPick, onClose }) {
+  const [a, b] = halves(tile);
+  return (
+    <Sheet title={`Play the ${a}–${b} with…`} short onClose={onClose} closeLabel="Cancel">
+      <div className="play-styles dom-play-styles">
+        {TILE_STYLE_CHOICES.map((p) => (
+          <button key={p.id} type="button" className={`play-style style-${p.id}`} onClick={() => onPick(p.id === 'toss' ? null : p.id)}>
+            <span className="play-style-icon">{p.icon}</span>
+            <b>{p.name}</b>
+            <span>{p.note}</span>
+          </button>
+        ))}
+      </div>
+    </Sheet>
+  );
+}
+
 function DominoTable({ table, mySeat, tiles, icons, isHost, send, act, onLeave, call, me, code, reactions = [], react, alerts, toast, onSave, onEditProfile, sendAim, aim, tv = false }) {
   const r = table.round;
   const deck = useDeck();
@@ -666,7 +694,22 @@ function DominoTable({ table, mySeat, tiles, icons, isHost, send, act, onLeave, 
   const dealtAt = r?.dealtAt;
   useEffect(() => { if (dealtAt && Date.now() - dealtAt < 3000) dealSound(); }, [dealtAt]);
   const lastAt = r?.last?.tile ? r.last.at : null;
-  useEffect(() => { if (lastAt && Date.now() - lastAt < 2000) cardSound(); }, [lastAt]);
+  // A newly played tile: its sound, and its flight onto the table if it was thrown, spun or slammed. (New to this
+  // device, so a tile doesn't fly in again when the table is resent or someone comes back to the game.)
+  const seenPlay = useRef(lastAt);
+  const flyTimer = useRef(null);
+  const [fly, setFly] = useState(null);
+  useLayoutEffect(() => {
+    if (!lastAt || lastAt === seenPlay.current) return;
+    seenPlay.current = lastAt;
+    const kind = r.last.style ?? (r.last.thrown ? 'thrown' : null);
+    clearTimeout(flyTimer.current);
+    setFly(kind ? { tile: r.last.tile, seat: r.last.seat, kind } : null);
+    if (kind) flyTimer.current = setTimeout(() => setFly(null), 1000);
+    if (kind === 'slam') setTimeout(() => { thud(); if (document.visibilityState === 'visible') buzz([70, 40, 120]); }, 400);
+    else cardSound(kind ? { delay: kind === 'spin' ? 0.6 : 0.35 } : undefined);
+  }, [lastAt]);
+  useEffect(() => () => clearTimeout(flyTimer.current), []);
 
   // The table fills whatever the hand area (fixed along the bottom) leaves: measure it rather than guess.
   const dockRef = useRef(null);
@@ -719,8 +762,57 @@ function DominoTable({ table, mySeat, tiles, icons, isHost, send, act, onLeave, 
   const counts = r?.counts ?? r?.hands?.map((h) => h.length) ?? [];
   const boneyard = r?.boneyardCount ?? r?.boneyard?.length ?? 0;
 
-  const play = (tile, arm) => { setSelected(null); send('d-play', { tile, arm }); };
+  // Where a thrown tile starts: from the player's side, or from their place along the top when the players are up there
+  const flyVars = (() => {
+    if (!fly || fly.kind === 'slam') return undefined;
+    let from;
+    if (!lines && !videoMode) from = FLY_FROM[posOf(fly.seat)];
+    else if (fly.seat === mySeat) from = FLY_FROM.bottom;
+    else from = [`${((fly.seat + 0.5) / n - 0.5) * 90}vw`, '-46vh', '24deg'];
+    return { '--fx': from[0], '--fy': from[1], '--spin': fly.kind === 'spin' ? '-1080deg' : from[2] };
+  })();
+  const flight = fly && { tile: fly.tile, className: ` dom-fly fly-${fly.kind}`, style: flyVars };
+
+  // Hold a tile to choose how to play it. The choice stays with the tile until it's played or another is picked.
+  const [held, setHeld] = useState(null);
+  const [playStyle, setPlayStyle] = useState(null);
+  useEffect(() => { setPlayStyle(null); }, [selected]);
+  useEffect(() => { if (!myTurn) setHeld(null); }, [myTurn]);
+  const holdTimer = useRef(null);
+  const holdAt = useRef(null);
+  const didHold = useRef(false);
+  const stopHold = () => { clearTimeout(holdTimer.current); holdTimer.current = null; };
+  const holdTile = (t) => {
+    stopHold();
+    didHold.current = true;
+    if (!myTurn) { toast.show(`It’s ${table.seats[r?.turn]?.name ?? 'someone else'}’s turn`); return; }
+    if (!playable.has(t)) { toast.show('That one doesn’t fit anywhere yet'); return; }
+    buzz(30);
+    setSelected(t);
+    setHeld(t);
+  };
+  const holdHandlers = (t) => ({
+    onPointerDown: (e) => {
+      didHold.current = false;
+      holdAt.current = { x: e.clientX, y: e.clientY };
+      holdTimer.current = setTimeout(() => holdTile(t), HOLD_MS);
+    },
+    onPointerMove: (e) => { if (holdTimer.current && Math.hypot(e.clientX - holdAt.current.x, e.clientY - holdAt.current.y) > 10) stopHold(); },
+    onPointerUp: stopHold,
+    onPointerCancel: stopHold,
+    onPointerLeave: stopHold,
+    onContextMenu: (e) => { e.preventDefault(); if (holdTimer.current || !didHold.current) holdTile(t); },
+  });
+  const play = (tile, arm, style = playStyle) => { setSelected(null); setPlayStyle(null); send('d-play', { tile, arm, ...(style ? { style } : {}) }); };
+  const pickStyle = (style) => {
+    const t = held;
+    setHeld(null);
+    const options = moves.filter((m) => m.tile === t);
+    if (options.length === 1) play(t, options[0].arm, style); // one place it can go: off it goes
+    else setPlayStyle(style);
+  };
   const tapTile = (t) => {
+    if (didHold.current) { didHold.current = false; return; }
     if (!myTurn || !playable.has(t)) { setSelected(t === selected ? null : t); return; }
     const options = moves.filter((m) => m.tile === t);
     // one place it can go: play it straight away on a second tap (first tap picks it up)
@@ -791,10 +883,10 @@ function DominoTable({ table, mySeat, tiles, icons, isHost, send, act, onLeave, 
                 </div>
               ))}
             </div>}
-            <LinesBoard table={table} mySeat={mySeat} icons={icons} selectedMoves={forSelected} onEnd={(arm) => play(selected, arm)} tv={tv} aimSpots={aimSpots} />
+            <LinesBoard table={table} mySeat={mySeat} icons={icons} selectedMoves={forSelected} onEnd={(arm) => play(selected, arm)} tv={tv} aimSpots={aimSpots} flight={flight} />
           </>
         )}
-        {!lines && <Board table={table} selectedMoves={forSelected} onEnd={(arm) => play(selected, arm)} maxUnit={tv ? 60 : 38} aimSpots={aimSpots} />}
+        {!lines && <Board table={table} selectedMoves={forSelected} onEnd={(arm) => play(selected, arm)} maxUnit={tv ? 60 : 38} aimSpots={aimSpots} flight={flight} />}
         {!lines && !videoMode && table.seats.map((who, s) => (
           <div key={s} className={`player-spot ${posOf(s)}${table.settings.teams ? ` t${sideOf(table, s)}` : ''}${r?.turn === s && table.phase === 'playing' ? ' turn' : ''}${s === mySeat ? ' me' : ''}`}>
             {seatAvatar(who, s)}
@@ -842,7 +934,7 @@ function DominoTable({ table, mySeat, tiles, icons, isHost, send, act, onLeave, 
       {mySeat >= 0 && !tv && (
         <div className="hand-dock online-dock dom-dock" ref={dockRef}>
           <div className="dock-head">
-            <span>{table.phase === 'playing' ? (myTurn ? 'Your turn' : `${table.seats[r.turn]?.name ?? '…'}’s turn`) : ''}</span>
+            <span>{table.phase === 'playing' ? (myTurn ? `Your turn${playStyle ? ` · ${styleWord(playStyle)}` : ''}` : `${table.seats[r.turn]?.name ?? '…'}’s turn`) : ''}</span>
             <span>{tiles ? `${tiles.length} tile${tiles.length === 1 ? '' : 's'}` : ''}</span>
           </div>
           {/* tiles share the row (two even rows past 10), sized to the space: see .dom-hand in styles.css */}
@@ -850,7 +942,7 @@ function DominoTable({ table, mySeat, tiles, icons, isHost, send, act, onLeave, 
             {(tiles ?? []).map((t) => {
               const [a, b] = halves(t);
               return (
-                <button key={t} type="button" className={`dom-tile${selected === t ? ' sel' : ''}${myTurn && !playable.has(t) ? ' dim' : ''}`} onClick={() => tapTile(t)} aria-label={`${a} and ${b}`}>
+                <button key={t} type="button" className={`dom-tile${selected === t ? ' sel' : ''}${myTurn && !playable.has(t) ? ' dim' : ''}`} onClick={() => tapTile(t)} {...holdHandlers(t)} aria-label={`${a} and ${b}`}>
                   <Domino a={a} b={b} vertical size={86} />
                 </button>
               );
@@ -866,16 +958,17 @@ function DominoTable({ table, mySeat, tiles, icons, isHost, send, act, onLeave, 
             {myTurn && !selected && lines && r?.openDouble && moves.length > 0 && <p className="dock-hint">Cover the double first.</p>}
             {myTurn && moves.length === 0 && canDrawPublic(table) && <button type="button" className="primary big go" onClick={() => send('d-draw')}>Draw a tile</button>}
             {myTurn && moves.length === 0 && !canDrawPublic(table) && <button type="button" className="secondary big" onClick={() => send('d-pass')}>{kindOf(table) === 'train' ? 'Pass (your train opens)' : 'Pass'}</button>}
-            {myTurn && !selected && moves.length > 0 && <p className="dock-hint">Tap a tile to play it.</p>}
+            {myTurn && !selected && moves.length > 0 && <p className="dock-hint">Tap a tile to play it. Hold it to slam or spin.</p>}
           </div>
         </div>
       )}
 
+      {held && myTurn && !inHandMode && <TileStyleSheet tile={held} onPick={pickStyle} onClose={() => setHeld(null)} />}
       {inHandMode && (
         <DomHandView table={table} mySeat={mySeat} tiles={tiles ?? []} moves={moves} myTurn={myTurn} boneyard={boneyard} call={call}
           send={send} sendAim={sendAim} onExit={() => setHandMode(false)} onMore={() => setCallOpen(true)} />
       )}
-      {(table.phase === 'scored' || table.phase === 'over') && <HandResult table={table} isHost={isHost} act={act} onLeave={onLeave} />}
+      {(table.phase === 'scored' || table.phase === 'over') && !fly && <HandResult table={table} isHost={isHost} act={act} onLeave={onLeave} />}
     </>
   );
 }
@@ -905,7 +998,7 @@ const sideName = (table, i) => {
 };
 
 /** The line of play, scaled to fit the table, with buttons on the ends the picked tile can go. */
-function Board({ table, selectedMoves, onEnd, maxUnit = 38, aimSpots = [] }) {
+function Board({ table, selectedMoves, onEnd, maxUnit = 38, aimSpots = [], flight = null }) {
   const box = useRef(null);
   const [size, setSize] = useState({ w: 360, h: 300 });
   useEffect(() => {
@@ -925,7 +1018,7 @@ function Board({ table, selectedMoves, onEnd, maxUnit = 38, aimSpots = [] }) {
   return (
     <div className="dom-board" ref={box}>
       {tiles.map((t) => (
-        <div key={t.t} className={`dom-placed${t.t === last ? ' last' : ''}`} style={{ left: ox + t.cx * unit, top: oy + t.cy * unit }}>
+        <div key={t.t} className={`dom-placed${t.t === last ? ' last' : ''}${flight?.tile === t.t ? flight.className : ''}`} style={{ left: ox + t.cx * unit, top: oy + t.cy * unit, ...(flight?.tile === t.t ? flight.style : {}) }}>
           <Domino a={t.a} b={t.b} vertical={t.vertical} size={unit * 2} />
         </div>
       ))}
@@ -949,7 +1042,7 @@ function Board({ table, selectedMoves, onEnd, maxUnit = 38, aimSpots = [] }) {
  * Mexican Train and Chicken Foot: one row per line, each starting from what it comes off (the middle double, or a
  * chicken foot's double), showing the newest tiles. When your picked tile fits a line, tap that row to play it.
  */
-function LinesBoard({ table, mySeat, icons, selectedMoves, onEnd, tv, aimSpots = [] }) {
+function LinesBoard({ table, mySeat, icons, selectedMoves, onEnd, tv, aimSpots = [], flight = null }) {
   const box = useRef(null);
   const [size, setSize] = useState({ w: 340, h: 300 });
   useEffect(() => {
@@ -1002,7 +1095,7 @@ function LinesBoard({ table, mySeat, icons, selectedMoves, onEnd, tv, aimSpots =
               {hidden > 0 && <span className="dom-row-more">+{hidden}</span>}
               {!l.tiles.length && <span className="dom-row-empty">{mustFill ? `needs a ${l.start}` : `starts with a ${l.start}`}</span>}
               {shown.map((p) => (
-                <span key={p.t} className={`dom-row-tile${p.t === lastTile ? ' last' : ''}${p.inner === p.outer ? ' double' : ''}`}>
+                <span key={p.t} className={`dom-row-tile${p.t === lastTile ? ' last' : ''}${p.inner === p.outer ? ' double' : ''}${flight?.tile === p.t ? flight.className : ''}`} style={flight?.tile === p.t ? flight.style : undefined}>
                   <Domino a={p.inner} b={p.outer} size={tileLong} />
                 </span>
               ))}
@@ -1027,6 +1120,13 @@ function DomHandView({ table, mySeat, tiles, moves, myTurn, boneyard, call, send
   const [page, setPage] = useState(0);
   const [drag, setDrag] = useState(null);
   const [note, setNote] = useState(null);
+  const [held, setHeld] = useState(null); // holding a tile: choosing how to play it
+  const [playStyle, setPlayStyle] = useState(null);
+  const holdTimer = useRef(null);
+  const stopHold = () => { clearTimeout(holdTimer.current); holdTimer.current = null; };
+  useEffect(() => { setPlayStyle(null); }, [selected]);
+  useEffect(() => { if (!myTurn) setHeld(null); }, [myTurn]);
+  useEffect(() => stopHold, []);
   const area = useRef(null);
   const root = useRef(null);
   const start = useRef(null);
@@ -1063,9 +1163,18 @@ function DomHandView({ table, mySeat, tiles, moves, myTurn, boneyard, call, send
     const sp = byDir[dir];
     if (!selected || !sp) return false;
     buzz(40);
-    send('d-play', { tile: selected, arm: sp.arm });
-    setSelected(null); setPage(0); setDrag(null);
+    send('d-play', { tile: selected, arm: sp.arm, thrown: true, ...(playStyle ? { style: playStyle } : {}) });
+    setSelected(null); setPage(0); setDrag(null); setPlayStyle(null);
     return true;
+  };
+  const pickStyle = (style) => {
+    const t = held;
+    setHeld(null);
+    const options = moves.filter((m) => m.tile === t);
+    if (options.length === 1) { // one place it can go: off it goes
+      send('d-play', { tile: t, arm: options[0].arm, thrown: true, ...(style ? { style } : {}) });
+      setSelected(null); setPage(0);
+    } else setPlayStyle(style);
   };
   const label = (sp) => {
     if (sp.arm == null) return 'Play it here';
@@ -1100,13 +1209,28 @@ function DomHandView({ table, mySeat, tiles, moves, myTurn, boneyard, call, send
     const k = root.current ? root.current.getBoundingClientRect().width / (root.current.offsetWidth || 1) : 1;
     start.current = { x: e.clientX, y: e.clientY, k: k || 1, moved: false, onTile: Boolean(tile) };
     root.current?.setPointerCapture?.(e.pointerId);
+    // held still on a tile: choose how to play it
+    if (tile) {
+      const { pointerId } = e;
+      stopHold();
+      holdTimer.current = setTimeout(() => {
+        holdTimer.current = null;
+        start.current = null;
+        setDrag(null);
+        try { root.current?.releasePointerCapture?.(pointerId); } catch { /* already let go */ }
+        buzz(30);
+        setHeld(tile);
+      }, HOLD_MS);
+    }
   };
   const onMove = (e) => {
     const s = start.current;
     if (!s) return;
+    if (Math.hypot(e.clientX - s.x, e.clientY - s.y) > 10) stopHold();
     setDrag({ x: (e.clientX - s.x) / s.k, y: (e.clientY - s.y) / s.k });
   };
   const onUp = (e) => {
+    stopHold();
     const s = start.current;
     start.current = null;
     setDrag(null);
@@ -1119,10 +1243,11 @@ function DomHandView({ table, mySeat, tiles, moves, myTurn, boneyard, call, send
 
   const { width, perRow } = handTileWidth(tiles.length, box.w, box.h);
   const message = note ?? (!playing ? '' : !myTurn ? `${table.seats[r?.turn]?.name ?? '…'}’s turn`
-    : selected ? (spots.length > 1 ? 'Swipe toward a color' : `Swipe ${spots[0]?.dir ?? 'up'} to play`)
-      : moves.length ? 'Your turn: pick a domino' : canDrawPublic(table) ? 'Nothing fits: draw a tile' : 'Nothing fits: pass');
+    : selected ? `${playStyle ? `${styleWord(playStyle)}: ` : ''}${spots.length > 1 ? 'Swipe toward a color' : `Swipe ${spots[0]?.dir ?? 'up'} to play`}`
+      : moves.length ? 'Your turn: pick a domino, or hold one to slam or spin' : canDrawPublic(table) ? 'Nothing fits: draw a tile' : 'Nothing fits: pass');
   return (
-    <div className={`dom-handview${myTurn && playing ? ' my-turn' : ''}`} ref={root} onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={() => { start.current = null; setDrag(null); }}>
+    <>
+    <div className={`dom-handview${myTurn && playing ? ' my-turn' : ''}`} ref={root} onContextMenu={(e) => e.preventDefault()} onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={() => { stopHold(); start.current = null; setDrag(null); }}>
       {Object.entries(AIM).map(([dir, a]) => (
         <button key={dir} type="button" className={`dh-edge ${dir}${byDir[dir] ? ' lit' : ''}${dragDir === dir && byDir[dir] ? ' hot' : ''}`} style={{ '--aim': a.color }}
           disabled={!byDir[dir]} tabIndex={byDir[dir] ? 0 : -1} aria-hidden={!byDir[dir]} onClick={() => playTo(dir)}>
@@ -1155,6 +1280,8 @@ function DomHandView({ table, mySeat, tiles, moves, myTurn, boneyard, call, send
         {myTurn && playing && moves.length === 0 && !canDrawPublic(table) && <button type="button" className="secondary big" onClick={() => send('d-pass')}>{kindOf(table) === 'train' ? 'Pass (your train opens)' : 'Pass'}</button>}
       </div>
     </div>
+    {held && myTurn && <TileStyleSheet tile={held} onPick={pickStyle} onClose={() => setHeld(null)} />}
+    </>
   );
 }
 
