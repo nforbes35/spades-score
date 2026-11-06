@@ -163,6 +163,41 @@ test('the board: dominoes only touch the one they join, with long runs before tu
   assert.ok(checked > 100);
 });
 
+test('the board: the open ends are bigger, blending down, and tiles still only touch the one they join', () => {
+  const box = (t) => (t.vertical ? [t.cx - 0.5 * t.s, t.cy - t.s, t.cx + 0.5 * t.s, t.cy + t.s] : [t.cx - t.s, t.cy - 0.5 * t.s, t.cx + t.s, t.cy + 0.5 * t.s]);
+  const gap = (p, q) => Math.max(Math.max(p[0], q[0]) - Math.min(p[2], q[2]), Math.max(p[1], q[1]) - Math.min(p[3], q[3]));
+  let checked = 0;
+  for (const variant of ['draw', 'block', 'allfives']) {
+    for (const max of [6, 9, 12]) {
+      for (const reach of [6, 9, 14]) {
+        const random = seeded(max * 17 + reach + variant.length);
+        let t = startMatch(seated(newDominoTable({ players: 2, setMax: max, variant, target: 1 })), random);
+        while (t.phase === 'playing') {
+          const s = t.round.turn;
+          const m = botMove(t, s);
+          t = m.type === 'play' ? playTile(t, s, m.tile, m.arm) : m.type === 'draw' ? drawTile(t, s) : pass(t, s);
+          const { tiles } = boardLayout(t.round.layout, { reach, zoom: 1.5 });
+          const boxes = tiles.map(box);
+          for (let i = 0; i < boxes.length; i++) {
+            if (tiles[i].link != null) assert.ok(Math.abs(gap(boxes[i], boxes[tiles[i].link])) < 0.01, `${tiles[i].t} meets the tile it joins`);
+            for (let j = i + 1; j < boxes.length; j++) {
+              const joined = tiles[i].link === j || tiles[j].link === i;
+              if (!joined) assert.ok(gap(boxes[i], boxes[j]) >= 0.2, `${variant} d${max} reach ${reach}: ${tiles[i].t} and ${tiles[j].t} touch (${gap(boxes[i], boxes[j])})`);
+            }
+          }
+          for (const arm of ['L', 'R']) {
+            const list = t.round.layout?.arms[arm] ?? [];
+            const sizes = list.slice(-4).map((p) => tiles.find((x) => x.t === p.t).s);
+            if (sizes.length === 4) assert.deepEqual(sizes.map((n) => +n.toFixed(2)), [1, 1.17, 1.33, 1.5]);
+          }
+          checked++;
+        }
+      }
+    }
+  }
+  assert.ok(checked > 100);
+});
+
 // ---------- Mexican Train and Chicken Foot ----------
 import { roundsOf, lineName, maxPlayers } from '../src/dominoes/engine.js';
 

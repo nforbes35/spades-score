@@ -24,7 +24,7 @@ import { Avatar, ProfileEditor } from '../Avatar.jsx';
 import { loadName, saveName, loadAvatar, saveAvatar, useAvatars } from '../lib/profile.js';
 import { Icon, Segmented, Toggle, useToast, Confetti, Sheet, useTableLayout } from '../components.jsx';
 import Domino from './Domino.jsx';
-import { fitBoard } from './board.js';
+import { fitBoard, END_ZOOM } from './board.js';
 import { AIM, aimPages, swipeDirection, handTileWidth } from './handmode.js';
 import { calloutFor, momentFor, recordDomGame, loadDomLog, mergeIntoDomLog, rivalryLines, validClip, talkFor } from './fun.js';
 import { snapReactions, savePhoto } from './album.js';
@@ -1208,16 +1208,16 @@ export function Board({ table, selectedMoves, onEnd, maxUnit = 38, aimSpots = []
     <div className="dom-board" ref={box}>
       {tiles.map((t) => (
         <div key={t.t} className={`dom-placed${t.t === last ? ' last' : ''}${flight?.tile === t.t ? flight.className : ''}`} style={{ left: ox + t.cx * unit, top: oy + t.cy * unit, ...(flight?.tile === t.t ? flight.style : {}) }}>
-          <Domino a={t.a} b={t.b} vertical={t.vertical} size={unit * 2} />
+          <Domino a={t.a} b={t.b} vertical={t.vertical} size={unit * 2 * t.s} style={{ width: unit * 2 * t.s / (t.vertical ? 2 : 1), height: unit * 2 * t.s / (t.vertical ? 1 : 2) }} />
         </div>
       ))}
       {Object.entries(ends).filter(([arm]) => pickArms.has(arm)).map(([arm, e]) => (
-        <button key={arm} type="button" className="dom-end" style={{ left: ox + e.x * unit, top: oy + e.y * unit, width: unit * 1.6, height: unit * 1.6 }} onClick={() => onEnd(arm)} aria-label={tr('Play here')}>+</button>
+        <button key={arm} type="button" className="dom-end" style={{ left: ox + e.x * unit, top: oy + e.y * unit, width: unit * 1.6 * END_ZOOM, height: unit * 1.6 * END_ZOOM }} onClick={() => onEnd(arm)} aria-label={tr('Play here')}>+</button>
       ))}
       {aimSpots.map((sp) => {
         const e = sp.arm == null ? { x: 0, y: 0 } : ends[sp.arm];
         if (!e || !AIM[sp.dir]) return null;
-        const px = Math.max(unit * 2, 44);
+        const px = Math.max(unit * 2 * END_ZOOM, 44);
         return (
           <span key={sp.dir} className="dom-aim" style={{ left: tiles.length ? Math.min(size.w - px / 2, Math.max(px / 2, ox + e.x * unit)) : size.w / 2, top: tiles.length ? Math.min(size.h - px / 2, Math.max(px / 2, oy + e.y * unit)) : size.h / 2, width: px, height: px, '--aim': AIM[sp.dir].color, fontSize: px * 0.5 }}>{AIM[sp.dir].arrow}</span>
         );
@@ -1258,7 +1258,9 @@ export function LinesBoard({ table, mySeat, icons, selectedMoves, onEnd, tv, aim
   const colW = (size.w - (cols - 1) * 6) / cols;
   const tileLong = Math.round(rowH * 1.3);
   const labelW = train ? Math.min(118, colW * 0.3) : rowH * 0.9;
-  const room = Math.max(1, Math.floor((colW - labelW - 18 - (fits.size ? 34 : 0)) / (tileLong + 3)));
+  // the newest tiles on each line are bigger (as tall as the row allows), blending down over the two before them
+  const rowZoom = [1.35, 1.23, 1.12];
+  const room = Math.max(1, Math.floor((colW - labelW - 18 - (fits.size ? 34 : 0) - tileLong * 0.7) / (tileLong + 3)));
   const lastTile = r.last?.tile;
   return (
     <div className={`dom-lines-board${cols > 1 ? ' two' : ''}`} ref={box}>
@@ -1283,9 +1285,9 @@ export function LinesBoard({ table, mySeat, icons, selectedMoves, onEnd, tv, aim
             <span className="dom-row-tiles">
               {hidden > 0 && <span className="dom-row-more">+{hidden}</span>}
               {!l.tiles.length && <span className="dom-row-empty">{mustFill ? tr('needs a {n}', { n: l.start }) : tr('starts with a {n}', { n: l.start })}</span>}
-              {shown.map((p) => (
+              {shown.map((p, i) => (
                 <span key={p.t} className={`dom-row-tile${p.t === lastTile ? ' last' : ''}${p.inner === p.outer ? ' double' : ''}${flight?.tile === p.t ? flight.className : ''}`} style={flight?.tile === p.t ? flight.style : undefined}>
-                  <Domino a={p.inner} b={p.outer} size={tileLong} />
+                  <Domino a={p.inner} b={p.outer} size={tileLong * (rowZoom[shown.length - 1 - i] ?? 1)} />
                 </span>
               ))}
               {can && <span className="dom-row-go" aria-label={tr('Play here')}>+</span>}

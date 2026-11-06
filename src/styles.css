@@ -2161,8 +2161,8 @@ button.choice:active { transform: scale(0.98); }
 .dom-felt { overflow: hidden; }
 .dom-board { position: absolute; inset: 70px 70px 60px; }
 :root[data-layout='tall'] .dom-board { inset: 96px 8px 84px; }
-.dom-placed { position: absolute; translate: -50% -50%; }
-.dom-placed .domino { filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.45)); }
+.dom-placed { position: absolute; translate: -50% -50%; transition: left 0.3s ease, top 0.3s ease; }
+.dom-placed .domino { filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.45)); transition: width 0.3s ease, height 0.3s ease; }
 .dom-placed.last .domino { filter: drop-shadow(0 0 6px var(--gold)) drop-shadow(0 2px 3px rgba(0, 0, 0, 0.45)); animation: dom-land 0.35s ease-out; }
 @keyframes dom-land { from { scale: 1.4; opacity: 0.4; } }
 .dom-end {
