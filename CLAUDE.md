@@ -15,9 +15,15 @@ plain words, keep text large and buttons big, check every screen fits a 320px ph
 - Hand flow: New Hand → bids (stage 'bids') → tap who won each book (stage 'play') → Score Hand.
   `HandSheet.jsx` fixes bids/books by hand.
 
-## Two modes
-- **At the table** (manual): the scorekeeper's phone keeps score of a real card game (everything below
-  "Remote play"). **Play online**: the app is the card table (`OnlineApp.jsx`).
+## Modes
+- **Live+** (`game.mode` 'live' or missing; was "At the table"): the scorekeeper's phone keeps score of a real card
+  game, tapping who wins each book, with remote players, card scanning, video and TV (everything below "Remote play").
+- **Scorekeeper only** (`game.mode` 'score'): bids, then hand stage 'books' (`BooksPanel` in LiveHand.jsx): each
+  team's books entered after the hand (the other team fills in to 13), nil players "made it" or how many they took
+  (`setTeamBooks` in table.js). No remote/video. Live+ can also switch a hand to 'books'; the menu switches modes.
+- A bid left at 0 counts as a nil: "Bids are in" asks, then `zeroBidsToNil` (table.js). Before this a player who
+  went nil without tapping Nil scored nothing.
+- **Play online**: the app is the card table (`OnlineApp.jsx`).
 
 ## Online mode
 - Profiles & icons (`src/lib/profile.js`, `src/Avatar.jsx`): name + avatar string in tab-first storage

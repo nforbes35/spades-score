@@ -171,6 +171,20 @@ p { margin: 0; }
 
 .bid-rows { display: flex; flex-direction: column; margin-top: 8px; }
 .bid-row { display: flex; flex-direction: column; gap: 10px; padding: 12px 0 12px 12px; border-left: 4px solid var(--team); margin-top: 8px; border-radius: 4px; }
+/* Scorekeeper: books entered after the hand */
+.keeper-team { display: flex; flex-direction: column; gap: 10px; padding: 12px 0 12px 12px; border-left: 4px solid var(--team); margin-top: 12px; border-radius: 4px; }
+.keeper-name { font-size: 20px; font-weight: 800; color: var(--team); overflow-wrap: anywhere; }
+.keeper-bids { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 16px; }
+.keeper-total { font-weight: 800; color: var(--team); }
+.keeper-books { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; font-size: 17px; font-weight: 700; }
+.keeper-nil { display: flex; flex-direction: column; gap: 8px; padding: 10px; border-radius: 12px; background: color-mix(in srgb, var(--team) 8%, transparent); font-weight: 700; }
+.keeper-score { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.keeper-score b { font-size: 28px; font-variant-numeric: tabular-nums; }
+.keeper-score.pos b { color: var(--ok); }
+.keeper-score.neg b { color: var(--neg); }
+.keeper-score span { font-size: 14px; color: var(--muted); }
+.keeper-sum { text-align: center; font-weight: 800; margin: 14px 0 0; }
+.keeper-sum.neg { color: var(--neg); }
 .bid-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .who { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; min-width: 0; }
 .name { font-size: 20px; font-weight: 800; overflow: hidden; text-overflow: ellipsis; }

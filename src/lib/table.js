@@ -115,3 +115,37 @@ export const nextDealer = (game) => {
   const last = game.hands[game.hands.length - 1];
   return last ? ((last.dealer ?? -1) + 1) % 4 : 0;
 };
+
+/** Seats with no bid entered (0 and not a nil). In spades a bid of 0 is a nil, so these get counted as nils. */
+export const unbidSeats = (hand) => SEATS.map((_, s) => s).filter((s) => { const p = seatEntry(hand, s); return !isNil(p.call) && !(p.bid > 0); });
+export const zeroBidsToNil = (hand) => unbidSeats(hand).reduce((h, s) => updateSeat(h, s, { call: 'nil', bid: 0 }), hand);
+
+/** The two seats on team t. */
+export const teamSeats = (t) => [t, t + 2];
+
+/**
+ * Scorekeeper: a team's books, entered after the hand. Each nil player gets the books they took (`nilTook`); the
+ * rest go to the players who bid, up to each one's bid first, extras to the first. If the whole team went nil, the
+ * team's books are just what the nil players took.
+ */
+export function setTeamBooks(hand, t, total, nilTook = {}) {
+  const seats = teamSeats(t);
+  const nils = seats.filter((s) => isNil(seatEntry(hand, s).call));
+  const bidders = seats.filter((s) => !nils.includes(s));
+  const took = Object.fromEntries(nils.map((s) => [s, Math.max(0, Math.min(13, Math.trunc(nilTook[s] ?? seatEntry(hand, s).books) || 0))]));
+  let rest = Math.max(0, Math.min(13, Math.trunc(total) || 0) - nils.reduce((n, s) => n + took[s], 0));
+  let next = hand;
+  for (const s of nils) next = updateSeat(next, s, { books: took[s] });
+  bidders.forEach((s, i) => {
+    const give = i === bidders.length - 1 ? rest : Math.min(rest, seatEntry(hand, s).bid);
+    next = updateSeat(next, s, { books: give });
+    rest -= give;
+  });
+  if (bidders.length === 2) {
+    // whatever's left over after both bids goes to the first player
+    const [a, b] = bidders;
+    const extra = seatEntry(next, b).books - Math.max(0, Math.min(seatEntry(next, b).books, seatEntry(hand, b).bid));
+    if (extra > 0) next = updateSeat(updateSeat(next, b, { books: seatEntry(next, b).books - extra }), a, { books: seatEntry(next, a).books + extra });
+  }
+  return next;
+}

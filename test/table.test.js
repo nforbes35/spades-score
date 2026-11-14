@@ -63,3 +63,46 @@ test('cards sort diamonds, clubs, hearts, spades, low to high', () => {
   assert.equal(isCard('10H'), true);
   assert.equal(isCard('1H'), false);
 });
+
+// ---------- Scorekeeper: bids of 0 are nils, books entered after the hand ----------
+import { zeroBidsToNil, unbidSeats, setTeamBooks, seatEntry as entryOf, updateSeat as setSeat } from '../src/lib/table.js';
+import { newHand as blankHand, scoreTeam as scoreOf, totalBooks as booksOf, STANDARD_RULES as RULES } from '../src/lib/scoring.js';
+
+test('a player left at a bid of 0 counts as a nil, and making it scores the nil', () => {
+  let h = blankHand(0);
+  h = setSeat(h, 0, { bid: 0 });       // Team 1: seat 0 "bid 0" (went nil without tapping Nil)
+  h = setSeat(h, 2, { bid: 5 });
+  h = setSeat(h, 1, { bid: 4 });
+  h = setSeat(h, 3, { bid: 3 });
+  assert.deepEqual(unbidSeats(h), [0]);
+  h = zeroBidsToNil(h);
+  assert.equal(entryOf(h, 0).call, 'nil');
+  h = setTeamBooks(h, 0, 6);
+  assert.equal(entryOf(h, 0).books, 0);
+  assert.equal(entryOf(h, 2).books, 6);
+  const r = scoreOf(h.teams[0], RULES);
+  assert.equal(r.total, 100 + 51); // nil made + bid 5 with 1 bag
+});
+
+test('setTeamBooks: the team total is kept, nil players get what they took', () => {
+  let h = blankHand(0);
+  h = setSeat(h, 1, { bid: 3 });
+  h = setSeat(h, 3, { bid: 4 });
+  for (const n of [0, 2, 3, 7, 9, 13]) {
+    const x = setTeamBooks(h, 1, n);
+    assert.equal(booksOf(x.teams[1]), n);
+  }
+  const nine = setTeamBooks(h, 1, 9);
+  assert.equal(entryOf(nine, 1).books + entryOf(nine, 3).books, 9);
+  assert.ok(entryOf(nine, 3).books >= 4 && entryOf(nine, 1).books >= 3);
+  // a nil player who got set
+  let n = setSeat(h, 1, { call: 'nil', bid: 0 });
+  n = setTeamBooks(n, 1, 6, { 1: 2 });
+  assert.equal(entryOf(n, 1).books, 2);
+  assert.equal(entryOf(n, 3).books, 4);
+  assert.equal(scoreOf(n.teams[1], RULES).total, -100 + 40 + 2);
+  // the whole team nil
+  let both = setSeat(setSeat(h, 1, { call: 'nil', bid: 0 }), 3, { call: 'blind', bid: 0 });
+  both = setTeamBooks(both, 1, 99, { 1: 0, 3: 1 });
+  assert.equal(booksOf(both.teams[1]), 1);
+});

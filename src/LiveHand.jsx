@@ -1,6 +1,6 @@
-import { contractBid, isNil, nilLabel, tableBid } from './lib/scoring.js';
+import { contractBid, isNil, nilLabel, tableBid, totalBooks, scoreTeam, signed } from './lib/scoring.js';
 import { tr, tx, langMsg } from './lib/i18n.js';
-import { SEATS, teamOf, playerName, seatEntry, liveOf, leaderOf, booksPlayed, updateSeat, seatProgress, remainingCards } from './lib/table.js';
+import { SEATS, teamOf, playerName, seatEntry, liveOf, leaderOf, booksPlayed, updateSeat, seatProgress, remainingCards, teamSeats, setTeamBooks } from './lib/table.js';
 import { NumberControl, NilPicker, PlayingCard, Icon, CardText } from './components.jsx';
 
 /** Seats drawn around a table: you (seat 1) at the bottom, partner across the top. */
@@ -158,6 +158,89 @@ export function PlayPanel({ game, hand, number, onAward, remoteSeats = [], onlin
           </div>
         );
       })}
+    </section>
+  );
+}
+
+/**
+ * Scorekeeper: the bids to look at while the hand is played, then how many books each team won, entered at the
+ * end. Setting one team's books fills in the other (they add up to 13). Each nil player: made it, or how many
+ * books they took. Shows what each team will score before the hand is scored.
+ */
+export function BooksPanel({ game, hand, number, onChange }) {
+  const setBooks = (t, n, nilTook) => onChange(langMsg('{team} books', { team: game.teams[t].name }), (h) => {
+    let next = setTeamBooks(h, t, n, nilTook);
+    const other = 1 - t;
+    const allNil = teamSeats(other).every((s) => isNil(seatEntry(h, s).call));
+    if (!allNil) next = setTeamBooks(next, other, 13 - totalBooks(next.teams[t]));
+    return next;
+  });
+  const sum = totalBooks(hand.teams[0]) + totalBooks(hand.teams[1]);
+  return (
+    <section className="live card keeper">
+      <div className="live-head">
+        <div>
+          <div className="eyebrow">{tr('Hand {n} · Playing', { n: number })}</div>
+          <div className="live-title">{tr('After the hand, enter the books each team won')}</div>
+        </div>
+        <span className="chip quiet">{tr('{name} dealt', { name: playerName(game, hand.dealer ?? 0) })}</span>
+      </div>
+      {[0, 1].map((t) => {
+        const round = hand.teams[t];
+        const seats = teamSeats(t);
+        const nils = seats.filter((s) => isNil(seatEntry(hand, s).call));
+        const allNil = nils.length === 2;
+        const books = totalBooks(round);
+        const res = scoreTeam(round, game.rules);
+        const nilTook = Object.fromEntries(nils.map((s) => [s, seatEntry(hand, s).books]));
+        return (
+          <div key={t} className={`keeper-team t${t}`}>
+            <div className="keeper-name">{game.teams[t].name}</div>
+            <div className="keeper-bids">
+              {seats.map((s) => {
+                const p = seatEntry(hand, s);
+                return <span key={s}>{playerName(game, s)}: <b>{isNil(p.call) ? nilLabel(p.call) : p.bid}</b></span>;
+              })}
+              {!allNil && <span className="keeper-total">{tr('Team bid {n}', { n: contractBid(round) })}</span>}
+            </div>
+            {!allNil && (
+              <div className="keeper-books">
+                <span>{tr('Books won')}</span>
+                <NumberControl label={tr('{team} books won', { team: game.teams[t].name })} value={books} onChange={(n) => setBooks(t, n, nilTook)} />
+              </div>
+            )}
+            {nils.map((s) => {
+              const took = seatEntry(hand, s).books;
+              const name = playerName(game, s);
+              return (
+                <div key={s} className="keeper-nil">
+                  <span>{tr('{name} ({nil})', { name, nil: nilLabel(seatEntry(hand, s).call) })}</span>
+                  <div className="segmented small" role="radiogroup" aria-label={tr('Did {name} make it?', { name })}>
+                    <button type="button" role="radio" aria-checked={took === 0} className={took === 0 ? 'on' : ''}
+                      onClick={() => setBooks(t, books, { ...nilTook, [s]: 0 })}>{tr('Made it ✓')}</button>
+                    <button type="button" role="radio" aria-checked={took > 0} className={took > 0 ? 'on' : ''}
+                      onClick={() => took === 0 && setBooks(t, books, { ...nilTook, [s]: 1 })}>{tr('Got set ✗')}</button>
+                  </div>
+                  {took > 0 && (
+                    <div className="keeper-books">
+                      <span>{tr('Books {name} took', { name })}</span>
+                      <NumberControl compact min={1} label={tr('Books {name} took', { name })} value={took}
+                        onChange={(n) => setBooks(t, books, { ...nilTook, [s]: n })} />
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+            {sum === 13 && (
+              <div className={`keeper-score ${res.total < 0 ? 'neg' : 'pos'}`}>
+                <b>{signed(res.total)}</b>
+                <span>{res.lines.join(' · ')}</span>
+              </div>
+            )}
+          </div>
+        );
+      })}
+      <p className={`keeper-sum${sum === 13 ? '' : ' neg'}`}>{tr('{n} of 13 books', { n: sum })}</p>
     </section>
   );
 }

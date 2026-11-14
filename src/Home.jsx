@@ -64,7 +64,7 @@ export default function Home({ onAllGames, onPlayOnline, onTable, onJoin, onStat
                   <span className="choice-text">
                     <b>{e.teams.map((t) => `${t.name} ${t.score}`).join(' · ')}</b>
                     <span>
-                      {e.kind === 'online' ? tr('Online · code {code}', { code: e.code }) : tr('At the table')}
+                      {e.kind === 'online' ? tr('Online · code {code}', { code: e.code }) : e.game?.mode === 'score' ? tr('Scorekeeper only') : 'Live+'}
                       {` · ${e.hands === 1 ? tr('{n} hand', { n: e.hands }) : tr('{n} hands', { n: e.hands })} · ${savedWhen(e.at)}`}
                     </span>
                     {e.teams.some((t) => t.players?.length && t.players.join(' & ') !== t.name) && <span className="saved-players">{e.teams.map((t) => t.players.join(' & ')).join('  vs  ')}</span>}
@@ -84,11 +84,20 @@ export default function Home({ onAllGames, onPlayOnline, onTable, onJoin, onStat
           <Icon name="chevron" size={20} />
         </button>
 
-        <button type="button" className="choice" onClick={onTable}>
+        <button type="button" className="choice" onClick={() => onTable('live')}>
           <span className="choice-icon"><Icon name="cards" size={26} /></span>
           <span className="choice-text">
-            <b>{tr('Score a game at the table')}</b>
-            <span>{tr('Play with real cards. Enter bids, tap who wins each book. Remote players welcome.')}</span>
+            <b>Live+</b>
+            <span>{tr('Real cards, with remote players welcome. Tap who wins each book. Scan a remote player’s hand so they play it on their phone. Video and TV too.')}</span>
+          </span>
+          <Icon name="chevron" size={20} />
+        </button>
+
+        <button type="button" className="choice" onClick={() => onTable('score')}>
+          <span className="choice-icon"><Icon name="edit" size={26} /></span>
+          <span className="choice-text">
+            <b>{tr('Scorekeeper only')}</b>
+            <span>{tr('Just keep score. Enter the bids, play the hand, then enter how many books each team won.')}</span>
           </span>
           <Icon name="chevron" size={20} />
         </button>

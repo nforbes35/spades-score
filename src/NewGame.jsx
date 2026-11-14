@@ -5,7 +5,7 @@ import { RulesFields, Segmented, Sheet } from './components.jsx';
 
 const PRESETS = [250, 300, 500];
 
-export default function NewGame({ lastSetup, onStart, onCancel, asSheet, onBack }) {
+export default function NewGame({ mode = 'live', lastSetup, onStart, onCancel, asSheet, onBack }) {
   const [teams, setTeams] = useState(lastSetup?.teams ?? [
     { name: tr('Team {n}', { n: 1 }), players: ['', ''] },
     { name: tr('Team {n}', { n: 2 }), players: ['', ''] },
@@ -20,7 +20,7 @@ export default function NewGame({ lastSetup, onStart, onCancel, asSheet, onBack 
       name: team.name.trim() || tr('Team {n}', { n: t + 1 }),
       players: team.players.map((p, i) => p.trim() || tr('Player {n}', { n: t * 2 + i + 1 })),
     }));
-    onStart({ id: crypto.randomUUID(), teams: cleaned, target: Math.max(1, target), rules, hands: [], remote: null, startedAt: Date.now() });
+    onStart({ id: crypto.randomUUID(), mode, teams: cleaned, target: Math.max(1, target), rules, hands: [], remote: null, startedAt: Date.now() });
   }
 
   const form = (
@@ -61,7 +61,7 @@ export default function NewGame({ lastSetup, onStart, onCancel, asSheet, onBack 
     <div className="app">
       <header className="hero">
         <div className="wrap hero-row">
-          <div className="brand"><span className="brand-mark">♠</span><h1>{tr('At the table')}</h1></div>
+          <div className="brand"><span className="brand-mark">♠</span><h1>{mode === 'score' ? tr('Scorekeeper only') : 'Live+'}</h1></div>
           {onBack && <button type="button" className="icon-btn" onClick={onBack}>{tr('Back')}</button>}
         </div>
         <div className="wrap"><p className="target">{tr('Who’s playing tonight?')}</p></div>

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useGame, read, write } from './lib/store.js';
 import { history, standings, winner, newHand, signed, tableBid, totalBooks, scoreTeam, NIL_CALLS, STANDARD_RULES } from './lib/scoring.js';
-import { playerName, stageOf, liveOf, booksPlayed, updateSeat, awardBook, remainingCards, nextDealer, remoteSeats, gameFor, playedBy } from './lib/table.js';
+import { playerName, stageOf, liveOf, booksPlayed, updateSeat, awardBook, remainingCards, nextDealer, remoteSeats, gameFor, playedBy, unbidSeats, zeroBidsToNil } from './lib/table.js';
 import { cardLabel } from './lib/cards.js';
 import { tr, tx, langMsg, tMsg } from './lib/i18n.js';
 import { useRoom } from './lib/room.js';
@@ -14,7 +14,7 @@ import { saveGame, savedGames as allSaved, forgetSaved, savedSummary } from './l
 const savedGames = () => allSaved().filter((e) => e.kind !== 'dominoes');
 import Stats from './Stats.jsx';
 import { Sheet, RulesFields, NumberField, Icon, useToast, Confetti, StatusDot, CardText } from './components.jsx';
-import { BidsPanel, PlayPanel } from './LiveHand.jsx';
+import { BidsPanel, PlayPanel, BooksPanel } from './LiveHand.jsx';
 import NewGame from './NewGame.jsx';
 import Home from './Home.jsx';
 import GameHub from './GameHub.jsx';
@@ -123,8 +123,8 @@ function HostApp({ onJoin, onPlayOnline, onRejoin, onAllGames }) {
     return (
       <>
         {setup
-          ? <NewGame lastSetup={store.lastSetup} onStart={store.start} onBack={() => setSetup(false)} />
-          : <Home onAllGames={onAllGames} onPlayOnline={onPlayOnline} onTable={() => setSetup(true)} onJoin={onJoin} onStats={() => setStatsOpen(true)}
+          ? <NewGame mode={setup} lastSetup={store.lastSetup} onStart={store.start} onBack={() => setSetup(false)} />
+          : <Home onAllGames={onAllGames} onPlayOnline={onPlayOnline} onTable={(mode) => setSetup(mode)} onJoin={onJoin} onStats={() => setStatsOpen(true)}
               rejoin={lastOnline && !saved.some((e) => e.code === lastOnline.code) ? lastOnline : null}
               onRejoin={() => onRejoin(lastOnline)} onForget={() => { write(LAST_ONLINE_KEY, null); setLastOnline(null); }}
               saved={saved} onResume={resume}
@@ -138,7 +138,7 @@ function HostApp({ onJoin, onPlayOnline, onRejoin, onAllGames }) {
     <>
       <GameScreen store={store} toast={toast} onJoin={onJoin} onPlayOnline={onPlayOnline} onNewGame={() => setNewGameOpen(true)} />
       {newGameOpen && (
-        <NewGame asSheet lastSetup={store.lastSetup}
+        <NewGame asSheet mode={store.game?.mode === 'score' ? 'score' : 'live'} lastSetup={store.lastSetup}
           onStart={(g) => { store.start(g); setNewGameOpen(false); toast.show(tr('New game started'), { onUndo: store.undo }); }}
           onCancel={() => setNewGameOpen(false)} />
       )}
@@ -158,6 +158,9 @@ function GameScreen({ store, toast, onNewGame, onJoin, onPlayOnline }) {
   const inPlay = game.hands.find((h) => h.inPlay);
   const inPlayNumber = inPlay ? game.hands.indexOf(inPlay) + 1 : 0;
   const stage = inPlay ? stageOf(inPlay) : null;
+  // Scorekeeper only: bids, then the books each team won entered after the hand. Live+ (the default): tap who wins
+  // each book, with remote players, card scanning, video and TV.
+  const keeper = game.mode === 'score';
 
   // ----- Remote players, video guests and TV screens -----
   const remote = game.remote ?? null;
@@ -235,9 +238,18 @@ function GameScreen({ store, toast, onNewGame, onJoin, onPlayOnline }) {
   };
   const newHandNow = () => store.addHand(newHand(nextDealer(game)));
   const startPlay = () => {
-    if (tableBid(inPlay) === 0 && !confirm(tr('Nobody has bid yet. Start playing anyway?'))) return;
-    change('Start playing', (h) => ({ ...h, stage: 'play' }));
+    // In spades a bid of 0 is a nil: anyone left at 0 is counted as going nil (unless nobody has bid at all).
+    const unbid = unbidSeats(inPlay);
+    if (unbid.length === 4) {
+      if (!confirm(tr('Nobody has bid yet. Start playing anyway?'))) return;
+    } else if (unbid.length) {
+      const names = unbid.map((s) => playerName(game, s)).join(', ');
+      if (!confirm(tr('{names} bid 0. That counts as going Nil ({pts} points if they take no books). OK?', { names, pts: game.rules.nilValue }))) return;
+    }
+    const nextStage = keeper ? 'books' : 'play';
+    change('Start playing', (h) => ({ ...(unbid.length === 4 ? h : zeroBidsToNil(h)), stage: nextStage }));
   };
+  const booksAfter = () => change('Enter books after the hand', (h) => ({ ...h, stage: 'books' }));
   const scoreHand = () => {
     const played = booksPlayed(inPlay);
     const books = inPlay.teams.reduce((n, t) => n + totalBooks(t), 0);
@@ -329,9 +341,15 @@ function GameScreen({ store, toast, onNewGame, onJoin, onPlayOnline }) {
           </>
         )}
         {inPlay && stage === 'play' && (
-          <PlayPanel game={game} hand={inPlay} number={inPlayNumber} onAward={award}
-            remoteSeats={seats} online={online} onPing={ping} onScan={openScan} />
+          <>
+            <PlayPanel game={game} hand={inPlay} number={inPlayNumber} onAward={award}
+              remoteSeats={seats} online={online} onPing={ping} onScan={openScan} />
+            {booksPlayed(inPlay) < 13 && (
+              <button type="button" className="text-btn" onClick={booksAfter}>{tr('Enter the books after the hand instead')}</button>
+            )}
+          </>
         )}
+        {inPlay && stage === 'books' && <BooksPanel game={game} hand={inPlay} number={inPlayNumber} onChange={change} />}
         {inPlay && (
           <button type="button" className="text-btn" onClick={() => setEditing(inPlay)}>
             <Icon name="edit" size={16} /> {tr('Fix bids or books by hand')}
@@ -342,7 +360,9 @@ function GameScreen({ store, toast, onNewGame, onJoin, onPlayOnline }) {
         {!game.hands.length && (
           <>
             <div className="section-title">{tr('No hands yet')}</div>
-            <p className="empty">{tx("Tap {button} after the deal. Enter everyone's bids, then tap who wins each book.", { button: <b>{tr('New Hand')}</b> })}</p>
+            <p className="empty">{keeper
+              ? tx("Tap {button} after the deal and enter everyone's bids. Play the hand, then enter how many books each team won.", { button: <b>{tr('New Hand')}</b> })
+              : tx("Tap {button} after the deal. Enter everyone's bids, then tap who wins each book.", { button: <b>{tr('New Hand')}</b> })}</p>
           </>
         )}
         <div className="stack">
@@ -356,8 +376,8 @@ function GameScreen({ store, toast, onNewGame, onJoin, onPlayOnline }) {
       <div className="bottom-bar">
         {!inPlay && <button type="button" className="primary big" onClick={newHandNow}>+ {tr('New Hand')}</button>}
         {stage === 'bids' && <button type="button" className="primary big" onClick={startPlay}>{tr('Bids are in · Start playing')}</button>}
-        {stage === 'play' && (
-          <button type="button" className={`primary big${booksPlayed(inPlay) >= 13 ? ' go' : ''}`} onClick={scoreHand}>
+        {(stage === 'play' || stage === 'books') && (
+          <button type="button" className={`primary big${booksPlayed(inPlay) >= 13 || (stage === 'books' && inPlay.teams.reduce((n, t) => n + totalBooks(t), 0) === 13) ? ' go' : ''}`} onClick={scoreHand}>
             ✓ {tr('Score Hand')}
           </button>
         )}
@@ -372,7 +392,14 @@ function GameScreen({ store, toast, onNewGame, onJoin, onPlayOnline }) {
       {sheet === 'menu' && (
         <Sheet title={tr('Menu')} onClose={() => setSheet(null)} closeLabel={tr('Close')} short>
           <div className="menu-list card group">
-            <button type="button" onClick={() => setSheet('invite')}><Icon name="users" /> {tr('Remote players, video & TV')}</button>
+            {!keeper && <button type="button" onClick={() => setSheet('invite')}><Icon name="users" /> {tr('Remote players, video & TV')}</button>}
+            <button type="button" onClick={() => {
+              setSheet(null);
+              store.commit(keeper ? 'Switch to Live+' : 'Switch to Scorekeeper only', (g) => ({ ...g, mode: keeper ? 'live' : 'score' }));
+              toast.show(keeper ? tr('Now in Live+: tap who wins each book') : tr('Now in Scorekeeper only: enter the books after each hand'), { onUndo: store.undo });
+            }}>
+              <Icon name="cards" /> {keeper ? tr('Switch to Live+') : tr('Switch to Scorekeeper only')}
+            </button>
             <button type="button" onClick={() => { setSheet(null); onPlayOnline(); }}><Icon name="cards" /> {tr('Play Online')}</button>
             <button type="button" onClick={() => setSheet('stats')}><Icon name="trophy" /> {tr('Stats & records')}</button>
             <button type="button" onClick={() => setSheet('rules')}><Icon name="edit" /> {tr('Scoring rules')}</button>
