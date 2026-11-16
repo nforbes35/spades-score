@@ -1682,6 +1682,10 @@ button.choice:active { transform: scale(0.98); }
 /* ---------- Emojis and gifts (tap a player's picture) ---------- */
 .avatar.tappable, .big-tile { cursor: pointer; }
 .avatar.tappable:active { scale: 0.95; }
+.dom-hand-react { position: fixed; left: 50%; top: 38%; translate: -50% -50%; z-index: 60; display: grid; justify-items: center; gap: 6px; pointer-events: none; animation: dom-hand-react 2.6s ease-out both; }
+.dom-hand-react-item { font-size: 96px; line-height: 1; filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.5)); }
+.dom-hand-react-from { font-size: 18px; font-weight: 800; color: #fff; background: rgba(0, 0, 0, 0.6); padding: 6px 14px; border-radius: 999px; max-width: 80vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@keyframes dom-hand-react { 0% { opacity: 0; scale: 0.3; } 12% { opacity: 1; scale: 1.15; } 22% { scale: 1; } 80% { opacity: 1; } 100% { opacity: 0; scale: 0.9; } }
 .fx-layer { position: absolute; inset: 0; pointer-events: none; z-index: 6; overflow: visible; }
 .fx { position: absolute; translate: -50% -50%; font-size: 48px; line-height: 1; display: grid; place-items: center; }
 .fx > * { grid-area: 1 / 1; }

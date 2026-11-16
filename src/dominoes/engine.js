@@ -85,6 +85,15 @@ export const teamsPossible = (players) => players >= 4 && players % 2 === 0;
 export const sideOf = (table, seat) => (table.settings.teams ? seat % (table.seats.length / 2) : seat);
 export const sideCount = (table) => (table.settings.teams ? table.seats.length / 2 : table.seats.length);
 
+/**
+ * Seats the computer was standing in for because the player's phone dropped out (`standIn` without `left`): back
+ * to the player as soon as their phone is connected again. Someone who chose to leave (`left`) stays with the computer.
+ */
+export function backFromAway(table, present) {
+  if (!table.seats.some((x) => x && !x.bot && x.standIn && !x.left && present.has(x.id))) return table;
+  return { ...table, seats: table.seats.map((x) => (x && !x.bot && x.standIn && !x.left && present.has(x.id) ? { ...x, standIn: false } : x)) };
+}
+
 /** A new table: seats (null = empty) and settings. */
 export function newDominoTable({ players = 4, setMax = 6, variant = 'draw', teams = false, target } = {}) {
   return {

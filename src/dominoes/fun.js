@@ -35,6 +35,15 @@ export function momentFor(table) {
     seat = onSide.length ? onSide.sort((x, y) => x.p - y.p)[0].s : null;
   }
   const name = seat != null ? seats[seat]?.name : null;
+  // Mexican Train / Chicken Foot: the game goes to the lowest total, not to whoever went out last
+  if (over && VARIANTS[table.settings.variant].lowWins) {
+    const champSeats = seats.map((_, s) => s).filter((s) => seats[s] && sideOf(table, s) === match.winner);
+    const champ = champSeats.map((s) => seats[s].name).join(' & ');
+    const sub = res.reason === 'domino' && name
+      ? tr('{name} went out, but {winner} has the lowest total', { name, winner: champ })
+      : tr('{winner} has the lowest total', { winner: champ });
+    return { title: champSeats.length > 1 ? tr('{name} win!', { name: champ }) : tr('{name} wins!', { name: champ }), sub, seat: champSeats[0] ?? null, confetti: true };
+  }
   const title = shutout ? tr('Shut out!') : res.reason === 'domino' ? tr('Domino!') : tr('Blocked!');
   const sub = res.reason === 'domino' ? tr('{name} is out of tiles', { name })
     : name ? tr('Nobody can play. {name} has the fewest dots', { name })

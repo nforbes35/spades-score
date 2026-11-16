@@ -49,7 +49,9 @@ function openRoom(code, getMe, { onMessage, onPeers, onStatus, onHeard, known = 
 
   function receive(m) {
     const me = getMe();
-    if (!m || m.from === me.id || (m.to && m.to !== me.id)) return;
+    // `to` addresses one device by its id (a string). Messages can also carry a seat number as `to` (an emoji sent
+    // to someone at the table): that's for everyone, not an address.
+    if (!m || m.from === me.id || (typeof m.to === 'string' && m.to !== me.id)) return;
     onHeard?.();
     if (m.type === 'bye') {
       if (peers.delete(m.from)) publish();

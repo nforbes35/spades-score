@@ -596,3 +596,32 @@ test('last game’s settings come back; nonsense doesn’t', () => {
   assert.equal(tableFromSaved({ players: 99, settings: { variant: 'draw', setMax: 6 } }).seats.length, 4);
 });
 
+
+// ---------- Fixes: stand-ins clear when the phone is back; the Train winner on the last screen ----------
+import { backFromAway } from '../src/dominoes/engine.js';
+import { momentFor as momentOf } from '../src/dominoes/fun.js';
+
+test('backFromAway: a dropped phone that is back gets its seat back; someone who left stays with the computer', () => {
+  const t = { seats: [{ id: 'a', name: 'Ann', standIn: true }, { id: 'b', name: 'Bob', standIn: true, left: true }, { id: 'c', name: 'Cy' }, { id: 'bot', bot: true, name: 'Robo' }] };
+  assert.equal(backFromAway(t, new Set(['x'])), t);
+  const back = backFromAway(t, new Set(['a', 'b', 'c']));
+  assert.equal(back.seats[0].standIn, false);
+  assert.equal(back.seats[1].standIn, true);
+  assert.equal(backFromAway(back, new Set(['a', 'b'])), back);
+});
+
+test('the last screen of Mexican Train names the lowest total as the winner, not whoever went out', () => {
+  const seats = [{ id: 'a', name: 'Ann' }, { id: 'b', name: 'Bob' }, { id: 'c', name: 'Cy' }];
+  const table = {
+    phase: 'over', seats, settings: { variant: 'train', teams: false },
+    match: { winner: 0, scores: [40, 70, 90] },
+    round: { result: { reason: 'domino', outSeat: 1, winner: 1, seatPips: [12, 0, 30] } },
+  };
+  const m = momentOf(table);
+  assert.equal(m.seat, 0);
+  assert.match(m.title, /Ann/);
+  assert.match(m.sub, /Bob went out/);
+  // a round that isn't the last: still about who went out
+  const mid = momentOf({ ...table, phase: 'scored', match: { ...table.match, winner: null } });
+  assert.equal(mid.seat, 1);
+});

@@ -364,4 +364,7 @@ export default {
   'Twirl it in': 'Échala girando',
   '{n} to draw': '{n} en el pozo',
   '{n} won': '{n} ganadas',
+  '{name} → You': '{name} → Tú',
+  '{name} went out, but {winner} has the lowest total': '{name} se quedó sin fichas, pero {winner} tiene el total más bajo',
+  '{winner} has the lowest total': '{winner} tiene el total más bajo',
 };

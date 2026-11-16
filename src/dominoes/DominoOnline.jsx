@@ -30,7 +30,7 @@ import { calloutFor, momentFor, recordDomGame, loadDomLog, mergeIntoDomLog, riva
 import { snapReactions, savePhoto } from './album.js';
 import { PorchNight, DomWash, DomMoment, DomCallout, DomTalk, TalkSheet, AlbumSheet } from './Fun.jsx';
 import {
-  VARIANTS, SETS, tableFromSaved, savedSettings, startingTiles, kindOf, sideOf, teamsPossible, maxPlayers, roundsOf, lineName, byRounds, roundsToWin, halves, newDominoTable, startMatch, deal, legalMoves, playTile, drawTile, pass, publicTable, botMove, openEnds,
+  VARIANTS, SETS, tableFromSaved, savedSettings, startingTiles, kindOf, sideOf, teamsPossible, maxPlayers, roundsOf, lineName, byRounds, roundsToWin, halves, newDominoTable, startMatch, backFromAway, deal, legalMoves, playTile, drawTile, pass, publicTable, botMove, openEnds,
 } from './engine.js';
 
 const ID_KEY = 'spades-device-id'; // the same device id as Spades online, so a reload rejoins the same seat
@@ -186,16 +186,18 @@ function DominoRoom({ code, isHost = false, tv = false, name, avatar, onLeave, o
       if (tv && from) setAim(Array.isArray(m.spots) && m.spots.length ? { id: from.id, hand: m.hand, moves: m.moves, spots: m.spots, at: Date.now() } : null);
       return;
     }
+    // (who sent it comes with the message, so it still shows if this phone has briefly lost track of theirs)
+    const fromId = from?.id ?? m.from;
     if (m.type === 'd-react') {
       const t = tableRef.current ?? viewRef.current;
-      const seatFrom = from && t ? seatOf(t, from.id) : -1;
+      const seatFrom = fromId && t ? seatOf(t, fromId) : -1;
       if (seatFrom >= 0) addReaction({ from: seatFrom, to: m.to, item: String(m.item).slice(0, 8), gift: Boolean(m.gift) });
       return;
     }
     if (m.type === 'd-wash') { washBus.current?.(Number(m.x), Number(m.y), from?.id); return; }
     if (m.type === 'd-talk') {
       const t = tableRef.current ?? viewRef.current;
-      const seatFrom = from && t ? seatOf(t, from.id) : -1;
+      const seatFrom = fromId && t ? seatOf(t, fromId) : -1;
       if (seatFrom >= 0) showTalk({ name: t.seats[seatFrom].name, text: String(m.text ?? '').slice(0, 60), lang: m.lang, line: typeof m.line === 'string' ? m.line : null, clip: validClip(m.clip) ? m.clip : null });
       return;
     }
@@ -210,12 +212,12 @@ function DominoRoom({ code, isHost = false, tv = false, name, avatar, onLeave, o
       if (m.type === 'd-hello') {
         // Back (maybe on another phone or browser): an away seat with their name is theirs again
         const back = seat < 0 && t.phase !== 'lobby' && from.role === 'dplayer' ? awaySeatNamed(t, from.name, room.peers, me.id) : -1;
-        if (back >= 0) act((x) => ({ ...x, seats: x.seats.map((y, i) => (i === back ? { ...y, id: from.id, standIn: false } : y)) }));
-        else if (seat >= 0 && t.seats[seat].standIn) act((x) => ({ ...x, seats: x.seats.map((y, i) => (i === seat ? { ...y, standIn: false } : y)) }));
+        if (back >= 0) act((x) => ({ ...x, seats: x.seats.map((y, i) => (i === back ? { ...y, id: from.id, standIn: false, left: false } : y)) }));
+        else if (seat >= 0 && t.seats[seat].standIn) act((x) => ({ ...x, seats: x.seats.map((y, i) => (i === seat ? { ...y, standIn: false, left: false } : y)) }));
         else sendAll(t, from);
       }
       else if (m.type === 'd-sit') error = act((x) => sit(x, m.seat, { id: from.id, name: String(m.name || from.name || 'Player').slice(0, 14) }));
-      else if (m.type === 'd-stand') error = act((x) => ({ ...x, seats: x.seats.map((s) => (s?.id !== from.id ? s : x.phase === 'lobby' ? null : { ...s, standIn: true })) }));
+      else if (m.type === 'd-stand') error = act((x) => ({ ...x, seats: x.seats.map((s) => (s?.id !== from.id ? s : x.phase === 'lobby' ? null : { ...s, standIn: true, left: true })) }));
       else if (seat >= 0 && m.type === 'd-rename') error = act((x) => renameSeat(x, seat, m.name));
       else if (seat >= 0 && m.type === 'd-play') error = act((x) => (handNo(x) === m.hand ? playTile(x, seat, m.tile, m.arm, m.style, Boolean(m.thrown)) : x));
       else if (seat >= 0 && m.type === 'd-draw') error = act((x) => (handNo(x) === m.hand ? drawTile(x, seat) : x));
@@ -261,6 +263,8 @@ function DominoRoom({ code, isHost = false, tv = false, name, avatar, onLeave, o
   // until they're back (they get their seat back as soon as they reconnect).
   const awayTurn = isHost && table?.phase === 'playing' && table.seats[table.round.turn] && !table.seats[table.round.turn].bot
     && !table.seats[table.round.turn].standIn && !present.has(table.seats[table.round.turn].id) ? table.round.turn : null;
+  // A phone that dropped out for a moment is back: the computer stops standing in (and stops showing as playing)
+  useEffect(() => { if (isHost && table && table.phase !== 'lobby' && backFromAway(table, present) !== table) act((x) => backFromAway(x, new Set([me.id, ...room.peers.map((p) => p.id)]))); }, [isHost, peerKey, table]);
   useEffect(() => {
     if (awayTurn == null) return undefined;
     const timer = setTimeout(() => act((x) => ({ ...x, seats: x.seats.map((y, i) => (i === awayTurn && y && !present.has(y.id) ? { ...y, standIn: true } : y)) })), AWAY_STAND_IN_MS);
@@ -1133,6 +1137,13 @@ function DominoTable({ table, mySeat, tiles, icons, isHost, send, act, onLeave, 
         <DomHandView table={table} mySeat={mySeat} tiles={tiles ?? []} moves={moves} myTurn={myTurn} boneyard={boneyard} call={call}
           send={send} sendAim={sendAim} onTalk={say ? () => setTalkOpen(true) : null} onExit={() => setHandMode(false)} onMore={() => setCallOpen(true)} />
       )}
+      {/* hand mode covers the table, so emojis sent to you pop up over your tiles instead */}
+      {inHandMode && reactions.filter((x) => x.from !== mySeat).slice(-1).map((x) => (
+        <div key={x.id} className="dom-hand-react" aria-live="polite">
+          <span className="dom-hand-react-item">{x.item}</span>
+          <span className="dom-hand-react-from">{x.to === mySeat ? tr('{name} → You', { name: table.seats[x.from]?.name ?? '?' }) : table.seats[x.from]?.name ?? '?'}</span>
+        </div>
+      ))}
       {callout && !washing && <DomCallout c={callout} />}
       {talk && <DomTalk talk={talk} />}
       {washing && <DomWash table={table} ms={WASH_MS} onSend={sendWash} bus={washBus} tv={tv} onSkip={() => setWashing(false)} />}
@@ -1551,7 +1562,7 @@ function HandResult({ table, isHost, act, onLeave }) {
           <p className="muted">{over ? tr('Lowest total wins.') : `${res.reason === 'blocked' && winnerName ? `${tr('{name} had the lowest hand.', { name: winnerName })} ` : ''}${tr('Round {n} of {m} done. Pips left in your hand count against you.', { n: table.match.hands.length, m: roundsOf(table) })}`}</p>
           <div className="dom-result-rows">
             {order.map(({ sc, i }) => (
-              <div key={i} className={`dom-result-row${over && i === champ ? ' best' : ''}`}><span>{sideName(table, i)}</span><b>{sc}</b><small>{res.points[i] > 0 ? `+${res.points[i]}` : tr('out')}</small></div>
+              <div key={i} className={`dom-result-row${(over ? i === champ : i === res.winner) ? ' best' : ''}`}><span>{sideName(table, i)}{!over && i === res.winner ? ' 🏆' : ''}</span><b>{sc}</b><small>{res.points[i] > 0 ? `+${res.points[i]}` : tr('out')}</small></div>
             ))}
           </div>
           {over
@@ -1572,7 +1583,7 @@ function HandResult({ table, isHost, act, onLeave }) {
         {!over && <p className="muted">{winnerName ? (teams ? tr('{name} score {n}', { name: winnerName, n: res.points[res.winner] }) : tr('{name} scores {n}', { name: winnerName, n: res.points[res.winner] })) : tr('A tie: no points this hand')}</p>}
         <div className="dom-result-rows">
           {table.match.scores.map((s, i) => (
-            <div key={i} className="dom-result-row"><span>{sideName(table, i)}</span><b>{s}</b>{res.points[i] > 0 && <small>+{res.points[i]}</small>}</div>
+            <div key={i} className={`dom-result-row${(over ? i === table.match.winner : i === res.winner) ? ' best' : ''}`}><span>{sideName(table, i)}{!over && i === res.winner ? ' 🏆' : ''}</span><b>{s}</b>{res.points[i] > 0 && <small>+{res.points[i]}</small>}</div>
           ))}
         </div>
         {over
